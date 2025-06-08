@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
@@ -382,11 +383,13 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
 // Main Component
 export default function NotePad() {
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
   const [inputValue, setInputValue] = useState("")
   const [date, setDate] = useState<Date>(new Date())
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearching, setIsSearching] = useState(false)
@@ -602,24 +605,53 @@ export default function NotePad() {
 
   // 检查用户登录状态
   useEffect(() => {
-    const userId = localStorage.getItem("userId")
-    setIsLoggedIn(!!userId)
-  }, [])
+    const checkAuth = () => {
+      const userId = localStorage.getItem("userId")
+      if (!userId) {
+        // 用户未登录，重定向到登录页面
+        router.push("/login")
+        return
+      }
+      setIsLoggedIn(true)
+      setIsCheckingAuth(false)
+    }
+
+    checkAuth()
+  }, [router])
 
   // 处理用户登出
   const handleLogout = () => {
+    localStorage.removeItem("userId")
     setIsLoggedIn(false)
-    // 可以选择是否在登出后重新加载笔记
-    loadNotes()
+    router.push("/login")
   }
 
-  // 组件加载时获取笔记
+  // 组件加载时获取笔记（仅在已登录时）
   useEffect(() => {
-    loadNotes()
-  }, [])
+    if (isLoggedIn && !isCheckingAuth) {
+      loadNotes()
+    }
+  }, [isLoggedIn, isCheckingAuth])
 
   const totalTodos = notes.reduce((acc, note) => acc + (note.todos?.length || 0), 0)
   const groupedNotes = groupNotesByDate(notes)
+
+  // 如果正在检查认证状态，显示加载界面
+  if (isCheckingAuth) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">正在验证登录状态...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果未登录，不渲染主界面（因为会重定向到登录页面）
+  if (!isLoggedIn) {
+    return null
+  }
 
   return (
     <div className="h-screen flex flex-col">

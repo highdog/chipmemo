@@ -2,7 +2,7 @@
 /* 全局样式 */
 
 /* 重置样式 */
-* {
+view, text, button, input, textarea, image {
   box-sizing: border-box;
 }
 

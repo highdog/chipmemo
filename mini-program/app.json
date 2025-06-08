@@ -4,8 +4,7 @@
     "pages/login/login",
     "pages/notes/notes",
     "pages/note-detail/note-detail",
-    "pages/add-note/add-note",
-    "pages/profile/profile"
+    "pages/note-edit/note-edit"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -33,16 +32,10 @@
         "text": "笔记"
       },
       {
-        "pagePath": "pages/add-note/add-note",
+        "pagePath": "pages/note-edit/note-edit",
         "iconPath": "images/add.png",
         "selectedIconPath": "images/add-active.png",
         "text": "添加"
-      },
-      {
-        "pagePath": "pages/profile/profile",
-        "iconPath": "images/profile.png",
-        "selectedIconPath": "images/profile-active.png",
-        "text": "我的"
       }
     ]
   },

@@ -50,7 +50,11 @@ Page({
     if (isLoggedIn) {
       this.loadDashboardData();
     } else {
-      this.setData({ loading: false });
+      // 用户未登录，跳转到登录页面
+      wx.reLaunch({
+        url: '/pages/login/login'
+      });
+      return;
     }
   },
 
@@ -156,7 +160,7 @@ Page({
     }
     
     wx.switchTab({
-      url: '/pages/add-note/add-note'
+      url: '/pages/note-edit/note-edit'
     });
   },
 
@@ -176,8 +180,10 @@ Page({
       return;
     }
     
-    wx.switchTab({
-      url: '/pages/profile/profile'
+    // 暂时显示提示，因为个人中心页面还未实现
+    wx.showToast({
+      title: '个人中心功能开发中',
+      icon: 'none'
     });
   },
 

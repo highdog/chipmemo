@@ -50,7 +50,7 @@ Page({
     
     // 检查登录状态
     if (!app.globalData.isLoggedIn) {
-      wx.redirectTo({
+      wx.reLaunch({
         url: '/pages/login/login'
       });
       return;
@@ -268,7 +268,7 @@ Page({
   // 跳转到添加笔记
   goToAddNote() {
     wx.switchTab({
-      url: '/pages/add-note/add-note'
+      url: '/pages/note-edit/note-edit'
     });
   },
 

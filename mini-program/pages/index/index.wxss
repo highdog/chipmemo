@@ -339,7 +339,7 @@
   }
 }
 
-.dashboard > * {
+.dashboard > view {
   animation: fadeIn 0.5s ease-out;
 }
 

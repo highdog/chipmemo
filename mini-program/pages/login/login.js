@@ -4,14 +4,14 @@ const util = require('../../utils/util.js');
 
 Page({
   data: {
-    // 表单数据
-    formData: {
+    // 登录表单数据
+    loginForm: {
       email: '',
       password: ''
     },
     
     // 注册表单数据
-    registerData: {
+    registerForm: {
       username: '',
       email: '',
       password: '',
@@ -64,11 +64,11 @@ Page({
   // 清空表单
   clearForm() {
     this.setData({
-      formData: {
+      loginForm: {
         email: '',
         password: ''
       },
-      registerData: {
+      registerForm: {
         username: '',
         email: '',
         password: '',
@@ -90,12 +90,12 @@ Page({
     const email = e.detail.value;
     if (this.data.isLogin) {
       this.setData({
-        'formData.email': email,
+        'loginForm.email': email,
         'errors.email': ''
       });
     } else {
       this.setData({
-        'registerData.email': email,
+        'registerForm.email': email,
         'errors.email': ''
       });
     }
@@ -105,12 +105,12 @@ Page({
     const password = e.detail.value;
     if (this.data.isLogin) {
       this.setData({
-        'formData.password': password,
+        'loginForm.password': password,
         'errors.password': ''
       });
     } else {
       this.setData({
-        'registerData.password': password,
+        'registerForm.password': password,
         'errors.password': ''
       });
     }
@@ -118,14 +118,14 @@ Page({
 
   onUsernameInput(e) {
     this.setData({
-      'registerData.username': e.detail.value,
+      'registerForm.username': e.detail.value,
       'errors.username': ''
     });
   },
 
   onConfirmPasswordInput(e) {
     this.setData({
-      'registerData.confirmPassword': e.detail.value,
+      'registerForm.confirmPassword': e.detail.value,
       'errors.confirmPassword': ''
     });
   },
@@ -145,7 +145,7 @@ Page({
 
   // 表单验证
   validateLoginForm() {
-    const { email, password } = this.data.formData;
+    const { email, password } = this.data.loginForm;
     const errors = {};
     let isValid = true;
 
@@ -172,7 +172,7 @@ Page({
   },
 
   validateRegisterForm() {
-    const { username, email, password, confirmPassword } = this.data.registerData;
+    const { username, email, password, confirmPassword } = this.data.registerForm;
     const errors = {};
     let isValid = true;
 
@@ -217,53 +217,78 @@ Page({
     return isValid;
   },
 
-  // 登录
+  // 处理登录
   async handleLogin() {
     if (!this.validateLoginForm()) {
       return;
     }
 
-    try {
-      this.setData({ loading: true });
-      
-      const { email, password } = this.data.formData;
-      const result = await app.login(email, password);
+    this.setData({ loading: true });
 
+    try {
+      const result = await app.login(this.data.loginForm.email, this.data.loginForm.password);
+      
       if (result.success) {
-        util.showToast('登录成功', 'success');
-        this.redirectToHome();
+        wx.showToast({
+          title: '登录成功',
+          icon: 'success'
+        });
+        
+        // 延迟跳转，让用户看到成功提示
+        setTimeout(() => {
+          this.redirectToHome();
+        }, 1500);
       } else {
-        util.showToast(result.error);
+        wx.showToast({
+          title: result.error || '登录失败',
+          icon: 'none'
+        });
       }
     } catch (error) {
-      console.error('登录失败:', error);
-      util.showToast('登录失败，请重试');
+      console.error('登录错误:', error);
+      wx.showToast({
+        title: '网络错误，请重试',
+        icon: 'none'
+      });
     } finally {
       this.setData({ loading: false });
     }
   },
 
-  // 注册
+  // 处理注册
   async handleRegister() {
     if (!this.validateRegisterForm()) {
       return;
     }
 
+    this.setData({ loading: true });
+
     try {
-      this.setData({ loading: true });
-      
-      const { username, email, password } = this.data.registerData;
+      const { username, email, password } = this.data.registerForm;
       const result = await app.register(username, email, password);
 
       if (result.success) {
-        util.showToast('注册成功', 'success');
-        this.redirectToHome();
+        wx.showToast({
+          title: '注册成功',
+          icon: 'success'
+        });
+        
+        // 延迟跳转，让用户看到成功提示
+        setTimeout(() => {
+          this.redirectToHome();
+        }, 1500);
       } else {
-        util.showToast(result.error);
+        wx.showToast({
+          title: result.error || '注册失败',
+          icon: 'none'
+        });
       }
     } catch (error) {
-      console.error('注册失败:', error);
-      util.showToast('注册失败，请重试');
+      console.error('注册错误:', error);
+      wx.showToast({
+        title: '网络错误，请重试',
+        icon: 'none'
+      });
     } finally {
       this.setData({ loading: false });
     }

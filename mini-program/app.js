@@ -70,9 +70,9 @@ App({
   },
 
   // 登录
-  async login(email, password) {
+  async login(usernameOrEmail, password) {
     try {
-      const result = await api.login({ email, password });
+      const result = await api.login({ usernameOrEmail, password });
       
       if (result.success) {
         const { token, user } = result.data;
@@ -80,13 +80,14 @@ App({
         // 保存到本地存储
         wx.setStorageSync('auth_token', token);
         wx.setStorageSync('user_info', user);
+        wx.setStorageSync('userId', user.id);
         
         // 更新全局状态
         this.globalData.token = token;
         this.globalData.userInfo = user;
         this.globalData.isLoggedIn = true;
         
-        return { success: true };
+        return { success: true, user };
       } else {
         return { success: false, error: result.error };
       }
@@ -107,13 +108,14 @@ App({
         // 保存到本地存储
         wx.setStorageSync('auth_token', token);
         wx.setStorageSync('user_info', user);
+        wx.setStorageSync('userId', user.id);
         
         // 更新全局状态
         this.globalData.token = token;
         this.globalData.userInfo = user;
         this.globalData.isLoggedIn = true;
         
-        return { success: true };
+        return { success: true, user };
       } else {
         return { success: false, error: result.error };
       }
@@ -128,6 +130,7 @@ App({
     // 清除本地存储
     wx.removeStorageSync('auth_token');
     wx.removeStorageSync('user_info');
+    wx.removeStorageSync('userId');
     
     // 清除全局状态
     this.globalData.token = null;

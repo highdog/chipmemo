@@ -43,6 +43,14 @@ Page({
   },
 
   onLoad(options) {
+    // 检查登录状态
+    if (!app.globalData.isLoggedIn) {
+      wx.reLaunch({
+        url: '/pages/login/login'
+      });
+      return;
+    }
+    
     const { id } = options;
     
     if (id) {

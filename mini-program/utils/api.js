@@ -5,7 +5,7 @@ const app = getApp();
 
 class ApiClient {
   constructor() {
-    this.baseUrl = 'http://localhost:3001/api'; // 开发环境
+    this.baseUrl = 'https://tcb-api.tencentcloudapi.com/api'; // 生产环境
     this.timeout = 10000;
   }
 

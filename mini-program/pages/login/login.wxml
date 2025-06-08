@@ -6,7 +6,7 @@
       <text class="back-icon">‹</text>
     </view>
     <view class="logo-section">
-      <image class="logo" src="/images/logo.png" mode="aspectFit"></image>
+      <view class="logo-placeholder">📝</view>
       <text class="app-name">笔记本</text>
     </view>
   </view>
@@ -37,7 +37,7 @@
             class="form-input {{errors.email ? 'error' : ''}}"
             type="text"
             placeholder="请输入邮箱地址"
-            value="{{formData.email}}"
+            value="{{loginForm.email}}"
             bindinput="onEmailInput"
             maxlength="50"
           />
@@ -53,7 +53,7 @@
             class="form-input {{errors.password ? 'error' : ''}}"
             type="{{showPassword ? 'text' : 'password'}}"
             placeholder="请输入密码"
-            value="{{formData.password}}"
+            value="{{loginForm.password}}"
             bindinput="onPasswordInput"
             maxlength="20"
           />
@@ -110,7 +110,7 @@
             class="form-input {{errors.username ? 'error' : ''}}"
             type="text"
             placeholder="请输入用户名"
-            value="{{registerData.username}}"
+            value="{{registerForm.username}}"
             bindinput="onUsernameInput"
             maxlength="20"
           />
@@ -126,7 +126,7 @@
             class="form-input {{errors.email ? 'error' : ''}}"
             type="text"
             placeholder="请输入邮箱地址"
-            value="{{registerData.email}}"
+            value="{{registerForm.email}}"
             bindinput="onEmailInput"
             maxlength="50"
           />
@@ -142,7 +142,7 @@
             class="form-input {{errors.password ? 'error' : ''}}"
             type="{{showPassword ? 'text' : 'password'}}"
             placeholder="请输入密码（至少6位）"
-            value="{{registerData.password}}"
+            value="{{registerForm.password}}"
             bindinput="onPasswordInput"
             maxlength="20"
           />
@@ -161,7 +161,7 @@
             class="form-input {{errors.confirmPassword ? 'error' : ''}}"
             type="{{showConfirmPassword ? 'text' : 'password'}}"
             placeholder="请再次输入密码"
-            value="{{registerData.confirmPassword}}"
+            value="{{registerForm.confirmPassword}}"
             bindinput="onConfirmPasswordInput"
             maxlength="20"
           />
