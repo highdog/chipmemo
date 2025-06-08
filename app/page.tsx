@@ -540,7 +540,18 @@ export default function NotePad() {
     setIsSearching(true)
 
     try {
-      const searchResults = await searchNotes(term)
+      let searchResults: Note[]
+      
+      // 检查是否是标签搜索（以#开头）
+      if (term.startsWith('#')) {
+        const tag = term.substring(1) // 移除#前缀
+        setCurrentTag(tag) // 设置当前标签
+        searchResults = await searchNotesByTag(tag)
+      } else {
+        setCurrentTag("") // 清除当前标签
+        searchResults = await searchNotes(term)
+      }
+      
       setNotes(searchResults)
     } catch (error) {
       toast({
