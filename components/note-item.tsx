@@ -60,7 +60,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick }: NoteItemPro
   const completedTodos = note.todos?.filter((todo) => todo.completed).length || 0
 
   return (
-    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-white">
+    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
       <div className="flex justify-between items-start mb-2">
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
@@ -108,7 +108,25 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick }: NoteItemPro
           </Button>
         </div>
       </div>
-      <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightSearchTerm(note.content) }} />
+      <div>
+        <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightSearchTerm(note.content) }} />
+        {note.imageUrl && note.imageUrl.trim() !== "" && (
+          <div className="mt-2">
+            <img 
+              src={note.imageUrl} 
+              alt="笔记图片" 
+              className="rounded-md max-w-full max-h-96 object-contain border shadow-sm" 
+              onError={(e) => {
+                console.error("图片加载失败:", note.imageUrl);
+                e.currentTarget.style.display = 'none';
+              }}
+              onLoad={(e) => {
+                console.log("图片加载成功:", note.imageUrl);
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

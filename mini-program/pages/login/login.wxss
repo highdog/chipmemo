@@ -1,0 +1,391 @@
+/* pages/login/login.wxss */
+
+.container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 头部样式 */
+.header {
+  position: relative;
+  padding: 60rpx 40rpx 40rpx;
+  display: flex;
+  align-items: center;
+}
+
+.back-btn {
+  position: absolute;
+  left: 40rpx;
+  top: 60rpx;
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  backdrop-filter: blur(10rpx);
+}
+
+.back-icon {
+  font-size: 36rpx;
+  color: #fff;
+  font-weight: bold;
+}
+
+.logo-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 40rpx;
+}
+
+.logo {
+  width: 100rpx;
+  height: 100rpx;
+  margin-bottom: 20rpx;
+}
+
+.app-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.3);
+}
+
+/* 表单容器 */
+.form-container {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 40rpx 40rpx 0 0;
+  margin-top: 60rpx;
+  padding: 60rpx 40rpx 40rpx;
+  position: relative;
+  box-shadow: 0 -10rpx 30rpx rgba(0, 0, 0, 0.1);
+}
+
+/* 模式切换标签 */
+.mode-tabs {
+  display: flex;
+  background-color: #f8f9fa;
+  border-radius: 16rpx;
+  padding: 8rpx;
+  margin-bottom: 40rpx;
+  position: relative;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.tab.active {
+  background-color: #fff;
+  color: #007aff;
+  box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.15);
+}
+
+/* 表单标题 */
+.form-title {
+  text-align: center;
+  margin-bottom: 50rpx;
+}
+
+.form-title text:first-child {
+  display: block;
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 12rpx;
+}
+
+.form-subtitle {
+  font-size: 28rpx;
+  color: #666;
+}
+
+/* 表单组 */
+.form-group {
+  margin-bottom: 40rpx;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: #f8f9fa;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #007aff;
+  background-color: #fff;
+  box-shadow: 0 0 0 6rpx rgba(0, 122, 255, 0.1);
+}
+
+.form-input {
+  flex: 1;
+  padding: 28rpx 20rpx 28rpx 80rpx;
+  font-size: 28rpx;
+  background-color: transparent;
+  border: none;
+  outline: none;
+}
+
+.form-input.error {
+  color: #dc3545;
+}
+
+.form-input::placeholder {
+  color: #999;
+}
+
+.input-icon {
+  position: absolute;
+  left: 24rpx;
+  font-size: 32rpx;
+  color: #666;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 24rpx;
+  padding: 12rpx;
+  font-size: 28rpx;
+  color: #666;
+  cursor: pointer;
+}
+
+.form-error {
+  display: block;
+  color: #dc3545;
+  font-size: 24rpx;
+  margin-top: 12rpx;
+  margin-left: 20rpx;
+}
+
+/* 表单选项 */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40rpx;
+}
+
+.quick-login,
+.forgot-password {
+  font-size: 26rpx;
+  color: #007aff;
+  padding: 12rpx;
+}
+
+.quick-login:active,
+.forgot-password:active {
+  opacity: 0.7;
+}
+
+/* 按钮样式 */
+.btn-block {
+  margin-bottom: 30rpx;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #007aff, #5ac8fa);
+  border: none;
+  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(2rpx);
+  box-shadow: 0 4rpx 12rpx rgba(0, 122, 255, 0.3);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 2rpx solid #e1e5e9;
+  color: #333;
+}
+
+/* 其他登录方式 */
+.other-login {
+  margin-top: 40rpx;
+}
+
+.divider {
+  text-align: center;
+  margin-bottom: 30rpx;
+  position: relative;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1rpx;
+  background-color: #e1e5e9;
+}
+
+.divider text {
+  background-color: #fff;
+  padding: 0 20rpx;
+  color: #999;
+  font-size: 24rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* 用户协议 */
+.agreement {
+  text-align: center;
+  margin-top: 30rpx;
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.6;
+}
+
+.agreement .link {
+  color: #007aff;
+}
+
+/* 底部装饰 */
+.footer {
+  position: absolute;
+  bottom: 60rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.decoration-dots {
+  display: flex;
+  gap: 16rpx;
+}
+
+.dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 加载状态 */
+.btn-disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* 动画效果 */
+@keyframes slideUp {
+  from {
+    transform: translateY(100rpx);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.form-container {
+  animation: slideUp 0.5s ease-out;
+}
+
+.form-group {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.form-group:nth-child(1) { animation-delay: 0.1s; }
+.form-group:nth-child(2) { animation-delay: 0.2s; }
+.form-group:nth-child(3) { animation-delay: 0.3s; }
+.form-group:nth-child(4) { animation-delay: 0.4s; }
+
+/* 响应式调整 */
+@media (max-width: 750rpx) {
+  .form-container {
+    padding: 40rpx 30rpx;
+  }
+  
+  .header {
+    padding: 40rpx 30rpx 30rpx;
+  }
+  
+  .back-btn {
+    left: 30rpx;
+    top: 40rpx;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .form-container {
+    background-color: #1c1c1e;
+  }
+  
+  .form-title text:first-child {
+    color: #fff;
+  }
+  
+  .form-subtitle {
+    color: #999;
+  }
+  
+  .input-wrapper {
+    background-color: #2c2c2e;
+  }
+  
+  .input-wrapper:focus-within {
+    background-color: #3a3a3c;
+  }
+  
+  .form-input {
+    color: #fff;
+  }
+  
+  .input-icon {
+    color: #999;
+  }
+  
+  .password-toggle {
+    color: #999;
+  }
+  
+  .btn-outline {
+    border-color: #3a3a3c;
+    color: #fff;
+  }
+  
+  .divider::before {
+    background-color: #3a3a3c;
+  }
+  
+  .divider text {
+    background-color: #1c1c1e;
+  }
+  
+  .agreement {
+    color: #999;
+  }
+}

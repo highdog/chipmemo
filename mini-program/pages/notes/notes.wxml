@@ -1,0 +1,237 @@
+<!--pages/notes/notes.wxml-->
+<view class="container">
+  <!-- 头部工具栏 -->
+  <view class="header-toolbar">
+    <view class="toolbar-left">
+      <text class="page-title">{{selectionMode ? '选择笔记' : '我的笔记'}}</text>
+      <text class="notes-count" wx:if="{{!selectionMode}}">({{pagination.total}})</text>
+    </view>
+    
+    <view class="toolbar-right">
+      <!-- 搜索按钮 -->
+      <view class="tool-btn" bindtap="toggleSearch" wx:if="{{!selectionMode}}">
+        <text class="tool-icon">🔍</text>
+      </view>
+      
+      <!-- 筛选按钮 -->
+      <view class="tool-btn" bindtap="toggleFilter" wx:if="{{!selectionMode}}">
+        <text class="tool-icon">🔽</text>
+      </view>
+      
+      <!-- 选择模式按钮 -->
+      <view class="tool-btn" bindtap="toggleSelectionMode" wx:if="{{!selectionMode && notes.length > 0}}">
+        <text class="tool-icon">☑️</text>
+      </view>
+      
+      <!-- 取消选择 -->
+      <view class="tool-btn" bindtap="toggleSelectionMode" wx:if="{{selectionMode}}">
+        <text class="tool-text">取消</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 搜索栏 -->
+  <view class="search-bar {{showSearch ? 'show' : ''}}">
+    <view class="search-input-wrapper">
+      <input
+        class="search-input"
+        type="text"
+        placeholder="搜索笔记内容或标签"
+        value="{{searchQuery}}"
+        bindinput="onSearchInput"
+        focus="{{showSearch}}"
+      />
+      <view class="search-icon">🔍</view>
+      <view class="clear-btn" bindtap="clearSearch" wx:if="{{searchQuery}}">
+        <text>✕</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 筛选面板 -->
+  <view class="filter-panel {{showFilter ? 'show' : ''}}">
+    <!-- 标签筛选 -->
+    <view class="filter-section">
+      <text class="filter-title">标签筛选</text>
+      <view class="tag-list">
+        <view 
+          class="filter-tag {{selectedTag === '' ? 'active' : ''}}"
+          bindtap="selectTag"
+          data-tag=""
+        >
+          全部
+        </view>
+        <view 
+          class="filter-tag {{selectedTag === item ? 'active' : ''}}"
+          wx:for="{{allTags}}"
+          wx:key="*this"
+          bindtap="selectTag"
+          data-tag="{{item}}"
+        >
+          {{item}}
+        </view>
+      </view>
+    </view>
+    
+    <!-- 排序选项 -->
+    <view class="filter-section">
+      <text class="filter-title">排序方式</text>
+      <view class="sort-list">
+        <view 
+          class="sort-option {{sortBy === item.key && sortOrder === item.order ? 'active' : ''}}"
+          wx:for="{{sortOptions}}"
+          wx:key="key"
+          bindtap="selectSort"
+          data-key="{{item.key}}"
+          data-order="{{item.order}}"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </view>
+    
+    <!-- 其他选项 -->
+    <view class="filter-section">
+      <view class="filter-option" bindtap="toggleArchived">
+        <text>显示已归档</text>
+        <view class="toggle {{showArchived ? 'active' : ''}}">
+          <view class="toggle-thumb"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 选择模式工具栏 -->
+  <view class="selection-toolbar" wx:if="{{selectionMode}}">
+    <view class="selection-info">
+      <text>已选择 {{selectedNotes.length}} 项</text>
+    </view>
+    <view class="selection-actions">
+      <button class="btn btn-outline btn-small" bindtap="toggleSelectAll">
+        {{selectedNotes.length === notes.length ? '取消全选' : '全选'}}
+      </button>
+      <button 
+        class="btn btn-danger btn-small" 
+        bindtap="batchDelete"
+        disabled="{{selectedNotes.length === 0}}"
+      >
+        删除
+      </button>
+    </view>
+  </view>
+
+  <!-- 笔记列表 -->
+  <scroll-view 
+    class="notes-scroll"
+    scroll-y
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onPullDownRefresh"
+    bindscrolltolower="onReachBottom"
+  >
+    <!-- 加载状态 -->
+    <view wx:if="{{loading}}" class="loading">
+      <view class="loading-spinner"></view>
+      <text>加载中...</text>
+    </view>
+
+    <!-- 笔记列表 -->
+    <view wx:elif="{{notes.length > 0}}" class="notes-list">
+      <view 
+        class="note-item {{selectionMode ? 'selection-mode' : ''}} {{selectedNotes.includes(item._id) ? 'selected' : ''}}"
+        wx:for="{{notes}}"
+        wx:key="_id"
+        data-id="{{item._id}}"
+        data-title="{{item.title}}"
+        bindtap="goToNoteDetail"
+      >
+        <!-- 选择框 -->
+        <view class="selection-checkbox" wx:if="{{selectionMode}}">
+          <view class="checkbox {{selectedNotes.includes(item._id) ? 'checked' : ''}}">
+            <text wx:if="{{selectedNotes.includes(item._id)}}">✓</text>
+          </view>
+        </view>
+        
+        <!-- 笔记内容 -->
+        <view class="note-content">
+          <view class="note-header">
+            <text class="note-title">{{item.title || '无标题'}}</text>
+            <text class="note-date">{{item.formattedDate}}</text>
+          </view>
+          
+          <view class="note-preview" wx:if="{{item.truncatedContent}}">
+            <text>{{item.truncatedContent}}</text>
+          </view>
+          
+          <view class="note-footer">
+            <!-- 标签 -->
+            <view class="note-tags" wx:if="{{item.tags && item.tags.length > 0}}">
+              <text 
+                class="tag tag-small"
+                wx:for="{{item.tags}}"
+                wx:for-item="tag"
+                wx:key="*this"
+              >
+                {{tag}}
+              </text>
+            </view>
+            
+            <!-- 操作按钮 -->
+            <view class="note-actions" wx:if="{{!selectionMode}}">
+              <view 
+                class="action-btn"
+                bindtap="shareNote"
+                data-id="{{item._id}}"
+                data-title="{{item.title}}"
+              >
+                <text>📤</text>
+              </view>
+              <view 
+                class="action-btn delete-btn"
+                bindtap="deleteNote"
+                data-id="{{item._id}}"
+                data-title="{{item.title}}"
+              >
+                <text>🗑️</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view wx:elif="{{!loading}}" class="empty-state">
+      <view class="empty-icon">📝</view>
+      <text class="empty-text">
+        {{searchQuery ? '没有找到相关笔记' : '还没有笔记'}}
+      </text>
+      <text class="empty-subtext">
+        {{searchQuery ? '试试其他关键词' : '点击右下角按钮开始记录'}}
+      </text>
+      <button 
+        class="btn btn-primary margin-top"
+        bindtap="goToAddNote"
+        wx:if="{{!searchQuery}}"
+      >
+        创建第一篇笔记
+      </button>
+    </view>
+
+    <!-- 加载更多 -->
+    <view wx:if="{{loadingMore}}" class="loading-more">
+      <view class="loading-spinner"></view>
+      <text>加载更多...</text>
+    </view>
+    
+    <!-- 没有更多 -->
+    <view wx:elif="{{notes.length > 0 && !pagination.hasMore}}" class="no-more">
+      <text>没有更多笔记了</text>
+    </view>
+  </scroll-view>
+
+  <!-- 浮动添加按钮 -->
+  <view class="fab" bindtap="goToAddNote" wx:if="{{!selectionMode}}">
+    <text class="fab-icon">✏️</text>
+  </view>
+</view>

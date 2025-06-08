@@ -1,0 +1,176 @@
+<!--pages/note-edit/note-edit.wxml-->
+<view class="note-edit-container">
+  <!-- 头部工具栏 -->
+  <view class="header-toolbar">
+    <view class="header-left">
+      <button class="back-btn" bindtap="goBack">
+        <text class="icon">←</text>
+      </button>
+    </view>
+    
+    <view class="header-center">
+      <text class="page-title">{{isNew ? '新建笔记' : '编辑笔记'}}</text>
+      <view wx:if="{{lastSaveTime}}" class="save-status">
+        <text class="save-time">{{lastSaveTime}} 已保存</text>
+      </view>
+    </view>
+    
+    <view class="header-right">
+      <button class="preview-btn" bindtap="previewNote">
+        <text class="icon">👁</text>
+      </button>
+      <button class="save-btn" 
+              bindtap="saveNote" 
+              disabled="{{saving}}"
+              class="{{saving ? 'saving' : ''}}">
+        <text wx:if="{{saving}}">保存中...</text>
+        <text wx:else>保存</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 编辑区域 -->
+  <scroll-view wx:else class="edit-scroll" scroll-y enhanced>
+    <view class="edit-content">
+      <!-- 标题输入 -->
+      <view class="title-section">
+        <input class="title-input {{titleFocused ? 'focused' : ''}}" 
+               value="{{title}}" 
+               placeholder="请输入标题"
+               bindinput="onTitleInput"
+               bindfocus="onTitleFocus"
+               bindblur="onTitleBlur"
+               maxlength="100"></input>
+        <view class="title-counter">
+          <text>{{title.length}}/100</text>
+        </view>
+      </view>
+
+      <!-- 标签区域 -->
+      <view class="tags-section">
+        <view class="section-header">
+          <text class="section-title">标签</text>
+          <button class="add-tag-btn" bindtap="showTagInput">+ 添加</button>
+        </view>
+        
+        <!-- 当前标签 -->
+        <view wx:if="{{tags.length > 0}}" class="current-tags">
+          <view wx:for="{{tags}}" wx:key="*this" class="tag-item">
+            <text class="tag-text">{{item}}</text>
+            <button class="remove-tag-btn" bindtap="removeTag" data-index="{{index}}">×</button>
+          </view>
+        </view>
+        
+        <!-- 标签输入 -->
+        <view wx:if="{{showTagInput}}" class="tag-input-section">
+          <input class="tag-input" 
+                 value="{{tagInput}}" 
+                 placeholder="输入标签名称"
+                 bindinput="onTagInput"
+                 maxlength="20"></input>
+          <button class="confirm-tag-btn" bindtap="addTag">确定</button>
+          <button class="cancel-tag-btn" bindtap="hideTagInput">取消</button>
+        </view>
+        
+        <!-- 推荐标签 -->
+        <view wx:if="{{availableTags.length > 0 && !showTagInput}}" class="available-tags">
+          <text class="available-title">推荐标签:</text>
+          <view class="available-tags-list">
+            <text wx:for="{{availableTags}}" 
+                  wx:key="*this" 
+                  class="available-tag"
+                  bindtap="selectAvailableTag"
+                  data-tag="{{item}}">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 内容输入 -->
+      <view class="content-section">
+        <view class="section-header">
+          <text class="section-title">内容</text>
+          <view class="content-tools">
+            <button class="tool-btn" bindtap="toggleToolbar">
+              <text class="icon">🔧</text>
+            </button>
+            <text class="word-count">{{content.length}} 字</text>
+          </view>
+        </view>
+        
+        <textarea class="content-textarea {{contentFocused ? 'focused' : ''}}" 
+                  value="{{content}}" 
+                  placeholder="请输入笔记内容..."
+                  bindinput="onContentInput"
+                  bindfocus="onContentFocus"
+                  bindblur="onContentBlur"
+                  auto-height
+                  maxlength="10000"
+                  cursor="{{cursorPosition}}"></textarea>
+      </view>
+
+      <!-- 编辑工具栏 -->
+      <view wx:if="{{showToolbar}}" class="toolbar-section">
+        <view class="toolbar">
+          <button wx:for="{{toolbarItems}}" 
+                  wx:key="key" 
+                  class="toolbar-btn"
+                  bindtap="handleToolbarAction"
+                  data-action="{{item.key}}">
+            <text class="toolbar-icon">{{item.icon}}</text>
+            <text class="toolbar-text">{{item.title}}</text>
+          </button>
+        </view>
+      </view>
+
+      <!-- 设置区域 -->
+      <view class="settings-section">
+        <view class="setting-item">
+          <text class="setting-label">自动保存</text>
+          <switch class="setting-switch" 
+                  checked="{{autoSaveEnabled}}"
+                  bindchange="toggleAutoSave"></switch>
+        </view>
+        
+        <view class="setting-item">
+          <button class="clear-btn" bindtap="clearContent">
+            <text class="icon">🗑️</text>
+            <text>清空内容</text>
+          </button>
+        </view>
+      </view>
+
+      <!-- 底部间距 -->
+      <view class="bottom-spacer"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 更改提示 -->
+  <view wx:if="{{hasChanges}}" class="changes-indicator">
+    <view class="changes-dot"></view>
+    <text class="changes-text">有未保存的更改</text>
+  </view>
+
+  <!-- 快捷操作栏 -->
+  <view class="quick-actions">
+    <button class="quick-btn" bindtap="chooseImage">
+      <text class="icon">📷</text>
+      <text class="text">插入图片</text>
+    </button>
+    
+    <button class="quick-btn" bindtap="showTagInput">
+      <text class="icon">🏷️</text>
+      <text class="text">添加标签</text>
+    </button>
+    
+    <button class="quick-btn" bindtap="previewNote">
+      <text class="icon">👁️</text>
+      <text class="text">预览</text>
+    </button>
+  </view>
+</view>

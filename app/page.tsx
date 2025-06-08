@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useTheme } from "next-themes"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,11 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, RefreshCw, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, Circle, Home } from "lucide-react"
-import { NoteGroup } from "@/components/note-group"
-import { SearchBar } from "@/components/search-bar"
-import { TodoList } from "@/components/todo-list"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, Circle, Home, Sun, Moon } from "lucide-react"
+// 由于NoteGroup组件已在本文件中定义,移除此导入
+// 由于组件已在本文件中定义,移除重复导入
+// 由于TodoList组件已在本文件中定义,移除此导入
 import { TagContent } from "@/components/tag-content"
+import { UserNav } from "@/components/user-nav"
 import {
   getNotes,
   addNote,
@@ -62,7 +64,7 @@ function SearchBar({
     // 只有当按下Ctrl+Enter或Command+Enter时才提交
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault()
-      handleAddNote()
+      onSearch(inputValue)
     }
   }
 
@@ -157,7 +159,7 @@ function NoteItem({
   const completedTodos = note.todos?.filter((todo) => todo.completed).length || 0
 
   return (
-    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-white">
+    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
       <div className="flex justify-between items-start mb-2">
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
@@ -186,14 +188,14 @@ function NoteItem({
                   >
                     #{tag}
                   </Badge>
-                ))}
+                    ))}
                 {note.tags.length > 4 && (
                   <Badge variant="outline" className="text-xs">
                     +{note.tags.length - 4}
                   </Badge>
-                )}
-              </div>
-            </div>
+                    )}
+                              </div>
+                </div>
           )}
           <Button
             variant="ghost"
@@ -345,12 +347,12 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
                 </label>
                 {item.todo.completed ? (
                   <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                ) : (
+                    ) : (
                   <Circle className="h-4 w-4 text-muted-foreground mt-0.5" />
-                )}
-              </div>
+                    )}
+                              </div>
             ))}
-          </div>
+              </div>
         </ScrollArea>
       ) : (
         <div className="text-center py-4 text-sm text-muted-foreground">
@@ -364,13 +366,13 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>进度</span>
             <span>{Math.round((completedCount / totalCount) * 100)}%</span>
-          </div>
+              </div>
           <div className="w-full bg-muted rounded-full h-1.5 mt-1">
             <div
               className="bg-primary h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${(completedCount / totalCount) * 100}%` }}
             />
-          </div>
+              </div>
         </div>
       )}
     </div>
@@ -379,15 +381,18 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
 
 // Main Component
 export default function NotePad() {
+  const { theme, setTheme } = useTheme()
   const [notes, setNotes] = useState<Note[]>([])
   const [inputValue, setInputValue] = useState("")
   const [date, setDate] = useState<Date>(new Date())
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [currentTag, setCurrentTag] = useState<string>("") // 当前搜索的标签
+  const [selectedImage, setSelectedImage] = useState<string | null>(null) // 选择的图片
+  const [isLoggedIn, setIsLoggedIn] = useState(false) // 用户登录状态
 
   // 按日期分组笔记
   const groupNotesByDate = (notes: Note[]) => {
@@ -498,41 +503,63 @@ export default function NotePad() {
   }
 
   // 刷新笔记
-  const refreshNotes = async () => {
-    setIsRefreshing(true)
-    try {
-      const fetchedNotes = searchTerm ? await searchNotes(searchTerm) : await getNotes()
-      setNotes(fetchedNotes)
+
+
+  // 处理图片上传
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
       toast({
-        title: "刷新成功",
-        description: "笔记已更新",
-      })
-    } catch (error) {
-      toast({
-        title: "刷新失败",
-        description: "无法刷新笔记",
+        title: "上传失败",
+        description: "请选择图片文件",
         variant: "destructive",
       })
-    } finally {
-      setIsRefreshing(false)
+      return
     }
+
+    // 检查文件大小（限制为5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "上传失败",
+        description: "图片大小不能超过5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      setSelectedImage(event.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 移除已选择的图片
+  const handleRemoveImage = () => {
+    setSelectedImage(null)
   }
 
   // 添加笔记
   const handleAddNote = async () => {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() && !selectedImage) return
 
     setIsAdding(true)
     try {
-      const result = await addNote(inputValue, date.toISOString())
+      const result = await addNote(inputValue, date.toISOString(), selectedImage || undefined)
       if (result.success) {
         setInputValue("")
+        setSelectedImage(null) // 清除已选择的图片
         // 如果有搜索词，重新搜索；否则重新加载
         if (searchTerm) {
           await handleSearch(searchTerm)
         } else {
           await loadNotes()
         }
+        // 强制更新日期以触发TodoList重新加载
+        setDate(new Date(date))
         toast({
           title: "添加成功",
           description: "笔记已保存到服务器",
@@ -573,7 +600,20 @@ export default function NotePad() {
     }
   }
 
-  // 初始加载
+  // 检查用户登录状态
+  useEffect(() => {
+    const userId = localStorage.getItem("userId")
+    setIsLoggedIn(!!userId)
+  }, [])
+
+  // 处理用户登出
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    // 可以选择是否在登出后重新加载笔记
+    loadNotes()
+  }
+
+  // 组件加载时获取笔记
   useEffect(() => {
     loadNotes()
   }, [])
@@ -582,122 +622,191 @@ export default function NotePad() {
   const groupedNotes = groupNotesByDate(notes)
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="border-b p-4">
-        <div className="flex justify-between items-center gap-4">
-          <h1 className="text-2xl font-bold">网页记事本</h1>
-
-          {/* 搜索框 */}
-          <div className="flex-1 flex justify-center">
-            <SearchBar onSearch={handleSearch} onClearSearch={handleClearSearch} searchTerm={searchTerm} />
-          </div>
-
-          <Button variant="outline" size="sm" onClick={refreshNotes} disabled={isRefreshing}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
+    <div className="h-screen flex flex-col">
+      <Toaster />
+      
+      {/* 导航栏 - 固定在顶部 */}
+      <header className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto py-3 px-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold">笔记应用</h1>
+              </div>
+          <UserNav onLogout={handleLogout} />
         </div>
-
-        {/* 搜索状态提示 */}
-        {searchTerm && (
-          <div className="mt-2 text-sm text-muted-foreground">
-            搜索结果: "{searchTerm}" ({notes.length} 条笔记)
-          </div>
-        )}
       </header>
+      
+      {/* 搜索栏区域 - 固定在顶部 */}
+      <div className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto p-4 max-w-7xl">
+          <div className="flex justify-between items-center gap-4">
+            {/* 搜索框移到左侧原标题位置 */}
+            <div className="flex-1">
+              <SearchBar onSearch={handleSearch} onClearSearch={handleClearSearch} searchTerm={searchTerm} />
+                </div>
 
-      <main className="flex flex-1 overflow-hidden">
-        {/* 记事本区域 (3/4宽度) */}
-        <div className="w-full md:w-3/4 flex flex-col border-r">
-          {/* 标签内容区域 - 仅在标签搜索时显示 */}
-          {currentTag && (
-            <div className="border-b p-4">
-              <TagContent tag={currentTag} />
-            </div>
+            {/* 明暗主题切换按钮 */}
+            <Button variant="outline" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              {theme === 'dark' ? (
+                <Sun className="h-4 w-4 mr-2" />
+                  ) : (
+                <Moon className="h-4 w-4 mr-2" />
+                  )}
+              {theme === 'dark' ? '浅色' : '深色'}
+            </Button>
+              </div>
+
+          {/* 搜索状态提示 */}
+          {searchTerm && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              搜索结果: "{searchTerm}" ({notes.length} 条笔记)
+                </div>
           )}
-          
-          {/* 笔记显示区域 */}
-          <ScrollArea className="flex-1 p-4">
-            {isLoading || isSearching ? (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
-              </div>
-            ) : groupedNotes.length > 0 ? (
-              <div className="space-y-6">
-                {groupedNotes.map(([dateKey, groupNotes]) => (
-                  <NoteGroup
-                    key={dateKey}
-                    date={dateKey}
-                    notes={groupNotes}
-                    onDelete={handleNoteDelete}
-                    searchTerm={searchTerm}
-                    onTagClick={handleTagClick}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center text-muted-foreground">
-                {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
-              </div>
-            )}
-          </ScrollArea>
-
-          {/* 输入区域 */}
-          <div className="p-4 border-t">
-            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <Info className="h-3 w-3" />
-              <span>使用 #标签 创建标签，#todo 创建待办事项（支持中英文）</span>
-            </div>
-            <div className="flex gap-2">
-              <Textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="输入新笔记... (使用 #学习 #工作 #todo 等)"
-                className="flex-1 min-h-[80px] resize-none"
-                disabled={isAdding}
-              />
-              <Button onClick={handleAddNote} disabled={isAdding || !inputValue.trim()}>
-                {isAdding ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    保存中
-                  </>
-                ) : (
-                  "添加"
-                )}
-              </Button>
-            </div>
-          </div>
         </div>
+      </div>
 
-        {/* 日历和Todo区域 (1/4宽度) */}
-        <div className="hidden md:block w-1/4 p-4">
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={(date) => date && setDate(date)}
-            className="rounded-md border"
-          />
-          <div className="mt-4 text-center">
-            <p className="font-medium">已选择日期: {formatDateShort(date)}</p>
-            <p className="text-sm text-muted-foreground mt-1">添加的笔记将使用此日期</p>
-          </div>
+      <main className="flex-1 flex overflow-hidden">
+        <div className="container mx-auto max-w-7xl flex-1 flex flex-col">
+          <div className="flex flex-1 overflow-hidden">
+            {/* 记事本区域 (3/4宽度) */}
+            <div className="w-full md:w-3/4 flex flex-col border-r bg-background">
+              {/* 标签内容区域 - 仅在标签搜索时显示 */}
+              {currentTag && (
+                <div className="border-b p-4 flex-shrink-0">
+                  <TagContent tag={currentTag} />
+                </div>
+              )}
+              
+              {/* 笔记显示区域 - 占满剩余空间并可滚动 */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-4">
+                  {isLoading || isSearching ? (
+                    <div className="h-full flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
+                    </div>
+                  ) : groupedNotes.length > 0 ? (
+                    <div className="space-y-6">
+                      {groupedNotes.map(([dateKey, groupNotes]) => (
+                        <NoteGroup
+                          key={dateKey}
+                          date={dateKey}
+                          notes={groupNotes}
+                          onDelete={handleNoteDelete}
+                          searchTerm={searchTerm}
+                          onTagClick={handleTagClick}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground">
+                      {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 固定在笔记区域底部的输入区域 */}
+              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-4 shadow-lg">
+                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Info className="h-3 w-3" />
+                  <span>使用 #标签 创建标签，#todo 创建待办事项（支持中英文）</span>
+                                </div>
+                <div className="flex flex-col space-y-2">
+                  <Textarea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="输入新笔记... (使用 #学习 #工作 #todo 等)"
+                    className="flex-1 min-h-[80px] resize-none"
+                    disabled={isAdding}
+                      />
+            
+                  {/* 图片上传和预览区域 */}
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="image-upload" className="cursor-pointer">
+                      <div className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-primary transition-colors">
+                        <Image className="h-4 w-4" />
+                        <span>添加图片</span>
+                                      </div>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                          />
+                    </label>
+                    
+                    {selectedImage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        className="h-6 px-2 text-xs text-destructive"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        移除图片
+                      </Button>
+                        )}
+                                  </div>
+                  
+                  {/* 图片预览 */}
+                  {selectedImage && (
+                    <div className="relative border rounded-md p-2 mt-2">
+                      <img 
+                        src={selectedImage} 
+                        alt="预览图片" 
+                        className="max-h-48 object-contain mx-auto" 
+                          />
+                                    </div>
+                      )}
+                  
+                  <div className="flex justify-end">
+                    <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && !selectedImage)}>
+                      {isAdding ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          保存中
+                        </>
+                          ) : (
+                        "添加"
+                          )}
+                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                </div>
 
-          <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium mb-1">统计信息</p>
-            <p className="text-sm text-muted-foreground">总笔记数: {notes.length}</p>
-            <p className="text-sm text-muted-foreground">总Todo数: {totalTodos}</p>
-            <p className="text-sm text-muted-foreground">日期分组: {groupedNotes.length}</p>
-          </div>
+            {/* 日历和Todo区域 (1/4宽度) - 确保其独立滚动 */}
+            <div className="hidden md:flex md:flex-col w-1/4 bg-background">
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-4">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(date) => date && setDate(date)}
+                    className="rounded-md border"
+                  />
+                  <div className="mt-4 text-center">
+                    <p className="font-medium">已选择日期: {formatDateShort(date)}</p>
+                    <p className="text-sm text-muted-foreground mt-1">添加的笔记将使用此日期</p>
+                  </div>
 
-          {/* Todo列表 */}
-          <TodoList selectedDate={date} />
+                  <div className="mt-4 p-3 bg-muted rounded-lg">
+                    <p className="text-sm font-medium mb-1">统计信息</p>
+                    <p className="text-sm text-muted-foreground">总笔记数: {notes.length}</p>
+                    <p className="text-sm text-muted-foreground">总Todo数: {totalTodos}</p>
+                    <p className="text-sm text-muted-foreground">日期分组: {groupedNotes.length}</p>
+                  </div>
+
+                  {/* Todo列表 */}
+                  <TodoList selectedDate={date} />
+                </div>
+              </div>
+            </div>
+              </div>
         </div>
       </main>
-
-      <Toaster />
     </div>
   )
 }

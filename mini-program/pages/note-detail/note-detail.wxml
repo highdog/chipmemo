@@ -1,0 +1,192 @@
+<!--pages/note-detail/note-detail.wxml-->
+<view class="note-detail-container">
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading-container">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 错误状态 -->
+  <view wx:elif="{{error}}" class="error-container">
+    <view class="error-icon">⚠️</view>
+    <text class="error-message">{{error}}</text>
+    <button class="retry-btn" bindtap="retryLoad">重试</button>
+  </view>
+
+  <!-- 笔记内容 -->
+  <view wx:elif="{{note}}" class="note-content">
+    <!-- 头部工具栏 -->
+    <view class="header-toolbar">
+      <view class="header-left">
+        <button class="back-btn" bindtap="goBack">
+          <text class="icon">←</text>
+        </button>
+      </view>
+      
+      <view class="header-center">
+        <text class="page-title">笔记详情</text>
+      </view>
+      
+      <view class="header-right">
+        <button wx:if="{{!isEditing}}" class="action-btn" bindtap="toggleActions">
+          <text class="icon">⋯</text>
+        </button>
+        <view wx:else class="edit-actions">
+          <button class="cancel-btn" bindtap="exitEditMode">取消</button>
+          <button class="save-btn" bindtap="saveEdit">保存</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 操作菜单 -->
+    <view wx:if="{{showActions}}" class="actions-overlay" bindtap="hideActions">
+      <view class="actions-menu" catchtap="">
+        <view class="action-item" bindtap="enterEditMode">
+          <text class="action-icon">✏️</text>
+          <text class="action-text">编辑</text>
+        </view>
+        <view class="action-item" bindtap="copyContent">
+          <text class="action-icon">📋</text>
+          <text class="action-text">复制</text>
+        </view>
+        <view class="action-item" bindtap="showShareModal">
+          <text class="action-icon">📤</text>
+          <text class="action-text">分享</text>
+        </view>
+        <view class="action-item" bindtap="toggleArchive">
+          <text class="action-icon">{{note.archived ? '📂' : '🗃️'}}</text>
+          <text class="action-text">{{note.archived ? '取消归档' : '归档'}}</text>
+        </view>
+        <view class="action-item danger" bindtap="deleteNote">
+          <text class="action-icon">🗑️</text>
+          <text class="action-text">删除</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 笔记主体 -->
+    <scroll-view class="note-scroll" scroll-y enhanced>
+      <!-- 非编辑模式 -->
+      <view wx:if="{{!isEditing}}" class="note-view">
+        <!-- 笔记标题 -->
+        <view class="note-title-section">
+          <text class="note-title">{{note.title}}</text>
+          <view wx:if="{{note.archived}}" class="archived-badge">
+            <text>已归档</text>
+          </view>
+        </view>
+
+        <!-- 笔记元信息 -->
+        <view class="note-meta">
+          <view class="meta-item">
+            <text class="meta-label">创建时间:</text>
+            <text class="meta-value">{{note.createdAt}}</text>
+          </view>
+          <view wx:if="{{note.updatedAt !== note.createdAt}}" class="meta-item">
+            <text class="meta-label">更新时间:</text>
+            <text class="meta-value">{{note.updatedAt}}</text>
+          </view>
+          <view wx:if="{{note.tags && note.tags.length > 0}}" class="meta-item">
+            <text class="meta-label">标签:</text>
+            <view class="tags-container">
+              <text wx:for="{{note.tags}}" wx:key="*this" class="tag">{{item}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 笔记内容 -->
+        <view class="note-content-section">
+          <text class="note-text" decode="{{true}}">{{note.content}}</text>
+        </view>
+
+        <!-- 笔记附件 -->
+        <view wx:if="{{note.attachments && note.attachments.length > 0}}" class="attachments-section">
+          <text class="section-title">附件</text>
+          <view class="attachments-grid">
+            <view wx:for="{{note.attachments}}" wx:key="id" class="attachment-item">
+              <image wx:if="{{item.type === 'image'}}" 
+                     class="attachment-image" 
+                     src="{{item.url}}" 
+                     mode="aspectFill"
+                     bindtap="previewImage"
+                     data-url="{{item.url}}"></image>
+              <view wx:else class="attachment-file">
+                <text class="file-icon">📄</text>
+                <text class="file-name">{{item.name}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 编辑模式 -->
+      <view wx:else class="note-edit">
+        <!-- 标题编辑 -->
+        <view class="edit-section">
+          <text class="edit-label">标题</text>
+          <input class="title-input" 
+                 value="{{editTitle}}" 
+                 placeholder="请输入标题"
+                 bindinput="onTitleInput"
+                 maxlength="100"></input>
+        </view>
+
+        <!-- 标签编辑 -->
+        <view class="edit-section">
+          <view class="section-header">
+            <text class="edit-label">标签</text>
+            <button class="add-tag-btn" bindtap="showTagInput">+ 添加</button>
+          </view>
+          
+          <view wx:if="{{editTags.length > 0}}" class="edit-tags">
+            <view wx:for="{{editTags}}" wx:key="*this" class="edit-tag">
+              <text class="tag-text">{{item}}</text>
+              <button class="remove-tag-btn" bindtap="removeTag" data-index="{{index}}">×</button>
+            </view>
+          </view>
+          
+          <view wx:if="{{showTagInput}}" class="tag-input-section">
+            <input class="tag-input" 
+                   value="{{tagInput}}" 
+                   placeholder="输入标签名称"
+                   bindinput="onTagInput"
+                   maxlength="20"></input>
+            <button class="confirm-tag-btn" bindtap="addTag">确定</button>
+            <button class="cancel-tag-btn" bindtap="hideTagInput">取消</button>
+          </view>
+        </view>
+
+        <!-- 内容编辑 -->
+        <view class="edit-section">
+          <text class="edit-label">内容</text>
+          <textarea class="content-textarea" 
+                    value="{{editContent}}" 
+                    placeholder="请输入笔记内容"
+                    bindinput="onContentInput"
+                    auto-height
+                    maxlength="10000"></textarea>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 分享弹窗 -->
+  <view wx:if="{{shareModalVisible}}" class="share-modal-overlay" bindtap="hideShareModal">
+    <view class="share-modal" catchtap="">
+      <view class="modal-header">
+        <text class="modal-title">分享笔记</text>
+        <button class="modal-close" bindtap="hideShareModal">×</button>
+      </view>
+      
+      <view class="share-options">
+        <view wx:for="{{shareOptions}}" wx:key="key" 
+              class="share-option" 
+              bindtap="handleShare" 
+              data-type="{{item.key}}">
+          <view class="option-icon">{{item.icon === 'copy' ? '📋' : item.icon === 'qr' ? '📱' : '💬'}}</view>
+          <text class="option-title">{{item.title}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

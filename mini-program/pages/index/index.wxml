@@ -1,0 +1,160 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- 加载状态 -->
+  <view wx:if="{{loading}}" class="loading">
+    <view class="loading-spinner"></view>
+    <text>加载中...</text>
+  </view>
+
+  <!-- 未登录状态 -->
+  <view wx:elif="{{!isLoggedIn}}" class="welcome-section">
+    <view class="welcome-header">
+      <image class="welcome-logo" src="/images/logo.png" mode="aspectFit"></image>
+      <text class="welcome-title">欢迎使用笔记本</text>
+      <text class="welcome-subtitle">记录生活点滴，管理待办事项</text>
+    </view>
+    
+    <view class="welcome-features">
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/note-icon.png" mode="aspectFit"></image>
+        <text class="feature-title">智能笔记</text>
+        <text class="feature-desc">支持富文本编辑，标签分类</text>
+      </view>
+      
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/todo-icon.png" mode="aspectFit"></image>
+        <text class="feature-title">待办管理</text>
+        <text class="feature-desc">高效管理任务，提升工作效率</text>
+      </view>
+      
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/sync-icon.png" mode="aspectFit"></image>
+        <text class="feature-title">云端同步</text>
+        <text class="feature-desc">多端同步，随时随地访问</text>
+      </view>
+    </view>
+    
+    <view class="welcome-actions">
+      <button class="btn btn-primary btn-block" bindtap="goToLogin">
+        立即开始
+      </button>
+    </view>
+  </view>
+
+  <!-- 已登录状态 -->
+  <view wx:else class="dashboard">
+    <!-- 用户信息卡片 -->
+    <view class="card user-card">
+      <view class="user-info">
+        <image class="user-avatar" src="/images/default-avatar.png" mode="aspectFill"></image>
+        <view class="user-details">
+          <text class="user-name">{{userInfo.username || '用户'}}</text>
+          <text class="user-email">{{userInfo.email}}</text>
+        </view>
+      </view>
+      <view class="user-actions">
+        <button class="btn btn-outline btn-small" bindtap="goToProfile">
+          个人中心
+        </button>
+      </view>
+    </view>
+
+    <!-- 统计卡片 -->
+    <view class="stats-grid">
+      <view class="stat-card" bindtap="goToNotes">
+        <view class="stat-number">{{recentNotes.length}}</view>
+        <view class="stat-label">最近笔记</view>
+        <view class="stat-icon">📝</view>
+      </view>
+      
+      <view class="stat-card" bindtap="quickCreateTodo">
+        <view class="stat-number">{{todoStats.pending}}</view>
+        <view class="stat-label">待办事项</view>
+        <view class="stat-icon">✅</view>
+      </view>
+      
+      <view class="stat-card">
+        <view class="stat-number">{{todoStats.completed}}</view>
+        <view class="stat-label">已完成</view>
+        <view class="stat-icon">🎉</view>
+      </view>
+    </view>
+
+    <!-- 快捷操作 -->
+    <view class="quick-actions">
+      <view class="section-header">
+        <text class="section-title">快捷操作</text>
+      </view>
+      
+      <view class="action-grid">
+        <view class="action-item" bindtap="goToAddNote">
+          <view class="action-icon">✏️</view>
+          <text class="action-label">写笔记</text>
+        </view>
+        
+        <view class="action-item" bindtap="quickCreateTodo">
+          <view class="action-icon">📋</view>
+          <text class="action-label">添加待办</text>
+        </view>
+        
+        <view class="action-item" bindtap="searchNotes">
+          <view class="action-icon">🔍</view>
+          <text class="action-label">搜索</text>
+        </view>
+        
+        <view class="action-item" bindtap="goToNotes">
+          <view class="action-icon">📚</view>
+          <text class="action-label">所有笔记</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 最近笔记 -->
+    <view class="recent-notes" wx:if="{{recentNotes.length > 0}}">
+      <view class="section-header">
+        <text class="section-title">最近笔记</text>
+        <text class="section-more" bindtap="goToNotes">查看更多</text>
+      </view>
+      
+      <view class="notes-list">
+        <view 
+          class="note-item" 
+          wx:for="{{recentNotes}}" 
+          wx:key="_id"
+          data-id="{{item._id}}"
+          bindtap="goToNoteDetail"
+        >
+          <view class="note-header">
+            <text class="note-title">{{item.title || '无标题'}}</text>
+            <text class="note-date">{{item.formattedDate}}</text>
+          </view>
+          
+          <view class="note-content" wx:if="{{item.truncatedContent}}">
+            <text>{{item.truncatedContent}}</text>
+          </view>
+          
+          <view class="note-tags" wx:if="{{item.tags && item.tags.length > 0}}">
+            <text 
+              class="tag tag-primary" 
+              wx:for="{{item.tags}}" 
+              wx:for-item="tag"
+              wx:key="*this"
+            >
+              {{tag}}
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{recentNotes.length === 0 && !loading}}">
+      <view class="empty-state-icon">📝</view>
+      <text class="empty-state-text">还没有笔记</text>
+      <text class="empty-state-subtext">点击下方按钮开始记录</text>
+      <button class="btn btn-primary margin-top" bindtap="goToAddNote">
+        创建第一篇笔记
+      </button>
+    </view>
+  </view>
+</view>

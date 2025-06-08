@@ -11,6 +11,7 @@ export interface Note {
   createdAt: string
   todos?: TodoItem[]
   tags: string[]
+  imageUrl?: string // 添加图片URL字段
 }
 
 export interface TodoItem {
@@ -48,7 +49,7 @@ export async function getNotes(): Promise<Note[]> {
   return [...notesStorage].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
-export async function addNote(content: string, date: string): Promise<{ success: boolean; error?: string }> {
+export async function addNote(content: string, date: string, imageUrl?: string): Promise<{ success: boolean; error?: string }> {
   try {
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -80,6 +81,7 @@ export async function addNote(content: string, date: string): Promise<{ success:
       createdAt: createdAtDate.toISOString(), // 使用选择的日期但保留当前时间
       todos,
       tags,
+      imageUrl, // 添加图片URL
     }
 
     notesStorage.push(newNote)

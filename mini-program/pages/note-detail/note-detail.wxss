@@ -1,0 +1,641 @@
+/* pages/note-detail/note-detail.wxss */
+
+.note-detail-container {
+  height: 100vh;
+  background-color: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 加载状态 */
+.loading-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 4rpx solid #e9ecef;
+  border-top: 4rpx solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20rpx;
+}
+
+.loading-text {
+  color: #6c757d;
+  font-size: 28rpx;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 错误状态 */
+.error-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.error-icon {
+  font-size: 80rpx;
+  margin-bottom: 20rpx;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 28rpx;
+  text-align: center;
+  margin-bottom: 30rpx;
+  line-height: 1.5;
+}
+
+.retry-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8rpx;
+  padding: 20rpx 40rpx;
+  font-size: 28rpx;
+}
+
+/* 笔记内容 */
+.note-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部工具栏 */
+.header-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 30rpx;
+  background-color: white;
+  border-bottom: 1rpx solid #e9ecef;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left,
+.header-right {
+  flex: 0 0 auto;
+  width: 120rpx;
+}
+
+.header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.back-btn,
+.action-btn {
+  background: none;
+  border: none;
+  padding: 10rpx;
+  font-size: 32rpx;
+  color: #495057;
+}
+
+.page-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #212529;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.cancel-btn,
+.save-btn {
+  padding: 12rpx 24rpx;
+  border-radius: 6rpx;
+  font-size: 26rpx;
+  border: none;
+}
+
+.cancel-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.save-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+/* 操作菜单 */
+.actions-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 120rpx 30rpx 0;
+}
+
+.actions-menu {
+  background-color: white;
+  border-radius: 12rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  min-width: 240rpx;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 30rpx;
+  border-bottom: 1rpx solid #f8f9fa;
+  transition: background-color 0.2s;
+}
+
+.action-item:last-child {
+  border-bottom: none;
+}
+
+.action-item:hover {
+  background-color: #f8f9fa;
+}
+
+.action-item.danger {
+  color: #dc3545;
+}
+
+.action-icon {
+  font-size: 32rpx;
+  margin-right: 20rpx;
+}
+
+.action-text {
+  font-size: 28rpx;
+}
+
+/* 笔记滚动区域 */
+.note-scroll {
+  flex: 1;
+  padding: 0 30rpx 30rpx;
+}
+
+/* 笔记查看模式 */
+.note-view {
+  padding-top: 30rpx;
+}
+
+.note-title-section {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 30rpx;
+}
+
+.note-title {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #212529;
+  line-height: 1.3;
+  flex: 1;
+  margin-right: 20rpx;
+}
+
+.archived-badge {
+  background-color: #ffc107;
+  color: #212529;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.note-meta {
+  background-color: white;
+  border-radius: 12rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.meta-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 20rpx;
+}
+
+.meta-item:last-child {
+  margin-bottom: 0;
+}
+
+.meta-label {
+  font-size: 26rpx;
+  color: #6c757d;
+  min-width: 140rpx;
+  margin-right: 20rpx;
+}
+
+.meta-value {
+  font-size: 26rpx;
+  color: #495057;
+  flex: 1;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  flex: 1;
+}
+
+.tag {
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+}
+
+.note-content-section {
+  background-color: white;
+  border-radius: 12rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.note-text {
+  font-size: 30rpx;
+  line-height: 1.6;
+  color: #212529;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 附件区域 */
+.attachments-section {
+  background-color: white;
+  border-radius: 12rpx;
+  padding: 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 20rpx;
+}
+
+.attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200rpx, 1fr));
+  gap: 20rpx;
+}
+
+.attachment-item {
+  border-radius: 8rpx;
+  overflow: hidden;
+  border: 1rpx solid #e9ecef;
+}
+
+.attachment-image {
+  width: 100%;
+  height: 200rpx;
+}
+
+.attachment-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30rpx 20rpx;
+  background-color: #f8f9fa;
+}
+
+.file-icon {
+  font-size: 48rpx;
+  margin-bottom: 10rpx;
+}
+
+.file-name {
+  font-size: 24rpx;
+  color: #495057;
+  text-align: center;
+  word-break: break-all;
+}
+
+/* 编辑模式 */
+.note-edit {
+  padding-top: 30rpx;
+}
+
+.edit-section {
+  background-color: white;
+  border-radius: 12rpx;
+  padding: 30rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.edit-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.title-input {
+  width: 100%;
+  padding: 20rpx;
+  border: 1rpx solid #dee2e6;
+  border-radius: 8rpx;
+  font-size: 30rpx;
+  background-color: #fff;
+}
+
+.add-tag-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6rpx;
+  padding: 12rpx 20rpx;
+  font-size: 24rpx;
+}
+
+.edit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.edit-tag {
+  display: flex;
+  align-items: center;
+  background-color: #e9ecef;
+  border-radius: 20rpx;
+  padding: 8rpx 16rpx;
+}
+
+.tag-text {
+  font-size: 24rpx;
+  color: #495057;
+  margin-right: 8rpx;
+}
+
+.remove-tag-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 28rpx;
+  padding: 0;
+  width: 32rpx;
+  height: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tag-input-section {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx;
+  background-color: #f8f9fa;
+  border-radius: 8rpx;
+}
+
+.tag-input {
+  flex: 1;
+  padding: 12rpx;
+  border: 1rpx solid #dee2e6;
+  border-radius: 6rpx;
+  font-size: 26rpx;
+  background-color: white;
+}
+
+.confirm-tag-btn,
+.cancel-tag-btn {
+  padding: 12rpx 20rpx;
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  border: none;
+}
+
+.confirm-tag-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.cancel-tag-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.content-textarea {
+  width: 100%;
+  min-height: 400rpx;
+  padding: 20rpx;
+  border: 1rpx solid #dee2e6;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  background-color: #fff;
+}
+
+/* 分享弹窗 */
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.share-modal {
+  background-color: white;
+  border-radius: 16rpx;
+  width: 100%;
+  max-width: 600rpx;
+  animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 30rpx;
+  border-bottom: 1rpx solid #e9ecef;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #212529;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 40rpx;
+  color: #6c757d;
+  padding: 0;
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-options {
+  padding: 30rpx;
+}
+
+.share-option {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f8f9fa;
+  transition: background-color 0.2s;
+}
+
+.share-option:last-child {
+  border-bottom: none;
+}
+
+.share-option:hover {
+  background-color: #f8f9fa;
+}
+
+.option-icon {
+  font-size: 40rpx;
+  margin-right: 24rpx;
+}
+
+.option-title {
+  font-size: 28rpx;
+  color: #495057;
+}
+
+/* 响应式调整 */
+@media (max-width: 750rpx) {
+  .note-scroll {
+    padding: 0 20rpx 20rpx;
+  }
+  
+  .note-title {
+    font-size: 36rpx;
+  }
+  
+  .note-text {
+    font-size: 28rpx;
+  }
+  
+  .attachments-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150rpx, 1fr));
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .note-detail-container {
+    background-color: #1a1a1a;
+  }
+  
+  .header-toolbar,
+  .note-meta,
+  .note-content-section,
+  .attachments-section,
+  .edit-section {
+    background-color: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .page-title,
+  .note-title,
+  .note-text {
+    color: #ffffff;
+  }
+  
+  .meta-label,
+  .meta-value,
+  .section-title {
+    color: #cccccc;
+  }
+  
+  .tag {
+    background-color: #404040;
+    color: #cccccc;
+  }
+  
+  .title-input,
+  .tag-input,
+  .content-textarea {
+    background-color: #404040;
+    border-color: #555555;
+    color: #ffffff;
+  }
+  
+  .actions-menu,
+  .share-modal {
+    background-color: #2d2d2d;
+  }
+  
+  .action-text,
+  .option-title {
+    color: #cccccc;
+  }
+}
