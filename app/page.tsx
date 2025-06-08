@@ -902,41 +902,77 @@ export default function NotePad() {
           <div className="flex flex-1 overflow-hidden">
             {/* 记事本区域 (3/4宽度) */}
             <div className="w-full md:w-3/4 flex flex-col border-r bg-background">
-              {/* 标签内容区域 - 仅在标签搜索时显示 */}
-              {currentTag && (
-                <div className="border-b p-4 flex-shrink-0">
-                  <TagContent tag={currentTag} />
+              {/* 当点击标签时，显示左右布局 */}
+              {currentTag ? (
+                <div className="flex-1 flex overflow-hidden">
+                  {/* 左侧：固定的标签内容区域 */}
+                  <div className="w-2/3 border-r bg-background flex-shrink-0">
+                    <div className="p-4 h-full overflow-y-auto">
+                      <TagContent tag={currentTag} />
+                    </div>
+                  </div>
+                  
+                  {/* 右侧：可滚动的有日期笔记区域 */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="p-4">
+                        {isLoading || isSearching ? (
+                          <div className="h-full flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                            <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
+                          </div>
+                        ) : groupedNotes.length > 0 ? (
+                          <div className="space-y-6">
+                            {groupedNotes.map(([dateKey, groupNotes]) => (
+                              <NoteGroup
+                                key={dateKey}
+                                date={dateKey}
+                                notes={groupNotes}
+                                onDelete={handleNoteDelete}
+                                searchTerm={searchTerm}
+                                onTagClick={handleTagClick}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-muted-foreground">
+                            {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* 正常布局：没有选择标签时的垂直布局 */
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-4">
+                    {isLoading || isSearching ? (
+                      <div className="h-full flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
+                      </div>
+                    ) : groupedNotes.length > 0 ? (
+                      <div className="space-y-6">
+                        {groupedNotes.map(([dateKey, groupNotes]) => (
+                          <NoteGroup
+                            key={dateKey}
+                            date={dateKey}
+                            notes={groupNotes}
+                            onDelete={handleNoteDelete}
+                            searchTerm={searchTerm}
+                            onTagClick={handleTagClick}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              
-              {/* 笔记显示区域 - 占满剩余空间并可滚动 */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4">
-                  {isLoading || isSearching ? (
-                    <div className="h-full flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                      <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
-                    </div>
-                  ) : groupedNotes.length > 0 ? (
-                    <div className="space-y-6">
-                      {groupedNotes.map(([dateKey, groupNotes]) => (
-                        <NoteGroup
-                          key={dateKey}
-                          date={dateKey}
-                          notes={groupNotes}
-                          onDelete={handleNoteDelete}
-                          searchTerm={searchTerm}
-                          onTagClick={handleTagClick}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
-                    </div>
-                  )}
-                </div>
-              </div>
               
               {/* 固定在笔记区域底部的输入区域 */}
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-4 shadow-lg">
