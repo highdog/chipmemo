@@ -229,9 +229,9 @@ function NoteGroup({
   onTagClick: (tag: string) => void
 }) {
   return (
-    <div className="mb-6">
-      {/* 日期标题 */}
-      <div className="flex items-center mb-3">
+    <div id={`date-group-${date}`} className="mb-6">
+      {/* 日期标题 - 粘性定位 */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border/40 flex items-center mb-3 py-2 -mx-4 px-4">
         <h3 className="text-lg font-semibold text-foreground">{formatDateOnly(date)}</h3>
         <div className="ml-3 text-sm text-muted-foreground">{notes.length} 条笔记</div>
       </div>
@@ -420,6 +420,36 @@ export default function NotePad() {
     })
 
     return sortedGroups
+  }
+
+  // 滚动到指定日期的笔记
+  const scrollToDate = (targetDate: Date) => {
+    const dateKey = getDateKey(targetDate.toISOString())
+    const element = document.getElementById(`date-group-${dateKey}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      toast({
+        title: "已跳转",
+        description: `跳转到 ${formatDateOnly(dateKey)} 的笔记`,
+      })
+    } else {
+      toast({
+        title: "未找到笔记",
+        description: `${formatDateOnly(dateKey)} 没有笔记`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 处理日历日期选择
+  const handleDateSelect = (selectedDate: Date | undefined) => {
+    if (selectedDate) {
+      setDate(selectedDate)
+      // 如果不是在搜索状态，则跳转到对应日期的笔记
+      if (!searchTerm) {
+        scrollToDate(selectedDate)
+      }
+    }
   }
 
   // 加载笔记
@@ -816,7 +846,7 @@ export default function NotePad() {
                   <Calendar
                     mode="single"
                     selected={date}
-                    onSelect={(date) => date && setDate(date)}
+                    onSelect={handleDateSelect}
                     className="rounded-md border"
                   />
                   <div className="mt-4 text-center">
