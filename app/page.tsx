@@ -12,24 +12,21 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, Circle, Home, Sun, Moon } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
 import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import {
-  getNotes,
   addNote,
+  getNotes,
+  deleteNote,
   searchNotes,
   searchNotesByTag,
-  deleteNote,
-  toggleTodo,
-  getTodosByDate,
   type Note,
-  type TodoItem,
 } from "@/lib/actions"
-import { formatDateShort, getDateKey, formatTime, formatDateOnly } from "@/lib/utils"
+import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -156,8 +153,7 @@ function NoteItem({
     return content.replace(regex, '<mark class="bg-yellow-200">$1</mark>')
   }
 
-  const todoCount = note.todos?.length || 0
-  const completedTodos = note.todos?.filter((todo) => todo.completed).length || 0
+
 
   return (
     <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
@@ -165,12 +161,7 @@ function NoteItem({
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
           <div className="text-sm font-medium text-muted-foreground">{formatTime(note.createdAt)}</div>
-          {todoCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              <CheckSquare className="h-3 w-3 mr-1" />
-              {completedTodos}/{todoCount}
-            </Badge>
-          )}
+
         </div>
 
         {/* 右上角：标签和删除按钮 */}
@@ -247,26 +238,45 @@ function NoteGroup({
 }
 
 // TodoList Component
-function TodoList({ selectedDate }: { selectedDate: Date }) {
-  const [todos, setTodos] = useState<{ noteId: string; todo: TodoItem }[]>([])
+function TodoList({ 
+  selectedDate, 
+  todosByDate, 
+  onToggleTodo 
+}: { 
+  selectedDate: Date;
+  todosByDate: Record<string, Array<{ 
+    id: string; 
+    content: string; 
+    completed: boolean;
+    tags: string[];
+    dueDate?: string;
+  }>>;
+  onToggleTodo: (todoId: string) => void;
+}) {
   const [isLoading, setIsLoading] = useState(false)
+
+  const dateKey = selectedDate.toDateString()
+  // 获取当前日期的todos，以及没有截止日期的todos
+  const currentTodos = todosByDate[dateKey] || []
+  const allTodosWithoutDueDate = Object.values(todosByDate)
+    .flat()
+    .filter(todo => !todo.dueDate)
+    .filter((todo, index, self) => 
+      self.findIndex(t => t.content === todo.content && t.tags.join(',') === todo.tags.join(',')) === index
+    )
+  
+  const displayTodos = [...currentTodos, ...allTodosWithoutDueDate.filter(todo => 
+    !currentTodos.some(ct => ct.id === todo.id)
+  )]
 
   const loadTodos = async () => {
     setIsLoading(true)
     try {
-      const todosByNote = await getTodosByDate(selectedDate.toISOString())
-      const allTodos: { noteId: string; todo: TodoItem }[] = []
-
-      todosByNote.forEach(({ noteId, todos }) => {
-        todos.forEach((todo) => {
-          allTodos.push({ noteId, todo })
-        })
-      })
-
-      setTodos(allTodos)
+      // 这里可以调用后端API获取todos
+      // 暂时保持现有数据不变
     } catch (error) {
       toast({
-        title: "加载失败",
+        title: "错误",
         description: "无法加载Todo列表",
         variant: "destructive",
       })
@@ -275,29 +285,11 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
     }
   }
 
-  const handleToggleTodo = async (noteId: string, todoId: string) => {
+  const handleToggleTodo = async (todoId: string) => {
     try {
-      const result = await toggleTodo(noteId, todoId)
-      if (result.success) {
-        // 更新本地状态
-        setTodos((prevTodos) =>
-          prevTodos.map((item) =>
-            item.todo.id === todoId ? { ...item, todo: { ...item.todo, completed: !item.todo.completed } } : item,
-          ),
-        )
-      } else {
-        toast({
-          title: "更新失败",
-          description: result.error || "未知错误",
-          variant: "destructive",
-        })
-      }
+      onToggleTodo(todoId)
     } catch (error) {
-      toast({
-        title: "更新失败",
-        description: "网络错误，请重试",
-        variant: "destructive",
-      })
+      // 错误处理已在主组件中完成
     }
   }
 
@@ -305,8 +297,8 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
     loadTodos()
   }, [selectedDate])
 
-  const completedCount = todos.filter((item) => item.todo.completed).length
-  const totalCount = todos.length
+  const completedCount = displayTodos.filter(todo => todo.completed).length
+  const totalCount = displayTodos.length
 
   return (
     <div className="mt-4">
@@ -324,41 +316,57 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
           <span className="text-sm">加载中...</span>
         </div>
-      ) : todos.length > 0 ? (
+      ) : displayTodos.length > 0 ? (
         <ScrollArea className="h-48">
           <div className="space-y-2">
-            {todos.map((item) => (
+            {displayTodos.map((todo) => (
               <div
-                key={`${item.noteId}-${item.todo.id}`}
-                className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                key={todo.id}
+                className="flex items-start space-x-2 p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
               >
                 <Checkbox
-                  id={item.todo.id}
-                  checked={item.todo.completed}
-                  onCheckedChange={() => handleToggleTodo(item.noteId, item.todo.id)}
+                  id={todo.id}
+                  checked={todo.completed}
+                  onCheckedChange={() => handleToggleTodo(todo.id)}
                   className="mt-0.5"
                 />
-                <label
-                  htmlFor={item.todo.id}
-                  className={`text-sm flex-1 cursor-pointer ${
-                    item.todo.completed ? "line-through text-muted-foreground" : "text-foreground"
-                  }`}
-                >
-                  {item.todo.content}
-                </label>
-                {item.todo.completed ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
-                    ) : (
-                  <Circle className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="flex-1">
+                  <label
+                    htmlFor={todo.id}
+                    className={cn(
+                       "text-sm cursor-pointer block",
+                       todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                     )}
+                  >
+                    {todo.content}
+                    {/* 标签跟在文字后面 */}
+                    {todo.tags.length > 0 && (
+                      <span className="ml-2">
+                        {todo.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </span>
                     )}
-                              </div>
-            ))}
+                  </label>
+                </div>
+                {/* 显示截止日期，不需要日历图标 */}
+                {todo.dueDate && (
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+                  </div>
+                )}
               </div>
+            ))}
+          </div>
         </ScrollArea>
       ) : (
         <div className="text-center py-4 text-sm text-muted-foreground">
-          当前日期没有Todo项
-          <div className="text-xs mt-1">在笔记中使用 #todo 标签来创建Todo</div>
+          暂无Todo事项
         </div>
       )}
 
@@ -367,13 +375,13 @@ function TodoList({ selectedDate }: { selectedDate: Date }) {
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>进度</span>
             <span>{Math.round((completedCount / totalCount) * 100)}%</span>
-              </div>
+          </div>
           <div className="w-full bg-muted rounded-full h-1.5 mt-1">
             <div
               className="bg-primary h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${(completedCount / totalCount) * 100}%` }}
             />
-              </div>
+          </div>
         </div>
       )}
     </div>
@@ -390,6 +398,15 @@ export default function NotePad() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
+  const [todoDueDate, setTodoDueDate] = useState('')
+  const [todosByDate, setTodosByDate] = useState<Record<string, Array<{ 
+    id: string; 
+    content: string; 
+    completed: boolean;
+    tags: string[];
+    dueDate?: string;
+  }>>>({})
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearching, setIsSearching] = useState(false)
@@ -581,37 +598,151 @@ export default function NotePad() {
 
     setIsAdding(true)
     try {
-      const result = await addNote(inputValue, date.toISOString(), selectedImage || undefined)
+      if (inputMode === 'todo') {
+        // Todo模式：添加到TodoList
+        const { cleanContent, tags } = extractTags(inputValue.trim())
+        const newTodo = {
+          id: Date.now().toString(),
+          content: cleanContent,
+          completed: false,
+          tags,
+          dueDate: todoDueDate || undefined
+        }
+        
+        // 如果没有截止日期，添加到所有日期；否则只添加到截止日期
+        const targetDate = todoDueDate ? new Date(todoDueDate) : date
+        const dateKey = targetDate.toDateString()
+        
+        setTodosByDate(prev => ({
+          ...prev,
+          [dateKey]: [...(prev[dateKey] || []), newTodo]
+        }))
+        
+        // 如果没有截止日期，也添加到当前选中日期（如果不同）
+        if (!todoDueDate && date.toDateString() !== dateKey) {
+          const currentDateKey = date.toDateString()
+          setTodosByDate(prev => ({
+            ...prev,
+            [currentDateKey]: [...(prev[currentDateKey] || []), { ...newTodo, id: (Date.now() + 1).toString() }]
+          }))
+        }
+        
+        setInputValue('')
+        setTodoDueDate('')
+        
+        toast({
+          title: "成功",
+          description: "Todo已添加",
+        })
+      } else {
+        // 笔记模式：原有逻辑
+        const result = await addNote(inputValue, date.toISOString(), selectedImage || undefined)
+        if (result.success) {
+          setInputValue("")
+          setSelectedImage(null) // 清除已选择的图片
+          // 如果有搜索词，重新搜索；否则重新加载
+          if (searchTerm) {
+            await handleSearch(searchTerm)
+          } else {
+            await loadNotes()
+          }
+          // 强制更新日期以触发TodoList重新加载
+          setDate(new Date(date))
+          toast({
+            title: "添加成功",
+            description: "笔记已保存到服务器",
+          })
+        } else {
+          toast({
+            title: "添加失败",
+            description: result.error || "未知错误",
+            variant: "destructive",
+          })
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "添加失败",
+        description: inputMode === 'todo' ? "添加Todo失败" : "网络错误，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAdding(false)
+    }
+  }
+  
+  const extractTags = (content: string): { cleanContent: string; tags: string[] } => {
+     const tagRegex = /#([\u4e00-\u9fa5\w]+)/g
+     const tags: string[] = []
+     let match
+     
+     while ((match = tagRegex.exec(content)) !== null) {
+       tags.push(match[1])
+     }
+     
+     const cleanContent = content.replace(tagRegex, '').trim()
+     return { cleanContent, tags }
+   }
+   
+   const handleToggleTodo = async (todoId: string) => {
+    // 找到要完成的todo
+    let completedTodo = null
+    let todoDateKey = null
+    
+    Object.keys(todosByDate).forEach(dateKey => {
+      const todo = todosByDate[dateKey].find(t => t.id === todoId)
+      if (todo) {
+        completedTodo = todo
+        todoDateKey = dateKey
+      }
+    })
+    
+    if (!completedTodo) return
+    
+    try {
+      // 创建笔记内容
+      let noteContent = completedTodo.content
+      if (completedTodo.tags.length > 0) {
+        noteContent += ' ' + completedTodo.tags.map(tag => `#${tag}`).join(' ')
+      }
+      
+      // 调用API创建笔记
+      const result = await addNote(noteContent, new Date().toISOString())
+      
       if (result.success) {
-        setInputValue("")
-        setSelectedImage(null) // 清除已选择的图片
-        // 如果有搜索词，重新搜索；否则重新加载
+        // 删除todo
+        setTodosByDate(prev => {
+          const newTodosByDate = { ...prev }
+          Object.keys(newTodosByDate).forEach(dateKey => {
+            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
+          })
+          return newTodosByDate
+        })
+        
+        // 重新加载笔记
         if (searchTerm) {
           await handleSearch(searchTerm)
         } else {
           await loadNotes()
         }
-        // 强制更新日期以触发TodoList重新加载
-        setDate(new Date(date))
+        
         toast({
-          title: "添加成功",
-          description: "笔记已保存到服务器",
+          title: "成功",
+          description: "Todo已完成并转换为笔记",
         })
       } else {
         toast({
-          title: "添加失败",
-          description: result.error || "未知错误",
+          title: "错误",
+          description: "创建笔记失败",
           variant: "destructive",
         })
       }
     } catch (error) {
       toast({
-        title: "添加失败",
-        description: "网络错误，请重试",
+        title: "错误",
+        description: "操作失败，请重试",
         variant: "destructive",
       })
-    } finally {
-      setIsAdding(false)
     }
   }
 
@@ -663,7 +794,7 @@ export default function NotePad() {
     }
   }, [isLoggedIn, isCheckingAuth])
 
-  const totalTodos = notes.reduce((acc, note) => acc + (note.todos?.length || 0), 0)
+
   const groupedNotes = groupNotesByDate(notes)
 
   // 如果正在检查认证状态，显示加载界面
@@ -769,72 +900,109 @@ export default function NotePad() {
               
               {/* 固定在笔记区域底部的输入区域 */}
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-4 shadow-lg">
-                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Info className="h-3 w-3" />
-                  <span>使用 #标签 创建标签，#todo 创建待办事项（支持中英文）</span>
-                                </div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Info className="h-3 w-3" />
+                    <span>使用 #标签 创建标签（支持中英文）</span>
+                  </div>
+                  {/* 模式切换按钮 */}
+                  <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                    <Button
+                      variant={inputMode === 'note' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setInputMode('note')}
+                      className="h-6 px-2 text-xs"
+                    >
+                      笔记
+                    </Button>
+                    <Button
+                      variant={inputMode === 'todo' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setInputMode('todo')}
+                      className="h-6 px-2 text-xs"
+                    >
+                      Todo
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex flex-col space-y-2">
                   <Textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="输入新笔记... (使用 #学习 #工作 #todo 等)"
+                    placeholder={inputMode === 'note' ? "输入新笔记... (使用 #学习 #工作 等)" : "输入新Todo... (使用 #标签)"}
                     className="flex-1 min-h-[80px] resize-none"
                     disabled={isAdding}
-                      />
-            
-                  {/* 图片上传和预览区域 */}
-                  <div className="flex items-center space-x-2">
-                    <label htmlFor="image-upload" className="cursor-pointer">
-                      <div className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-primary transition-colors">
-                        <Image className="h-4 w-4" />
-                        <span>添加图片</span>
-                                      </div>
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                          />
-                    </label>
-                    
-                    {selectedImage && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveImage}
-                        className="h-6 px-2 text-xs text-destructive"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        移除图片
-                      </Button>
-                        )}
-                                  </div>
+                  />
                   
-                  {/* 图片预览 */}
-                  {selectedImage && (
-                    <div className="relative border rounded-md p-2 mt-2">
-                      <img 
-                        src={selectedImage} 
-                        alt="预览图片" 
-                        className="max-h-48 object-contain mx-auto" 
+                  {/* Todo模式下显示截止日期输入框 */}
+                  {inputMode === 'todo' && (
+                    <Input
+                      type="date"
+                      value={todoDueDate}
+                      onChange={(e) => setTodoDueDate(e.target.value)}
+                      placeholder="截止日期 (可选)"
+                      className="text-sm"
+                      disabled={isAdding}
+                    />
+                  )}
+            
+                  {/* 图片上传和预览区域 - 仅在笔记模式下显示 */}
+                  {inputMode === 'note' && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <label htmlFor="image-upload" className="cursor-pointer">
+                          <div className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-primary transition-colors">
+                            <Image className="h-4 w-4" />
+                            <span>添加图片</span>
+                          </div>
+                          <input
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
                           />
-                                    </div>
+                        </label>
+                        
+                        {selectedImage && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveImage}
+                            className="h-6 px-2 text-xs text-destructive"
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            移除图片
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {/* 图片预览 */}
+                      {selectedImage && (
+                        <div className="relative border rounded-md p-2 mt-2">
+                          <img 
+                            src={selectedImage} 
+                            alt="预览图片" 
+                            className="max-h-48 object-contain mx-auto" 
+                          />
+                        </div>
                       )}
+                    </>
+                  )}
                   
                   <div className="flex justify-end">
-                    <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && !selectedImage)}>
+                    <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))}>
                       {isAdding ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          保存中
+                          {inputMode === 'todo' ? 'Todo添加中' : '保存中'}
                         </>
-                          ) : (
-                        "添加"
-                          )}
+                      ) : (
+                        inputMode === 'todo' ? '添加Todo' : '添加笔记'
+                      )}
                     </Button>
-                                  </div>
+                  </div>
                                 </div>
                               </div>
                 </div>
@@ -849,20 +1017,13 @@ export default function NotePad() {
                     onSelect={handleDateSelect}
                     className="rounded-md border"
                   />
-                  <div className="mt-4 text-center">
-                    <p className="font-medium">已选择日期: {formatDateShort(date)}</p>
-                    <p className="text-sm text-muted-foreground mt-1">添加的笔记将使用此日期</p>
-                  </div>
-
-                  <div className="mt-4 p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium mb-1">统计信息</p>
-                    <p className="text-sm text-muted-foreground">总笔记数: {notes.length}</p>
-                    <p className="text-sm text-muted-foreground">总Todo数: {totalTodos}</p>
-                    <p className="text-sm text-muted-foreground">日期分组: {groupedNotes.length}</p>
-                  </div>
 
                   {/* Todo列表 */}
-                  <TodoList selectedDate={date} />
+                  <TodoList 
+                    selectedDate={date} 
+                    todosByDate={todosByDate}
+                    onToggleTodo={handleToggleTodo}
+                  />
                 </div>
               </div>
             </div>
