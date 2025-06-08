@@ -250,24 +250,54 @@ function TodoList({
     completed: boolean;
     tags: string[];
     dueDate?: string;
+    startDate?: string;
   }>>;
   onToggleTodo: (todoId: string) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedTag, setSelectedTag] = useState<string>('all')
 
-  const dateKey = selectedDate.toDateString()
-  // 获取当前日期的todos，以及没有截止日期的todos
-  const currentTodos = todosByDate[dateKey] || []
-  const allTodosWithoutDueDate = Object.values(todosByDate)
-    .flat()
-    .filter(todo => !todo.dueDate)
-    .filter((todo, index, self) => 
-      self.findIndex(t => t.content === todo.content && t.tags.join(',') === todo.tags.join(',')) === index
-    )
+  const selectedDateObj = new Date(selectedDate)
   
-  const displayTodos = [...currentTodos, ...allTodosWithoutDueDate.filter(todo => 
-    !currentTodos.some(ct => ct.id === todo.id)
-  )]
+  // 获取所有todos并根据日期范围过滤
+  const allTodos = Object.values(todosByDate)
+    .flat()
+    .filter((todo, index, self) => 
+      // 去重
+      self.findIndex(t => t.id === todo.id) === index
+    )
+    .filter(todo => {
+      const hasStartDate = todo.startDate
+      const hasDueDate = todo.dueDate
+      
+      if (hasStartDate && hasDueDate) {
+         // 有起始日期和截止日期：点击日期在起始日期前一天或之后显示
+         const startDate = new Date(todo.startDate!)
+         startDate.setDate(startDate.getDate() - 1)
+         return selectedDateObj >= startDate
+      } else if (hasStartDate && !hasDueDate) {
+         // 只有起始日期：点击日期在起始日期前一天或之后则显示
+         const startDate = new Date(todo.startDate!)
+         startDate.setDate(startDate.getDate() - 1)
+         return selectedDateObj >= startDate
+       } else if (!hasStartDate && hasDueDate) {
+         // 只有截止日期：点击日期在截止日期前一天或之后则显示
+         const dueDate = new Date(todo.dueDate!)
+         dueDate.setDate(dueDate.getDate() - 1)
+         return selectedDateObj >= dueDate
+      } else {
+        // 没有日期限制：总是显示
+        return true
+      }
+    })
+
+  // 获取所有标签
+  const allTags = Array.from(new Set(allTodos.flatMap(todo => todo.tags)))
+
+  // 根据选中的标签筛选todos
+  const displayTodos = selectedTag === 'all' 
+    ? allTodos 
+    : allTodos.filter(todo => todo.tags.includes(selectedTag))
 
   const loadTodos = async () => {
     setIsLoading(true)
@@ -301,89 +331,115 @@ function TodoList({
   const totalCount = displayTodos.length
 
   return (
-    <div className="mt-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-sm">Todo 列表</h3>
-        <div className="text-xs text-muted-foreground">
-          {completedCount}/{totalCount}
+    <div className="flex flex-col h-full">
+      {/* 固定的标题和标签筛选区域 */}
+      <div className="p-4 border-b bg-background">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium text-sm">Todo 列表</h3>
+          <div className="text-xs text-muted-foreground">
+            {completedCount}/{totalCount}
+          </div>
+        </div>
+
+        {/* 标签筛选区域 */}
+        <div className="mb-3">
+          <div className="flex flex-wrap gap-1">
+            <button
+              onClick={() => setSelectedTag('all')}
+              className={cn(
+                "px-2 py-1 text-xs rounded border transition-colors",
+                selectedTag === 'all' 
+                  ? "bg-primary text-primary-foreground border-primary" 
+                  : "bg-background text-muted-foreground border-border hover:bg-accent"
+              )}
+            >
+              All
+            </button>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag)}
+                className={cn(
+                  "px-2 py-1 text-xs rounded border transition-colors",
+                  selectedTag === tag 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-background text-muted-foreground border-border hover:bg-accent"
+                )}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="text-xs text-muted-foreground mb-2">{formatDateShort(selectedDate)}</div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          <span className="text-sm">加载中...</span>
-        </div>
-      ) : displayTodos.length > 0 ? (
-        <ScrollArea className="h-48">
-          <div className="space-y-2">
-            {displayTodos.map((todo) => (
-              <div
-                key={todo.id}
-                className="flex items-start space-x-2 p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
-              >
-                <Checkbox
-                  id={todo.id}
-                  checked={todo.completed}
-                  onCheckedChange={() => handleToggleTodo(todo.id)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1">
-                  <label
-                    htmlFor={todo.id}
-                    className={cn(
-                       "text-sm cursor-pointer block",
-                       todo.completed ? "line-through text-muted-foreground" : "text-foreground"
-                     )}
-                  >
-                    {todo.content}
-                    {/* 标签跟在文字后面 */}
-                    {todo.tags.length > 0 && (
-                      <span className="ml-2">
-                        {todo.tags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </label>
-                </div>
-                {/* 显示截止日期，不需要日历图标 */}
-                {todo.dueDate && (
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+      {/* 可滚动的Todo列表区域 */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <span className="text-sm">加载中...</span>
+            </div>
+          ) : displayTodos.length > 0 ? (
+            <div className="space-y-2">
+              {displayTodos.map((todo) => (
+                <div
+                  key={todo.id}
+                  className="flex items-start space-x-2 p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <Checkbox
+                    id={todo.id}
+                    checked={todo.completed}
+                    onCheckedChange={() => handleToggleTodo(todo.id)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <label
+                      htmlFor={todo.id}
+                      className={cn(
+                         "text-sm cursor-pointer block",
+                         todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                       )}
+                    >
+                      {todo.content}
+                      {/* 标签跟在文字后面 */}
+                      {todo.tags.length > 0 && (
+                        <span className="ml-2">
+                          {todo.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </label>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      ) : (
-        <div className="text-center py-4 text-sm text-muted-foreground">
-          暂无Todo事项
+                  {/* 显示日期信息 */}
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {todo.startDate && todo.dueDate ? (
+                      <span>
+                        {new Date(todo.startDate).toLocaleDateString('zh-CN')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+                      </span>
+                    ) : todo.startDate ? (
+                      <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN')}</span>
+                    ) : todo.dueDate ? (
+                      <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN')}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              暂无Todo事项
+            </div>
+          )}
         </div>
-      )}
-
-      {totalCount > 0 && (
-        <div className="mt-3 pt-2 border-t">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>进度</span>
-            <span>{Math.round((completedCount / totalCount) * 100)}%</span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-1.5 mt-1">
-            <div
-              className="bg-primary h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${(completedCount / totalCount) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -400,12 +456,14 @@ export default function NotePad() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
   const [todoDueDate, setTodoDueDate] = useState('')
+  const [todoStartDate, setTodoStartDate] = useState('')
   const [todosByDate, setTodosByDate] = useState<Record<string, Array<{ 
     id: string; 
     content: string; 
     completed: boolean;
     tags: string[];
     dueDate?: string;
+    startDate?: string;
   }>>>({})
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -445,17 +503,8 @@ export default function NotePad() {
     const element = document.getElementById(`date-group-${dateKey}`)
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      toast({
-        title: "已跳转",
-        description: `跳转到 ${formatDateOnly(dateKey)} 的笔记`,
-      })
-    } else {
-      toast({
-        title: "未找到笔记",
-        description: `${formatDateOnly(dateKey)} 没有笔记`,
-        variant: "destructive",
-      })
     }
+    // 移除未找到笔记的警告提示
   }
 
   // 处理日历日期选择
@@ -606,29 +655,20 @@ export default function NotePad() {
           content: cleanContent,
           completed: false,
           tags,
-          dueDate: todoDueDate || undefined
+          dueDate: todoDueDate || undefined,
+          startDate: todoStartDate || undefined
         }
         
-        // 如果没有截止日期，添加到所有日期；否则只添加到截止日期
-        const targetDate = todoDueDate ? new Date(todoDueDate) : date
-        const dateKey = targetDate.toDateString()
-        
+        // 将todo添加到所有相关日期
+        const currentDateKey = date.toDateString()
         setTodosByDate(prev => ({
           ...prev,
-          [dateKey]: [...(prev[dateKey] || []), newTodo]
+          [currentDateKey]: [...(prev[currentDateKey] || []), newTodo]
         }))
-        
-        // 如果没有截止日期，也添加到当前选中日期（如果不同）
-        if (!todoDueDate && date.toDateString() !== dateKey) {
-          const currentDateKey = date.toDateString()
-          setTodosByDate(prev => ({
-            ...prev,
-            [currentDateKey]: [...(prev[currentDateKey] || []), { ...newTodo, id: (Date.now() + 1).toString() }]
-          }))
-        }
         
         setInputValue('')
         setTodoDueDate('')
+        setTodoStartDate('')
         
         toast({
           title: "成功",
@@ -935,16 +975,26 @@ export default function NotePad() {
                     disabled={isAdding}
                   />
                   
-                  {/* Todo模式下显示截止日期输入框 */}
+                  {/* Todo模式下显示起始日期和截止日期输入框 */}
                   {inputMode === 'todo' && (
-                    <Input
-                      type="date"
-                      value={todoDueDate}
-                      onChange={(e) => setTodoDueDate(e.target.value)}
-                      placeholder="截止日期 (可选)"
-                      className="text-sm"
-                      disabled={isAdding}
-                    />
+                    <div className="flex space-x-2">
+                      <Input
+                        type="date"
+                        value={todoStartDate}
+                        onChange={(e) => setTodoStartDate(e.target.value)}
+                        placeholder="起始日期 (可选)"
+                        className="text-sm flex-1"
+                        disabled={isAdding}
+                      />
+                      <Input
+                        type="date"
+                        value={todoDueDate}
+                        onChange={(e) => setTodoDueDate(e.target.value)}
+                        placeholder="截止日期 (可选)"
+                        className="text-sm flex-1"
+                        disabled={isAdding}
+                      />
+                    </div>
                   )}
             
                   {/* 图片上传和预览区域 - 仅在笔记模式下显示 */}
@@ -1007,24 +1057,25 @@ export default function NotePad() {
                               </div>
                 </div>
 
-            {/* 日历和Todo区域 (1/4宽度) - 确保其独立滚动 */}
+            {/* 日历和Todo区域 (1/4宽度) - 日历固定，Todo列表独立滚动 */}
             <div className="hidden md:flex md:flex-col w-1/4 bg-background">
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    className="rounded-md border"
-                  />
-
-                  {/* Todo列表 */}
-                  <TodoList 
-                    selectedDate={date} 
-                    todosByDate={todosByDate}
-                    onToggleTodo={handleToggleTodo}
-                  />
-                </div>
+              {/* 日历区域 - 固定不滚动 */}
+              <div className="p-4 border-b">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={handleDateSelect}
+                  className="rounded-md border"
+                />
+              </div>
+              
+              {/* Todo列表区域 - 独立滚动 */}
+              <div className="flex-1 overflow-hidden">
+                <TodoList 
+                  selectedDate={date} 
+                  todosByDate={todosByDate}
+                  onToggleTodo={handleToggleTodo}
+                />
               </div>
             </div>
               </div>
