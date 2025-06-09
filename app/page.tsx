@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
@@ -241,7 +241,9 @@ function NoteGroup({
 function TodoList({ 
   selectedDate, 
   todosByDate, 
-  onToggleTodo 
+  onToggleTodo,
+  onUpdateTodo,
+  onDeleteTodo
 }: { 
   selectedDate: Date;
   todosByDate: Record<string, Array<{ 
@@ -253,9 +255,15 @@ function TodoList({
     startDate?: string;
   }>>;
   onToggleTodo: (todoId: string) => void;
+  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => void;
+  onDeleteTodo: (todoId: string) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
+  const [editingTodo, setEditingTodo] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState('')
+  const [editStartDate, setEditStartDate] = useState('')
+  const [editDueDate, setEditDueDate] = useState('')
 
   const selectedDateObj = new Date(selectedDate)
   
@@ -323,6 +331,50 @@ function TodoList({
     }
   }
 
+  const handleEditTodo = (todo: any) => {
+    setEditingTodo(todo.id)
+    setEditContent(todo.content)
+    setEditStartDate(todo.startDate || '')
+    setEditDueDate(todo.dueDate || '')
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingTodo) return
+    
+    try {
+      // 调用父组件的更新函数
+      onUpdateTodo(editingTodo, {
+        content: editContent,
+        startDate: editStartDate,
+        dueDate: editDueDate
+      })
+      setEditingTodo(null)
+      setEditContent('')
+      setEditStartDate('')
+      setEditDueDate('')
+    } catch (error) {
+      console.error('更新todo失败:', error)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingTodo(null)
+    setEditContent('')
+    setEditStartDate('')
+    setEditDueDate('')
+  }
+
+  const handleDeleteTodo = async (todoId: string) => {
+    if (!confirm('确定要删除这个todo事项吗？')) return
+    
+    try {
+      // 调用父组件的删除函数
+      onDeleteTodo(todoId)
+    } catch (error) {
+      console.error('删除todo失败:', error)
+    }
+  }
+
   useEffect(() => {
     loadTodos()
   }, [selectedDate])
@@ -386,50 +438,123 @@ function TodoList({
               {displayTodos.map((todo) => (
                 <div
                   key={todo.id}
-                  className="flex items-start space-x-2 p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
+                  className="p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
                 >
-                  <Checkbox
-                    id={todo.id}
-                    checked={todo.completed}
-                    onCheckedChange={() => handleToggleTodo(todo.id)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor={todo.id}
-                      className={cn(
-                         "text-sm cursor-pointer block",
-                         todo.completed ? "line-through text-muted-foreground" : "text-foreground"
-                       )}
-                    >
-                      {todo.content}
-                      {/* 标签跟在文字后面 */}
-                      {todo.tags.length > 0 && (
-                        <span className="ml-2">
-                          {todo.tags.map((tag, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
-                            >
-                              #{tag}
+                  {editingTodo === todo.id ? (
+                    // 编辑模式
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          checked={todo.completed}
+                          onCheckedChange={() => handleToggleTodo(todo.id)}
+                          className="mt-0.5"
+                        />
+                        <Input
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="flex-1 text-sm"
+                          placeholder="编辑todo内容"
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        <Input
+                          type="date"
+                          value={editStartDate}
+                          onChange={(e) => setEditStartDate(e.target.value)}
+                          className="flex-1 text-xs"
+                          placeholder="起始日期"
+                        />
+                        <Input
+                          type="date"
+                          value={editDueDate}
+                          onChange={(e) => setEditDueDate(e.target.value)}
+                          className="flex-1 text-xs"
+                          placeholder="截止日期"
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          className="h-6 px-2"
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveEdit}
+                          className="h-6 px-2"
+                        >
+                          <Save className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // 显示模式
+                    <div className="flex items-start space-x-2">
+                      <Checkbox
+                        id={todo.id}
+                        checked={todo.completed}
+                        onCheckedChange={() => handleToggleTodo(todo.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1" onClick={() => handleEditTodo(todo)} style={{ cursor: 'pointer' }}>
+                        <label
+                          htmlFor={todo.id}
+                          className={cn(
+                             "text-sm cursor-pointer block",
+                             todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                           )}
+                        >
+                          {todo.content}
+                          {/* 标签跟在文字后面 */}
+                          {todo.tags.length > 0 && (
+                            <span className="ml-2">
+                              {todo.tags.map((tag, index) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
                             </span>
-                          ))}
-                        </span>
-                      )}
-                    </label>
-                  </div>
-                  {/* 显示日期信息 */}
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {todo.startDate && todo.dueDate ? (
-                      <span>
-                        {new Date(todo.startDate).toLocaleDateString('zh-CN')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
-                      </span>
-                    ) : todo.startDate ? (
-                      <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN')}</span>
-                    ) : todo.dueDate ? (
-                      <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN')}</span>
-                    ) : null}
-                  </div>
+                          )}
+                        </label>
+                        {/* 显示日期信息 */}
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {todo.startDate && todo.dueDate ? (
+                            <span>
+                              {new Date(todo.startDate).toLocaleDateString('zh-CN')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+                            </span>
+                          ) : todo.startDate ? (
+                            <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN')}</span>
+                          ) : todo.dueDate ? (
+                            <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN')}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex space-x-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditTodo(todo)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteTodo(todo.id)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -736,62 +861,69 @@ export default function NotePad() {
    }
    
    const handleToggleTodo = async (todoId: string) => {
-    // 找到要完成的todo
-    let completedTodo = null
-    let todoDateKey = null
-    
-    Object.keys(todosByDate).forEach(dateKey => {
-      const todo = todosByDate[dateKey].find(t => t.id === todoId)
-      if (todo) {
-        completedTodo = todo
-        todoDateKey = dateKey
-      }
-    })
-    
-    if (!completedTodo) return
-    
     try {
-      // 创建笔记内容
-      let noteContent = completedTodo.content
-      if (completedTodo.tags.length > 0) {
-        noteContent += ' ' + completedTodo.tags.map(tag => `#${tag}`).join(' ')
-      }
-      
-      // 调用API创建笔记
-      const result = await addNote(noteContent, new Date().toISOString())
-      
-      if (result.success) {
-        // 删除todo
-        setTodosByDate(prev => {
-          const newTodosByDate = { ...prev }
-          Object.keys(newTodosByDate).forEach(dateKey => {
-            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
-          })
-          return newTodosByDate
-        })
-        
-        // 重新加载笔记
-        if (searchTerm) {
-          await handleSearch(searchTerm)
-        } else {
-          await loadNotes()
+      // 在所有日期中查找并切换todo状态
+      setTodosByDate(prev => {
+        const newTodosByDate = { ...prev }
+        for (const dateKey in newTodosByDate) {
+          newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
+            todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
+          )
         }
-        
-        toast({
-          title: "成功",
-          description: "Todo已完成并转换为笔记",
-        })
-      } else {
-        toast({
-          title: "错误",
-          description: "创建笔记失败",
-          variant: "destructive",
-        })
-      }
+        return newTodosByDate
+      })
     } catch (error) {
       toast({
         title: "错误",
-        description: "操作失败，请重试",
+        description: "切换Todo状态失败",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => {
+    try {
+      // 在所有日期中查找并更新todo
+      setTodosByDate(prev => {
+        const newTodosByDate = { ...prev }
+        for (const dateKey in newTodosByDate) {
+          newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
+            todo.id === todoId ? { ...todo, ...updates } : todo
+          )
+        }
+        return newTodosByDate
+      })
+      toast({
+        title: "成功",
+        description: "Todo已更新",
+      })
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "更新Todo失败",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteTodo = async (todoId: string) => {
+    try {
+      // 在所有日期中查找并删除todo
+      setTodosByDate(prev => {
+        const newTodosByDate = { ...prev }
+        for (const dateKey in newTodosByDate) {
+          newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
+        }
+        return newTodosByDate
+      })
+      toast({
+        title: "成功",
+        description: "Todo已删除",
+      })
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "删除Todo失败",
         variant: "destructive",
       })
     }
@@ -1122,6 +1254,8 @@ export default function NotePad() {
                   selectedDate={date} 
                   todosByDate={todosByDate}
                   onToggleTodo={handleToggleTodo}
+                  onUpdateTodo={handleUpdateTodo}
+                  onDeleteTodo={handleDeleteTodo}
                 />
               </div>
             </div>
