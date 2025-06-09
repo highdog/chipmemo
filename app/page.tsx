@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
+import { useAuth } from "@/lib/auth-context"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,6 +29,7 @@ import {
 } from "@/lib/actions"
 import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
 
 // SearchBar Component
@@ -107,11 +109,13 @@ function NoteItem({
   onDelete,
   searchTerm,
   onTagClick,
+  onConvertToTodo,
 }: {
   note: Note
   onDelete: () => void
   searchTerm?: string
   onTagClick: (tag: string) => void
+  onConvertToTodo: () => void
 }) {
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -161,7 +165,12 @@ function NoteItem({
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
           <div className="text-sm font-medium text-muted-foreground">{formatTime(note.createdAt)}</div>
-
+          {note.todos && note.todos.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              <CheckSquare className="h-3 w-3 mr-1" />
+              {note.todos.filter((todo: any) => todo.completed).length}/{note.todos.length}
+            </Badge>
+          )}
         </div>
 
         {/* 右上角：标签和删除按钮 */}
@@ -192,6 +201,15 @@ function NoteItem({
           <Button
             variant="ghost"
             size="sm"
+            onClick={onConvertToTodo}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+            title="转换为Todo"
+          >
+            <CheckSquare className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleDelete}
             disabled={isDeleting}
             className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
@@ -212,12 +230,14 @@ function NoteGroup({
   onDelete,
   searchTerm,
   onTagClick,
+  onConvertToTodo,
 }: {
   date: string
   notes: Note[]
   onDelete: () => void
   searchTerm?: string
   onTagClick: (tag: string) => void
+  onConvertToTodo: (note: Note) => void
 }) {
   return (
     <div id={`date-group-${date}`} className="mb-6">
@@ -230,7 +250,7 @@ function NoteGroup({
       {/* 该日期下的所有笔记 */}
       <div className="space-y-3 ml-4">
         {notes.map((note) => (
-          <NoteItem key={note.id} note={note} onDelete={onDelete} searchTerm={searchTerm} onTagClick={onTagClick} />
+          <NoteItem key={note.id} note={note} onDelete={onDelete} searchTerm={searchTerm} onTagClick={onTagClick} onConvertToTodo={() => onConvertToTodo(note)} />
         ))}
       </div>
     </div>
@@ -368,7 +388,6 @@ function TodoList({
 
   const handleDeleteTodo = async (todoId: string) => {
     console.log('handleDeleteTodo被调用', todoId)
-    if (!confirm('确定要删除这个todo事项吗？')) return
     
     try {
       // 调用父组件的删除函数
@@ -386,7 +405,12 @@ function TodoList({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuOpenTodo) {
-        setMenuOpenTodo(null)
+        const target = event.target as Element
+        // 检查点击的元素是否在菜单内部
+        const menuElement = target.closest('.todo-menu')
+        if (!menuElement) {
+          setMenuOpenTodo(null)
+        }
       }
     }
     
@@ -473,21 +497,27 @@ function TodoList({
                           placeholder="编辑todo内容"
                         />
                       </div>
-                      <div className="flex space-x-2">
-                        <Input
-                          type="date"
-                          value={editStartDate}
-                          onChange={(e) => setEditStartDate(e.target.value)}
-                          className="flex-1 text-xs"
-                          placeholder="起始日期"
-                        />
-                        <Input
-                          type="date"
-                          value={editDueDate}
-                          onChange={(e) => setEditDueDate(e.target.value)}
-                          className="flex-1 text-xs"
-                          placeholder="截止日期"
-                        />
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1 flex-1">
+                          <label className="text-xs text-gray-600 whitespace-nowrap">起始日期:</label>
+                          <Input
+                            type="date"
+                            value={editStartDate}
+                            onChange={(e) => setEditStartDate(e.target.value)}
+                            className="flex-1 text-xs"
+                            placeholder="年/月/日"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-1 flex-1">
+                          <label className="text-xs text-gray-600 whitespace-nowrap">截止日期:</label>
+                          <Input
+                            type="date"
+                            value={editDueDate}
+                            onChange={(e) => setEditDueDate(e.target.value)}
+                            className="flex-1 text-xs"
+                            placeholder="年/月/日"
+                          />
+                        </div>
                       </div>
                       <div className="flex justify-end space-x-1">
                         <Button
@@ -543,12 +573,12 @@ function TodoList({
                         <div className="text-xs text-muted-foreground mt-0.5">
                           {todo.startDate && todo.dueDate ? (
                             <span>
-                              {new Date(todo.startDate).toLocaleDateString('zh-CN')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+                              {new Date(todo.startDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
                             </span>
                           ) : todo.startDate ? (
-                            <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN')}</span>
+                            <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
                           ) : todo.dueDate ? (
-                            <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN')}</span>
+                            <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
                           ) : null}
                         </div>
                       </div>
@@ -556,13 +586,18 @@ function TodoList({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setMenuOpenTodo(menuOpenTodo === todo.id ? null : todo.id)}
+                          onClick={() => {
+                            console.log('三个小点按钮被点击', todo.id, menuOpenTodo)
+                            const newState = menuOpenTodo === todo.id ? null : todo.id
+                            console.log('设置菜单状态为:', newState)
+                            setMenuOpenTodo(newState)
+                          }}
                           className="h-6 w-6 p-0"
                         >
                           <MoreVertical className="h-3 w-3" />
                         </Button>
                         {menuOpenTodo === todo.id && (
-                          <div className="absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[80px]">
+                          <div className="todo-menu absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[80px]">
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1045,25 +1080,73 @@ export default function NotePad() {
     }
   }
 
+  // 处理笔记转换为Todo
+  const handleConvertToTodo = async (note: Note) => {
+    try {
+      // 创建todo
+      const todoResult = await apiClient.createTodo({
+        text: note.content,
+        tags: note.tags,
+        priority: 'medium'
+      })
+      
+      if (todoResult.success) {
+        // 删除笔记
+        const deleteResult = await deleteNote(note.id)
+        if (deleteResult.success) {
+          // 刷新笔记列表
+          if (searchTerm) {
+            handleSearch(searchTerm)
+          } else {
+            loadNotes()
+          }
+          toast({
+            title: "转换成功",
+            description: "笔记已转换为Todo事项并删除原笔记",
+          })
+        } else {
+          toast({
+            title: "转换失败",
+            description: "Todo创建成功但删除笔记失败",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "转换失败",
+          description: todoResult.error || "创建Todo失败",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "转换失败",
+        description: "网络错误，请重试",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 使用认证上下文
+  const { user, loading: authLoading, isAuthenticated, logout } = useAuth()
+
   // 检查用户登录状态
   useEffect(() => {
-    const checkAuth = () => {
-      const userId = localStorage.getItem("userId")
-      if (!userId) {
+    if (!authLoading) {
+      if (!isAuthenticated) {
         // 用户未登录，重定向到登录页面
         router.push("/login")
         return
       }
+      
       setIsLoggedIn(true)
       setIsCheckingAuth(false)
     }
-
-    checkAuth()
-  }, [router])
+  }, [authLoading, isAuthenticated, router])
 
   // 处理用户登出
   const handleLogout = () => {
-    localStorage.removeItem("userId")
+    logout()
     setIsLoggedIn(false)
     router.push("/login")
   }
@@ -1172,6 +1255,7 @@ export default function NotePad() {
                                 onDelete={handleNoteDelete}
                                 searchTerm={searchTerm}
                                 onTagClick={handleTagClick}
+                                onConvertToTodo={handleConvertToTodo}
                               />
                             ))}
                           </div>
@@ -1203,6 +1287,7 @@ export default function NotePad() {
                             onDelete={handleNoteDelete}
                             searchTerm={searchTerm}
                             onTagClick={handleTagClick}
+                            onConvertToTodo={handleConvertToTodo}
                           />
                         ))}
                       </div>
@@ -1254,23 +1339,29 @@ export default function NotePad() {
                   
                   {/* Todo模式下显示起始日期和截止日期输入框 */}
                   {inputMode === 'todo' && (
-                    <div className="flex space-x-2">
-                      <Input
-                        type="date"
-                        value={todoStartDate}
-                        onChange={(e) => setTodoStartDate(e.target.value)}
-                        placeholder="起始日期 (可选)"
-                        className="text-sm flex-1"
-                        disabled={isAdding}
-                      />
-                      <Input
-                        type="date"
-                        value={todoDueDate}
-                        onChange={(e) => setTodoDueDate(e.target.value)}
-                        placeholder="截止日期 (可选)"
-                        className="text-sm flex-1"
-                        disabled={isAdding}
-                      />
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2 flex-1">
+                        <label className="text-sm text-gray-600 whitespace-nowrap">起始日期:</label>
+                        <Input
+                          type="date"
+                          value={todoStartDate}
+                          onChange={(e) => setTodoStartDate(e.target.value)}
+                          placeholder="年/月/日"
+                          className="text-sm flex-1"
+                          disabled={isAdding}
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2 flex-1">
+                        <label className="text-sm text-gray-600 whitespace-nowrap">截止日期:</label>
+                        <Input
+                          type="date"
+                          value={todoDueDate}
+                          onChange={(e) => setTodoDueDate(e.target.value)}
+                          placeholder="年/月/日"
+                          className="text-sm flex-1"
+                          disabled={isAdding}
+                        />
+                      </div>
                     </div>
                   )}
             

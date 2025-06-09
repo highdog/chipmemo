@@ -1,23 +1,23 @@
-"use server"
-
-import { revalidatePath } from "next/cache"
-
 export interface User {
   id: string
   username: string
   email: string
-  password: string // 实际项目中应该存储哈希后的密码
-  createdAt: string
+  preferences?: any
 }
 
-// 模拟用户数据存储
-const usersStorage: User[] = []
+export interface AuthResponse {
+  success: boolean
+  token?: string
+  user?: User
+  error?: string
+  errors?: Array<{ msg: string; param: string }>
+}
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
 
 // 注册新用户
-export async function registerUser(username: string, email: string, password: string): Promise<{ success: boolean; error?: string; userId?: string }> {
+export async function registerUser(username: string, email: string, password: string): Promise<AuthResponse> {
   try {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
     // 验证输入
     if (!username.trim()) {
       return { success: false, error: "用户名不能为空" }
@@ -29,83 +29,96 @@ export async function registerUser(username: string, email: string, password: st
       return { success: false, error: "密码不能少于6个字符" }
     }
 
-    // 检查用户名和邮箱是否已存在
-    const existingUser = usersStorage.find(
-      (user) => user.username === username || user.email === email
-    )
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, email, password }),
+    })
 
-    if (existingUser) {
-      if (existingUser.username === username) {
-        return { success: false, error: "用户名已被使用" }
-      }
-      if (existingUser.email === email) {
-        return { success: false, error: "邮箱已被注册" }
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || data.errors?.[0]?.msg || '注册失败'
       }
     }
 
-    // 创建新用户
-    const newUser: User = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      username,
-      email,
-      password, // 实际项目中应该存储哈希后的密码
-      createdAt: new Date().toISOString(),
+    return {
+      success: true,
+      token: data.token,
+      user: data.user
     }
-
-    usersStorage.push(newUser)
-    revalidatePath("/")
-
-    return { success: true, userId: newUser.id }
   } catch (error) {
-    return { success: false, error: "注册失败，请重试" }
+    return { success: false, error: "网络错误，请重试" }
   }
 }
 
 // 用户登录
-export async function loginUser(usernameOrEmail: string, password: string): Promise<{ success: boolean; error?: string; user?: Omit<User, "password"> }> {
+export async function loginUser(email: string, password: string): Promise<AuthResponse> {
   try {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
     // 验证输入
-    if (!usernameOrEmail.trim()) {
-      return { success: false, error: "用户名或邮箱不能为空" }
+    if (!email.trim()) {
+      return { success: false, error: "邮箱不能为空" }
     }
     if (!password) {
       return { success: false, error: "密码不能为空" }
     }
 
-    // 查找用户
-    const user = usersStorage.find(
-      (user) => (user.username === usernameOrEmail || user.email === usernameOrEmail) && user.password === password
-    )
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    })
 
-    if (!user) {
-      return { success: false, error: "用户名/邮箱或密码不正确" }
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || data.errors?.[0]?.msg || '登录失败'
+      }
     }
 
-    // 返回用户信息（不包含密码）
-    const { password: _, ...userWithoutPassword } = user
-    return { success: true, user: userWithoutPassword }
+    return {
+      success: true,
+      token: data.token,
+      user: data.user
+    }
   } catch (error) {
-    return { success: false, error: "登录失败，请重试" }
+    return { success: false, error: "网络错误，请重试" }
   }
 }
 
-// 获取当前用户信息（模拟）
-export async function getCurrentUser(userId: string): Promise<{ success: boolean; error?: string; user?: Omit<User, "password"> }> {
+// 获取当前用户信息
+export async function getCurrentUser(token: string): Promise<{ success: boolean; error?: string; user?: User }> {
   try {
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
 
-    const user = usersStorage.find((user) => user.id === userId)
+    const data = await response.json()
 
-    if (!user) {
-      return { success: false, error: "用户不存在" }
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || '获取用户信息失败'
+      }
     }
 
-    // 返回用户信息（不包含密码）
-    const { password: _, ...userWithoutPassword } = user
-    return { success: true, user: userWithoutPassword }
+    return {
+      success: true,
+      user: data.user
+    }
   } catch (error) {
-    return { success: false, error: "获取用户信息失败" }
+    return { success: false, error: "网络错误，请重试" }
   }
 }

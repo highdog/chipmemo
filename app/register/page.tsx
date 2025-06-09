@@ -116,6 +116,7 @@ export default function RegisterPage() {
                 name="password"
                 type="password"
                 placeholder="请输入密码（至少6个字符）"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={formData.password}
@@ -129,6 +130,7 @@ export default function RegisterPage() {
                 name="confirmPassword"
                 type="password"
                 placeholder="请再次输入密码"
+                autoComplete="new-password"
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}

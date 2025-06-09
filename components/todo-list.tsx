@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2, CheckCircle2, Circle } from "lucide-react"
-import { getTodosByDate, toggleTodo, type TodoItem } from "@/lib/actions"
+import { getTodosByDate, toggleTodo, type TodoItem } from "@/lib/actions-new"
 import { formatDateShort } from "@/lib/date-utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -24,11 +24,11 @@ export function TodoList({ selectedDate }: TodoListProps) {
   const loadTodos = async () => {
     setIsLoading(true)
     try {
-      const todosByNote = await getTodosByDate(selectedDate.toISOString())
+      const todosByNote: { noteId: string; todos: TodoItem[] }[] = await getTodosByDate(selectedDate.toISOString())
       const allTodos: TodoWithNote[] = []
 
-      todosByNote.forEach(({ noteId, todos }) => {
-        todos.forEach((todo) => {
+      todosByNote.forEach(({ noteId, todos }: { noteId: string; todos: TodoItem[] }) => {
+        todos.forEach((todo: TodoItem) => {
           allTodos.push({ noteId, todo })
         })
       })

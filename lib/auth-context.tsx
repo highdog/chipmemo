@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { authApi, User } from './api';
+import { authApi, User, apiClient } from './api';
 
 interface AuthContextType {
   user: User | null;
@@ -32,16 +32,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // 设置token到apiClient
+      apiClient.setToken(token);
+      
       const response = await authApi.getCurrentUser();
       if (response.success && response.data) {
         setUser(response.data.user);
       } else {
         // Token无效，清除本地存储
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('userId');
+        apiClient.clearToken();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('userId');
+      apiClient.clearToken();
     } finally {
       setLoading(false);
     }
@@ -55,6 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         const { token, user: userData } = response.data;
         localStorage.setItem('auth_token', token);
+        localStorage.setItem('userId', userData.id);
+        
+        // 设置apiClient的token
+        apiClient.setToken(token);
+        
         setUser(userData);
         return { success: true };
       } else {
@@ -81,6 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         const { token, user: userData } = response.data;
         localStorage.setItem('auth_token', token);
+        localStorage.setItem('userId', userData.id);
+        
+        // 设置apiClient的token
+        apiClient.setToken(token);
         setUser(userData);
         return { success: true };
       } else {
@@ -101,7 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem('auth_token');
-    authApi.logout();
+    localStorage.removeItem('userId');
+    apiClient.clearToken();
     setUser(null);
   };
 

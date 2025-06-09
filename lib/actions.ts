@@ -3,6 +3,19 @@
 import { revalidatePath } from "next/cache"
 import { extractTags, removeTagsFromContent } from "./utils"
 
+export interface Todo {
+  id: string
+  text: string
+  completed: boolean
+  priority?: 'low' | 'medium' | 'high'
+  dueDate?: string
+  startDate?: string
+  category?: string
+  tags?: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Note {
   id: string
   content: string
@@ -11,6 +24,7 @@ export interface Note {
   createdAt: string
   tags: string[]
   imageUrl?: string // 添加图片URL字段
+  todos?: Todo[] // 添加todos属性
 }
 
 // 模拟数据库存储

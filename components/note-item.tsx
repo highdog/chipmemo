@@ -3,21 +3,24 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CheckSquare, Tag } from "lucide-react"
+import { Trash2, CheckSquare, Tag, ListTodo } from "lucide-react"
 import { deleteNote, type Note } from "@/lib/actions"
 import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
 import { toast } from "@/hooks/use-toast"
+import { apiClient } from "@/lib/api"
 
 interface NoteItemProps {
   note: Note
   onDelete: () => void
   searchTerm?: string
   onTagClick?: (tag: string) => void
+  onConvertToTodo?: () => void
 }
 
-export function NoteItem({ note, onDelete, searchTerm, onTagClick }: NoteItemProps) {
+export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTodo }: NoteItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -44,6 +47,50 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick }: NoteItemPro
       })
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleConvertToTodo = async () => {
+    setIsConverting(true)
+    try {
+      // 创建todo
+      const todoResult = await apiClient.createTodo({
+        text: note.content,
+        tags: note.tags,
+        priority: 'medium'
+      })
+      
+      if (todoResult.success) {
+        // 删除笔记
+        const deleteResult = await deleteNote(note.id)
+        if (deleteResult.success) {
+          onConvertToTodo && onConvertToTodo()
+          toast({
+            title: "转换成功",
+            description: "笔记已转换为Todo事项并删除原笔记",
+          })
+        } else {
+          toast({
+            title: "转换失败",
+            description: "Todo创建成功但删除笔记失败",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "转换失败",
+          description: todoResult.error || "创建Todo失败",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "转换失败",
+        description: "网络错误，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsConverting(false)
     }
   }
 
@@ -97,6 +144,16 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick }: NoteItemPro
               </div>
             </div>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleConvertToTodo}
+            disabled={isConverting}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 mr-1"
+            title="转换为Todo"
+          >
+            <ListTodo className="h-3 w-3" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

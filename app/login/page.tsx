@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label"
 import { loginUser } from "@/lib/auth"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import { apiClient } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
-    usernameOrEmail: "",
+    email: "",
     password: "",
   })
 
@@ -32,16 +33,19 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const result = await loginUser(formData.usernameOrEmail, formData.password)
+      const result = await loginUser(formData.email, formData.password)
 
-      if (result.success) {
-        // 在实际应用中，这里应该存储用户会话信息
-        // 例如使用 cookies 或 localStorage
-        localStorage.setItem("userId", result.user?.id || "")
+      if (result.success && result.token && result.user) {
+        // 保存token和用户信息
+        localStorage.setItem("auth_token", result.token)
+        localStorage.setItem("userId", result.user.id)
+        
+        // 设置apiClient的token
+        apiClient.setToken(result.token)
         
         toast({
           title: "登录成功",
-          description: `欢迎回来，${result.user?.username}！`,
+          description: `欢迎回来，${result.user.username}！`,
         })
         
         // 登录成功后跳转到主页
@@ -77,16 +81,17 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="usernameOrEmail">用户名或邮箱</Label>
-              <Input
-                id="usernameOrEmail"
-                name="usernameOrEmail"
-                type="text"
-                placeholder="请输入用户名或邮箱"
-                required
-                value={formData.usernameOrEmail}
-                onChange={handleChange}
-              />
+              <Label htmlFor="email">邮箱</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="请输入邮箱"
+              value={formData.email}
+              onChange={handleChange}
+              autoComplete="email"
+              required
+            />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -103,6 +108,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 placeholder="请输入密码"
+                autoComplete="current-password"
                 required
                 value={formData.password}
                 onChange={handleChange}
