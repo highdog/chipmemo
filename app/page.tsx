@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
@@ -264,6 +264,7 @@ function TodoList({
   const [editContent, setEditContent] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
+  const [menuOpenTodo, setMenuOpenTodo] = useState<string | null>(null)
 
   const selectedDateObj = new Date(selectedDate)
   
@@ -332,6 +333,7 @@ function TodoList({
   }
 
   const handleEditTodo = (todo: any) => {
+    console.log('handleEditTodo被调用', todo)
     setEditingTodo(todo.id)
     setEditContent(todo.content)
     setEditStartDate(todo.startDate || '')
@@ -365,6 +367,7 @@ function TodoList({
   }
 
   const handleDeleteTodo = async (todoId: string) => {
+    console.log('handleDeleteTodo被调用', todoId)
     if (!confirm('确定要删除这个todo事项吗？')) return
     
     try {
@@ -378,6 +381,20 @@ function TodoList({
   useEffect(() => {
     loadTodos()
   }, [selectedDate])
+
+  // 点击外部区域关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuOpenTodo) {
+        setMenuOpenTodo(null)
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [menuOpenTodo])
 
   const completedCount = displayTodos.filter(todo => todo.completed).length
   const totalCount = displayTodos.length
@@ -499,7 +516,7 @@ function TodoList({
                         onCheckedChange={() => handleToggleTodo(todo.id)}
                         className="mt-0.5"
                       />
-                      <div className="flex-1" onClick={() => handleEditTodo(todo)} style={{ cursor: 'pointer' }}>
+                      <div className="flex-1">
                         <label
                           htmlFor={todo.id}
                           className={cn(
@@ -535,23 +552,45 @@ function TodoList({
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex space-x-1">
+                      <div className="relative">
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleEditTodo(todo)}
+                          onClick={() => setMenuOpenTodo(menuOpenTodo === todo.id ? null : todo.id)}
                           className="h-6 w-6 p-0"
                         >
-                          <Edit className="h-3 w-3" />
+                          <MoreVertical className="h-3 w-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteTodo(todo.id)}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {menuOpenTodo === todo.id && (
+                          <div className="absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[80px]">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                console.log('编辑按钮被点击', todo)
+                                handleEditTodo(todo)
+                                setMenuOpenTodo(null)
+                              }}
+                              className="w-full justify-start h-8 px-2 text-xs"
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              编辑
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                console.log('删除按钮被点击', todo.id)
+                                handleDeleteTodo(todo.id)
+                                setMenuOpenTodo(null)
+                              }}
+                              className="w-full justify-start h-8 px-2 text-xs text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              删除
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -862,20 +901,79 @@ export default function NotePad() {
    
    const handleToggleTodo = async (todoId: string) => {
     try {
-      // 在所有日期中查找并切换todo状态
-      setTodosByDate(prev => {
-        const newTodosByDate = { ...prev }
-        for (const dateKey in newTodosByDate) {
-          newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
-            todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
-          )
+      // 在所有日期中查找todo
+      let targetTodo: any = null
+      for (const dateKey in todosByDate) {
+        const todo = todosByDate[dateKey].find(t => t.id === todoId)
+        if (todo) {
+          targetTodo = todo
+          break
         }
-        return newTodosByDate
-      })
+      }
+      
+      if (!targetTodo) return
+      
+      // 如果todo从未完成变为完成，则删除todo并创建笔记
+      if (!targetTodo.completed) {
+        // 删除todo
+        setTodosByDate(prev => {
+          const newTodosByDate = { ...prev }
+          for (const dateKey in newTodosByDate) {
+            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
+          }
+          return newTodosByDate
+        })
+        
+        // 创建笔记内容，包含原todo的内容和标签
+        const noteContent = targetTodo.content + (targetTodo.tags && targetTodo.tags.length > 0 ? ' ' + targetTodo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
+        
+        // 调用addNote API创建新笔记
+        const result = await addNote(noteContent, new Date().toISOString())
+        if (result.success) {
+          // 重新加载笔记列表
+          if (searchTerm) {
+            await handleSearch(searchTerm)
+          } else {
+            await loadNotes()
+          }
+          toast({
+            title: "成功",
+            description: "Todo已完成并转换为笔记",
+          })
+        } else {
+          toast({
+            title: "错误",
+            description: "创建笔记失败：" + (result.error || "未知错误"),
+            variant: "destructive",
+          })
+          // 如果创建笔记失败，恢复todo
+          setTodosByDate(prev => {
+            const newTodosByDate = { ...prev }
+            const currentDateKey = date.toDateString()
+            newTodosByDate[currentDateKey] = [...(newTodosByDate[currentDateKey] || []), targetTodo]
+            return newTodosByDate
+          })
+        }
+      } else {
+        // 如果是从完成变为未完成，只切换状态
+        setTodosByDate(prev => {
+          const newTodosByDate = { ...prev }
+          for (const dateKey in newTodosByDate) {
+            newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
+              todo.id === todoId ? { ...todo, completed: false } : todo
+            )
+          }
+          return newTodosByDate
+        })
+        toast({
+          title: "成功",
+          description: "Todo状态已更新",
+        })
+      }
     } catch (error) {
       toast({
         title: "错误",
-        description: "切换Todo状态失败",
+        description: "操作失败",
         variant: "destructive",
       })
     }
@@ -1120,10 +1218,6 @@ export default function NotePad() {
               {/* 固定在笔记区域底部的输入区域 */}
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-4 shadow-lg">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Info className="h-3 w-3" />
-                    <span>使用 #标签 创建标签（支持中英文）</span>
-                  </div>
                   {/* 模式切换按钮 */}
                   <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                     <Button
@@ -1142,6 +1236,10 @@ export default function NotePad() {
                     >
                       Todo
                     </Button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Info className="h-3 w-3" />
+                    <span>使用 #标签 创建标签（支持中英文）</span>
                   </div>
                 </div>
                 <div className="flex flex-col space-y-2">
