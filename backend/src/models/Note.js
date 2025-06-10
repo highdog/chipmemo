@@ -41,7 +41,11 @@ const noteSchema = new mongoose.Schema({
     mimeType: String,
     size: Number,
     url: String
-  }]
+  }],
+  customDate: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });

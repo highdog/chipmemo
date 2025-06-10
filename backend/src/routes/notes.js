@@ -120,7 +120,11 @@ router.post('/', [
   body('color')
     .optional()
     .isIn(['default', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'])
-    .withMessage('Invalid color')
+    .withMessage('Invalid color'),
+  body('customDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Custom date must be a valid ISO 8601 date')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -128,15 +132,21 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { title, content, tags, color } = req.body;
+    const { title, content, tags, color, customDate } = req.body;
 
     const note = new Note({
       title,
       content,
       tags: tags || [],
       color: color || 'default',
-      userId: req.user._id
+      userId: req.user._id,
+      customDate: customDate ? new Date(customDate) : null
     });
+
+    // 如果指定了自定义日期，也设置createdAt
+    if (customDate) {
+      note.createdAt = new Date(customDate);
+    }
 
     await note.save();
 
@@ -169,6 +179,10 @@ router.put('/:id', [
     .optional()
     .isIn(['default', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'])
     .withMessage('Invalid color'),
+  body('customDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Custom date must be a valid ISO 8601 date'),
   body('isPinned')
     .optional()
     .isBoolean()

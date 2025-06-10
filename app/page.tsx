@@ -21,6 +21,7 @@ import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2
 import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
+import ScheduleList from "@/components/schedule-list"
 import {
   addNote,
   getNotes,
@@ -596,6 +597,12 @@ export default function NotePad() {
       if (!searchTerm) {
         scrollToDate(selectedDate)
       }
+      // 显示提示信息，告知用户现在可以添加笔记到选中的日期
+      toast({
+        title: "日期已选择",
+        description: `现在添加的笔记将保存到 ${selectedDate.toLocaleDateString('zh-CN')}`,
+        duration: 2000,
+      })
     }
   }
 
@@ -1280,6 +1287,10 @@ export default function NotePad() {
               
               {/* 固定在笔记区域底部的输入区域 */}
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t p-4 shadow-lg">
+                {/* 当前选中日期显示 */}
+                <div className="mb-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1 text-center">
+                  📅 当前选中日期: {date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+                </div>
                 <div className="mb-2 flex items-center justify-between">
                   {/* 模式切换按钮 */}
                   <div className="flex items-center gap-1 bg-muted rounded-md p-1">
@@ -1413,6 +1424,11 @@ export default function NotePad() {
                   onSelect={handleDateSelect}
                   className="rounded-md border"
                 />
+              </div>
+              
+              {/* 日程区域 - 固定不滚动 */}
+              <div className="p-4 border-b">
+                <ScheduleList selectedDate={date} />
               </div>
               
               {/* Todo列表区域 - 独立滚动 */}

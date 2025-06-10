@@ -125,6 +125,7 @@ export async function addNote(
       title,
       content: originalContent,
       tags,
+      customDate: date,
     });
 
     if (response.success) {

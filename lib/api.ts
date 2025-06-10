@@ -231,6 +231,7 @@ class ApiClient {
     content: string;
     tags?: string[];
     color?: string;
+    customDate?: string;
   }): Promise<ApiResponse<Note>> {
     return this.post<Note>('/notes', noteData);
   }
