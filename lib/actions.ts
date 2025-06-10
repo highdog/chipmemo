@@ -32,7 +32,10 @@ function convertApiNoteToNote(apiNote: ApiNote): Note {
   const imageUrl = imageMatch ? imageMatch[1] : undefined;
   
   // 移除内容中的图片markdown，只保留文本内容用于显示
-  const contentWithoutImage = apiNote.content.replace(/!\[.*?\]\(.*?\)/g, '').trim();
+  let contentWithoutImage = apiNote.content.replace(/!\[.*?\]\(.*?\)/g, '').trim();
+  
+  // 移除标签文字，因为标签已经单独显示
+  contentWithoutImage = removeTagsFromContent(contentWithoutImage);
   
   return {
     id: apiNote._id,

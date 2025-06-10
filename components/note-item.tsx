@@ -9,6 +9,10 @@ import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
 import { toast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
+
 
 interface NoteItemProps {
   note: Note
@@ -51,63 +55,146 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   }
 
   const handleConvertToTodo = async () => {
-    setIsConverting(true)
-    try {
-      // 创建todo
-      const todoResult = await apiClient.createTodo({
-        text: note.content,
-        tags: note.tags,
-        priority: 'medium'
-      })
-      
-      if (todoResult.success) {
-        // 删除笔记
-        const deleteResult = await deleteNote(note.id)
-        if (deleteResult.success) {
-          onConvertToTodo && onConvertToTodo()
-          toast({
-            title: "转换成功",
-            description: "笔记已转换为Todo事项并删除原笔记",
-          })
-        } else {
-          toast({
-            title: "转换失败",
-            description: "Todo创建成功但删除笔记失败",
-            variant: "destructive",
-          })
-        }
-      } else {
-        toast({
-          title: "转换失败",
-          description: todoResult.error || "创建Todo失败",
-          variant: "destructive",
-        })
+    if (onConvertToTodo) {
+      setIsConverting(true)
+      try {
+        await onConvertToTodo()
+      } finally {
+        setIsConverting(false)
       }
-    } catch (error) {
-      toast({
-        title: "转换失败",
-        description: "网络错误，请重试",
-        variant: "destructive",
-      })
-    } finally {
-      setIsConverting(false)
     }
   }
 
-  // 高亮搜索内容
-  const highlightSearchTerm = (content: string) => {
-    if (!searchTerm) return highlightTags(content)
+  // 渲染笔记内容的组件
+  const renderNoteContent = () => {
+    // 自定义组件来处理标签点击
+    const components = {
+      p: ({ children, ...props }: any) => {
+        return (
+          <p {...props} className="mb-2 last:mb-0">
+            {processTextWithTags(children)}
+          </p>
+        );
+      },
+      // 处理其他Markdown元素
+      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-2">{processTextWithTags(children)}</h1>,
+      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-2">{processTextWithTags(children)}</h2>,
+      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-1">{processTextWithTags(children)}</h3>,
+      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-2">{children}</ul>,
+      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-2">{children}</ol>,
+      li: ({ children, ...props }: any) => <li {...props}>{processTextWithTags(children)}</li>,
+      blockquote: ({ children, ...props }: any) => (
+        <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-2">
+          {processTextWithTags(children)}
+        </blockquote>
+      ),
+      code: ({ children, ...props }: any) => (
+        <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">
+          {children}
+        </code>
+      ),
+      pre: ({ children, ...props }: any) => (
+        <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-3 rounded mb-2 overflow-x-auto">
+          {children}
+        </pre>
+      ),
+    };
 
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
-    const highlighted = content.replace(regex, '<mark class="bg-yellow-200">$1</mark>')
-    return highlightTags(highlighted)
+    return (
+      <div className="markdown-content">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkBreaks]}
+          components={components}
+        >
+          {note.content}
+        </ReactMarkdown>
+      </div>
+    );
+  };
+
+  // 处理文本中的标签和搜索高亮
+  const processTextWithTags = (children: any): any => {
+    if (typeof children === 'string') {
+      return processStringWithTagsAndHighlight(children);
+    }
+    
+    if (Array.isArray(children)) {
+      return children.map((child, index) => {
+        if (typeof child === 'string') {
+          return <span key={index}>{processStringWithTagsAndHighlight(child)}</span>;
+        }
+        return child;
+      });
+    }
+    
+    return children;
+  };
+
+  // 处理字符串中的标签和搜索高亮
+  const processStringWithTagsAndHighlight = (text: string) => {
+    const tagRegex = /#[\w\u4e00-\u9fa5]+/g;
+    const parts = text.split(tagRegex);
+    const tags = text.match(tagRegex) || [];
+    
+    const result = [];
+    
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i]) {
+        // 处理搜索高亮
+        if (searchTerm && parts[i].toLowerCase().includes(searchTerm.toLowerCase())) {
+          const regex = new RegExp(`(${searchTerm})`, 'gi');
+          const highlightedParts = parts[i].split(regex);
+          result.push(
+            <span key={`text-${i}`}>
+              {highlightedParts.map((part, index) => 
+                regex.test(part) ? (
+                  <span key={index} className="bg-yellow-200 dark:bg-yellow-800">
+                    {part}
+                  </span>
+                ) : (
+                  part
+                )
+              )}
+            </span>
+          );
+        } else {
+          result.push(<span key={`text-${i}`}>{parts[i]}</span>);
+        }
+      }
+      
+      // 添加标签
+      if (tags[i]) {
+        result.push(
+          <span
+            key={`tag-${i}`}
+            className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline font-medium"
+            onClick={() => onTagClick && onTagClick(tags[i].substring(1))}
+          >
+            {tags[i]}
+          </span>
+        );
+      }
+    }
+    
+    return result;
+  };
+  
+  // 处理标签点击
+  const handleContentClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.classList.contains('tag-span')) {
+      const tag = target.getAttribute('data-tag')
+      if (tag && onTagClick) {
+        onTagClick(tag)
+      }
+    }
   }
 
   const todoCount = note.todos?.length || 0
   const completedTodos = note.todos?.filter((todo) => todo.completed).length || 0
 
   return (
-    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
+    <div id={`note-${note.id}`} className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
       <div className="flex justify-between items-start mb-2">
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
@@ -165,8 +252,13 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           </Button>
         </div>
       </div>
-      <div>
-        <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightSearchTerm(note.content) }} />
+      <div 
+        className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+        style={{ whiteSpace: 'pre-wrap' }}
+        onClick={handleContentClick}
+      >
+        {renderNoteContent()}
+      </div>
         {note.imageUrl && note.imageUrl.trim() !== "" && (
           <div className="mt-2">
             <img 
@@ -183,7 +275,6 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             />
           </div>
         )}
-      </div>
     </div>
   )
 }

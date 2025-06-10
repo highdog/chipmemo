@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { MarkdownEditor } from "@/components/markdown-editor"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -19,6 +20,7 @@ import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2
 // 由于TodoList组件已在本文件中定义,移除此导入
 import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
+import { NoteItem } from "@/components/note-item"
 import {
   addNote,
   getNotes,
@@ -99,126 +101,6 @@ function SearchBar({
           显示全部
         </Button>
       )}
-    </div>
-  )
-}
-
-// NoteItem Component
-function NoteItem({
-  note,
-  onDelete,
-  searchTerm,
-  onTagClick,
-  onConvertToTodo,
-}: {
-  note: Note
-  onDelete: () => void
-  searchTerm?: string
-  onTagClick: (tag: string) => void
-  onConvertToTodo: () => void
-}) {
-  const [isDeleting, setIsDeleting] = useState(false)
-
-  const handleDelete = async () => {
-    setIsDeleting(true)
-    try {
-      const result = await deleteNote(note.id)
-      if (result.success) {
-        onDelete()
-        toast({
-          title: "删除成功",
-          description: "笔记已删除",
-        })
-      } else {
-        toast({
-          title: "删除失败",
-          description: result.error || "未知错误",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "删除失败",
-        description: "网络错误，请重试",
-        variant: "destructive",
-      })
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  // 高亮搜索内容
-  const highlightSearchTerm = (content: string) => {
-    if (!searchTerm) return content
-
-    // 移除搜索词前面的#号（如果有的话）
-    const cleanSearchTerm = searchTerm.replace(/^#/, "")
-    const regex = new RegExp(`(${cleanSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi")
-    return content.replace(regex, '<mark class="bg-yellow-200">$1</mark>')
-  }
-
-
-
-  return (
-    <div className="p-3 border rounded-lg group hover:shadow-sm transition-shadow bg-card">
-      <div className="flex justify-between items-start mb-2">
-        {/* 左上角：时间和Todo徽章 */}
-        <div className="flex items-center gap-2">
-          <div className="text-sm font-medium text-muted-foreground">{formatTime(note.createdAt)}</div>
-          {note.todos && note.todos.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              <CheckSquare className="h-3 w-3 mr-1" />
-              {note.todos.filter((todo: any) => todo.completed).length}/{note.todos.length}
-            </Badge>
-          )}
-        </div>
-
-        {/* 右上角：标签和删除按钮 */}
-        <div className="flex items-center gap-2">
-          {note.tags.length > 0 && (
-            <div className="flex items-center gap-1">
-              <Tag className="h-3 w-3 text-muted-foreground" />
-              <div className="flex gap-1 flex-wrap">
-                {note.tags.slice(0, 4).map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="outline"
-                    className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors"
-                    onClick={() => onTagClick(tag)}
-                    title={`点击搜索 #${tag} 标签`}
-                  >
-                    #{tag}
-                  </Badge>
-                    ))}
-                {note.tags.length > 4 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{note.tags.length - 4}
-                  </Badge>
-                    )}
-                              </div>
-                </div>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onConvertToTodo}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-            title="转换为Todo"
-          >
-            <CheckSquare className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-      <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightSearchTerm(note.content) }} />
     </div>
   )
 }
@@ -910,6 +792,25 @@ export default function NotePad() {
           }
           // 强制更新日期以触发TodoList重新加载
           setDate(new Date(date))
+          
+          // 自动滚动到最新添加的笔记
+          setTimeout(() => {
+            // 重新加载笔记后，找到最新的笔记进行滚动
+            const allNoteElements = document.querySelectorAll('[id^="note-"]')
+            if (allNoteElements.length > 0) {
+              const lastNote = allNoteElements[allNoteElements.length - 1]
+              lastNote.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            } else {
+              // 如果没有找到笔记元素，回退到日期滚动
+              const currentDateString = date.toDateString()
+              const dateElement = document.getElementById(`date-${currentDateString}`) || 
+                                 document.getElementById(`date-group-${currentDateString}`)
+              if (dateElement) {
+                dateElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }
+          }, 300)
+          
           toast({
             title: "添加成功",
             description: "笔记已保存到服务器",
@@ -1053,18 +954,28 @@ export default function NotePad() {
 
   const handleDeleteTodo = async (todoId: string) => {
     try {
-      // 在所有日期中查找并删除todo
-      setTodosByDate(prev => {
-        const newTodosByDate = { ...prev }
-        for (const dateKey in newTodosByDate) {
-          newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
-        }
-        return newTodosByDate
-      })
-      toast({
-        title: "成功",
-        description: "Todo已删除",
-      })
+      // 调用后端API删除todo
+      const result = await apiClient.deleteTodo(todoId)
+      if (result.success) {
+        // 在所有日期中查找并删除todo
+        setTodosByDate(prev => {
+          const newTodosByDate = { ...prev }
+          for (const dateKey in newTodosByDate) {
+            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
+          }
+          return newTodosByDate
+        })
+        toast({
+          title: "成功",
+          description: "Todo已删除",
+        })
+      } else {
+        toast({
+          title: "删除失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       toast({
         title: "错误",
@@ -1112,6 +1023,8 @@ export default function NotePad() {
           } else {
             loadNotes()
           }
+          // 刷新todo列表
+          loadTodosData()
           toast({
             title: "转换成功",
             description: "笔记已转换为Todo事项并删除原笔记",
@@ -1131,9 +1044,10 @@ export default function NotePad() {
         })
       }
     } catch (error) {
+      console.error('转换笔记为todo时发生错误:', error)
       toast({
         title: "转换失败",
-        description: "网络错误，请重试",
+        description: `网络错误: ${error instanceof Error ? error.message : '请重试'}`,
         variant: "destructive",
       })
     }
@@ -1163,12 +1077,68 @@ export default function NotePad() {
     router.push("/login")
   }
 
-  // 组件加载时获取笔记（仅在已登录时）
+  // 组件加载时获取笔记和todos（仅在已登录时）
   useEffect(() => {
     if (isLoggedIn && !isCheckingAuth) {
-      loadNotes()
+      loadNotes().then(() => {
+        // 页面加载完成后自动滚动到最新笔记
+        setTimeout(() => {
+          // 查找最新的笔记元素
+          const noteElements = document.querySelectorAll('[id^="note-"]')
+          if (noteElements.length > 0) {
+            const lastNote = noteElements[noteElements.length - 1]
+            lastNote.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          } else {
+            // 如果没有笔记，滚动到今天的日期
+            const today = new Date().toDateString()
+            const todayElement = document.getElementById(`date-${today}`) || 
+                                document.getElementById(`date-group-${today}`)
+            if (todayElement) {
+              todayElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          }
+        }, 300)
+      })
+      loadTodosData()
     }
   }, [isLoggedIn, isCheckingAuth])
+
+  // 加载todo数据
+  const loadTodosData = async () => {
+    try {
+      // 获取所有todos并按日期分组
+      const response = await apiClient.getTodos({ limit: 100 })
+      if (response.success && response.data) {
+        const todosByDateMap: Record<string, Array<{
+          id: string;
+          content: string;
+          completed: boolean;
+          tags: string[];
+          dueDate?: string;
+          startDate?: string;
+        }>> = {}
+        
+        response.data.todos.forEach((todo: any) => {
+          const dateKey = todo.dueDate ? getDateKey(todo.dueDate) : getDateKey(new Date().toISOString())
+          if (!todosByDateMap[dateKey]) {
+            todosByDateMap[dateKey] = []
+          }
+          todosByDateMap[dateKey].push({
+            id: todo._id,
+            content: todo.text,
+            completed: todo.completed || false,
+            tags: todo.tags || [],
+            dueDate: todo.dueDate,
+            startDate: todo.startDate
+          })
+        })
+        
+        setTodosByDate(todosByDateMap)
+      }
+    } catch (error) {
+      console.error('加载todos失败:', error)
+    }
+  }
 
 
   const groupedNotes = groupNotesByDate(notes)
@@ -1196,42 +1166,38 @@ export default function NotePad() {
       
       {/* 导航栏 - 固定在顶部 */}
       <header className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto py-3 px-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold">笔记应用</h1>
-              </div>
-          <UserNav onLogout={handleLogout} />
-        </div>
-      </header>
-      
-      {/* 搜索栏区域 - 固定在顶部 */}
-      <div className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto p-4 max-w-7xl">
-          <div className="flex justify-between items-center gap-4">
-            {/* 搜索框移到左侧原标题位置 */}
-            <div className="flex-1">
-              <SearchBar onSearch={handleSearch} onClearSearch={handleClearSearch} searchTerm={searchTerm} />
-                </div>
-
-            {/* 明暗主题切换按钮 */}
-            <Button variant="outline" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-              {theme === 'dark' ? (
-                <Sun className="h-4 w-4 mr-2" />
-                  ) : (
-                <Moon className="h-4 w-4 mr-2" />
-                  )}
-              {theme === 'dark' ? '浅色' : '深色'}
-            </Button>
-              </div>
-
+        <div className="container mx-auto py-3 px-4 max-w-7xl">
+          <div className="flex items-center justify-between gap-4">
+             {/* 左侧：土豆笔记标题和搜索框 */}
+             <div className="flex items-center gap-4 flex-1">
+               <h1 className="text-xl font-bold whitespace-nowrap">土豆笔记</h1>
+               <div className="flex-1 max-w-md">
+                 <SearchBar onSearch={handleSearch} onClearSearch={handleClearSearch} searchTerm={searchTerm} />
+               </div>
+             </div>
+             
+             {/* 右侧：深浅色切换按钮和用户图标 */}
+             <div className="flex items-center gap-2">
+               <Button variant="outline" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                 {theme === 'dark' ? (
+                   <Sun className="h-4 w-4 mr-2" />
+                 ) : (
+                   <Moon className="h-4 w-4 mr-2" />
+                 )}
+                 {theme === 'dark' ? '浅色' : '深色'}
+               </Button>
+               <UserNav onLogout={handleLogout} />
+             </div>
+          </div>
+          
           {/* 搜索状态提示 */}
           {searchTerm && (
             <div className="mt-2 text-sm text-muted-foreground">
               搜索结果: "{searchTerm}" ({notes.length} 条笔记)
-                </div>
+            </div>
           )}
         </div>
-      </div>
+      </header>
 
       <main className="flex-1 flex overflow-hidden">
         <div className="container mx-auto max-w-7xl flex-1 flex flex-col">
@@ -1344,8 +1310,8 @@ export default function NotePad() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={inputMode === 'note' ? "输入新笔记... (使用 #学习 #工作 等)" : "输入新Todo... (使用 #标签)"}
-                    className="flex-1 min-h-[80px] resize-none"
+                    placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
+                    className="flex-1 min-h-[120px] resize-none font-mono text-sm"
                     disabled={isAdding}
                   />
                   
