@@ -6,10 +6,10 @@ import { authApi, User, apiClient } from './api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
+  register: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
-  updateUser: (data: { username?: string; preferences?: Partial<User['preferences']> }) => Promise<{ success: boolean; error?: string }>;
+  updateUser: (data: { username?: string; preferences?: Partial<User['preferences']> }) => Promise<{ success: boolean; error?: string; user?: User }>;
   isAuthenticated: boolean;
 }
 
@@ -54,10 +54,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    console.log('[AuthContext] Attempting login for:', email);
     try {
       setLoading(true);
+      console.log('[AuthContext] Calling authApi.login...');
       const response = await authApi.login({ email, password });
+      console.log('[AuthContext] authApi.login response:', response);
       
       if (response.success && response.data) {
         const { token, user: userData } = response.data;
@@ -68,24 +71,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apiClient.setToken(token);
         
         setUser(userData);
-        return { success: true };
+        console.log('[AuthContext] Login successful, user set:', userData);
+        return { success: true, user: userData };
       } else {
+        console.error('[AuthContext] Login failed, response error:', response.error);
         return {
           success: false,
           error: response.error || '登录失败',
         };
       }
     } catch (error) {
+      console.error('[AuthContext] Login caught exception:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : '登录失败',
       };
     } finally {
       setLoading(false);
+      console.log('[AuthContext] Login attempt finished.');
     }
   };
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = async (username: string, email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
     try {
       setLoading(true);
       const response = await authApi.register({ username, email, password });
@@ -98,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 设置apiClient的token
         apiClient.setToken(token);
         setUser(userData);
-        return { success: true };
+        return { success: true, user: userData };
       } else {
         return {
           success: false,
@@ -122,13 +129,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const updateUser = async (data: { username?: string; preferences?: Partial<User['preferences']> }) => {
+  const updateUser = async (data: { username?: string; preferences?: Partial<User['preferences']> }): Promise<{ success: boolean; error?: string; user?: User }> => {
     try {
       const response = await authApi.updateProfile(data);
       
       if (response.success && response.data) {
         setUser(response.data.user);
-        return { success: true };
+        return { success: true, user: response.data.user };
       } else {
         return {
           success: false,

@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getCurrentUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
 
 interface UserNavProps {
@@ -22,35 +21,10 @@ interface UserNavProps {
 
 export function UserNav({ onLogout }: UserNavProps) {
   const router = useRouter()
-  const [user, setUser] = useState<{ id: string; username: string; email: string } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const userId = localStorage.getItem("userId")
-      if (userId) {
-        try {
-          const result = await getCurrentUser(userId)
-          if (result.success && result.user) {
-            setUser(result.user)
-          } else {
-            // 用户信息获取失败，清除本地存储
-            localStorage.removeItem("userId")
-          }
-        } catch (error) {
-          console.error("获取用户信息失败", error)
-        }
-      }
-      setIsLoading(false)
-    }
-
-    fetchUser()
-  }, [])
+  const { user, loading: isLoading, logout } = useAuth()
 
   const handleLogout = () => {
-    // 清除用户会话
-    localStorage.removeItem("userId")
-    setUser(null)
+    logout()
     
     toast({
       title: "已退出登录",

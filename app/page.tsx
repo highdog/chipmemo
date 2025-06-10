@@ -841,7 +841,19 @@ export default function NotePad() {
 
     const reader = new FileReader()
     reader.onload = (event) => {
-      setSelectedImage(event.target?.result as string)
+      const dataUrl = event.target?.result as string
+      
+      // 检查Data URL大小（限制为90KB，确保不超过后端100000字符限制）
+      if (dataUrl && dataUrl.length > 90000) {
+        toast({
+          title: "上传失败",
+          description: "图片过大，请选择更小的图片或降低图片质量",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      setSelectedImage(dataUrl)
     }
     reader.readAsDataURL(file)
   }

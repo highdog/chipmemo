@@ -111,8 +111,8 @@ router.post('/', [
   body('content')
     .notEmpty()
     .withMessage('Content is required')
-    .isLength({ max: 50000 })
-    .withMessage('Content cannot exceed 50000 characters'),
+    .isLength({ max: 100000 })
+    .withMessage('Content cannot exceed 100000 characters'),
   body('tags')
     .optional()
     .isArray()

@@ -7,14 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { loginUser } from "@/lib/auth"
+import { useEffect } from "react" // Add useEffect import
+import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { apiClient } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const { login, isAuthenticated, loading: authLoading } = useAuth() // Get isAuthenticated and authLoading
+  const [isLoading, setIsLoading] = useState(false) // Local loading state for form submission
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,27 +32,23 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[LoginPage] handleSubmit called with formData:', formData);
     setIsLoading(true)
 
     try {
-      const result = await loginUser(formData.email, formData.password)
+      console.log('[LoginPage] Calling authContext.login...');
+      const result = await login(formData.email, formData.password) // 使用 context 中的 login 方法
+      console.log('[LoginPage] authContext.login result:', result);
 
-      if (result.success && result.token && result.user) {
-        // 保存token和用户信息
-        localStorage.setItem("auth_token", result.token)
-        localStorage.setItem("userId", result.user.id)
-        
-        // 设置apiClient的token
-        apiClient.setToken(result.token)
-        
+      if (result.success && result.user) {
         toast({
           title: "登录成功",
           description: `欢迎回来，${result.user.username}！`,
-        })
-        
-        // 登录成功后跳转到主页
-        router.push("/")
+        });
+        console.log('[LoginPage] Login success toast shown.');
+        // router.push("/"); // Navigation will be handled by useEffect
       } else {
+        console.error('[LoginPage] Login failed, result error:', result.error);
         toast({
           title: "登录失败",
           description: result.error || "未知错误",
@@ -58,6 +56,7 @@ export default function LoginPage() {
         })
       }
     } catch (error) {
+      console.error('[LoginPage] Login handleSubmit caught exception:', error);
       toast({
         title: "登录失败",
         description: "发生错误，请重试",
@@ -65,7 +64,33 @@ export default function LoginPage() {
       })
     } finally {
       setIsLoading(false)
+      console.log('[LoginPage] handleSubmit finished.');
     }
+  }
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Optional: Show loading or different UI based on auth state
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>检查认证状态...</p> {/* Or a spinner component */}
+      </div>
+    );
+  }
+  
+  // If already authenticated and not loading, and somehow still on this page before useEffect redirects
+  // This might be redundant if useEffect is quick, but can prevent form flash
+  if (isAuthenticated) {
+     return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p>已登录，正在跳转...</p>
+      </div>
+    ); 
   }
 
   return (

@@ -58,12 +58,14 @@ router.post('/register', [
 
     res.status(201).json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        preferences: user.preferences
+      data: {
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          preferences: user.preferences
+        }
       }
     });
   } catch (error) {
@@ -103,12 +105,14 @@ router.post('/login', [
 
     res.json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        preferences: user.preferences
+      data: {
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          preferences: user.preferences
+        }
       }
     });
   } catch (error) {
@@ -123,7 +127,9 @@ router.get('/me', auth, async (req, res) => {
   try {
     res.json({
       success: true,
-      user: req.user
+      data: {
+        user: req.user
+      }
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
@@ -176,7 +182,9 @@ router.put('/profile', auth, [
 
     res.json({
       success: true,
-      user
+      data: {
+        user
+      }
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error during profile update' });

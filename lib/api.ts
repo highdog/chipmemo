@@ -120,15 +120,18 @@ class ApiClient {
         if (response.status === 401) {
           this.clearToken();
         }
+        // Handle different error response formats
+        const errorMessage = data.error || data.message || `HTTP ${response.status}`;
         return {
           success: false,
-          error: data.error || `HTTP ${response.status}`,
+          error: errorMessage,
           errors: data.errors,
         };
       }
 
       return data;
     } catch (error) {
+      console.error(`API request failed: ${endpoint}`, error); // 添加日志
       return {
         success: false,
         error: error instanceof Error ? error.message : '网络请求失败',

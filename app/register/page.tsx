@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { registerUser } from "@/lib/auth"
+import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { register } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
@@ -45,7 +46,7 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await registerUser(formData.username, formData.email, formData.password)
+      const result = await register(formData.username, formData.email, formData.password)
 
       if (result.success) {
         toast({
@@ -92,6 +93,7 @@ export default function RegisterPage() {
                 name="username"
                 type="text"
                 placeholder="请输入用户名"
+                autoComplete="username"
                 required
                 value={formData.username}
                 onChange={handleChange}
@@ -104,6 +106,7 @@ export default function RegisterPage() {
                 name="email"
                 type="email"
                 placeholder="请输入邮箱"
+                autoComplete="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
