@@ -22,6 +22,7 @@ import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import ScheduleList from "@/components/schedule-list"
+import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
   getNotes,
@@ -31,6 +32,7 @@ import {
   type Note,
 } from "@/lib/actions"
 import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn } from "@/lib/utils"
+import { format } from 'date-fns'
 import { toast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
@@ -553,6 +555,50 @@ export default function NotePad() {
   const [currentTag, setCurrentTag] = useState<string>("") // 当前搜索的标签
   const [selectedImage, setSelectedImage] = useState<string | null>(null) // 选择的图片
   const [isLoggedIn, setIsLoggedIn] = useState(false) // 用户登录状态
+  const [isLargeCalendarOpen, setIsLargeCalendarOpen] = useState(false) // 大日历弹窗状态
+  const [schedulesByDate, setSchedulesByDate] = useState<Record<string, any[]>>({}) // 日程数据
+
+  // 加载所有日程数据
+  const loadAllSchedules = () => {
+    const schedules: Record<string, any[]> = {}
+    // 遍历localStorage中的所有键，找到日程数据
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('schedules_')) {
+        const dateKey = key.replace('schedules_', '')
+        try {
+          const data = localStorage.getItem(key)
+          if (data) {
+            schedules[dateKey] = JSON.parse(data)
+          }
+        } catch (error) {
+          console.error('解析日程数据失败:', error)
+        }
+      }
+    }
+    setSchedulesByDate(schedules)
+  }
+
+  // 监听localStorage变化和自定义事件，实时更新日程数据
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key && e.key.startsWith('schedules_')) {
+        loadAllSchedules()
+      }
+    }
+
+    const handleScheduleUpdate = () => {
+      loadAllSchedules()
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('scheduleUpdated', handleScheduleUpdate)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('scheduleUpdated', handleScheduleUpdate)
+    }
+  }, [])
 
   // 按日期分组笔记
   const groupNotesByDate = (notes: Note[]) => {
@@ -1107,6 +1153,7 @@ export default function NotePad() {
         }, 300)
       })
       loadTodosData()
+      loadAllSchedules() // 加载日程数据
     }
   }, [isLoggedIn, isCheckingAuth])
 
@@ -1418,12 +1465,20 @@ export default function NotePad() {
             <div className="hidden md:flex md:flex-col w-1/4 bg-background">
               {/* 日历区域 - 固定不滚动 */}
               <div className="p-4 border-b">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={handleDateSelect}
-                  className="rounded-md border"
-                />
+                <div className="relative">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={handleDateSelect}
+                    className="rounded-md border"
+                  />
+                  {/* 月份点击区域覆盖层 */}
+                  <div 
+                    className="absolute top-2 left-2 right-2 h-8 cursor-pointer z-10 hover:bg-muted/20 rounded transition-colors"
+                    onClick={() => setIsLargeCalendarOpen(true)}
+                    title="点击查看大日历"
+                  />
+                </div>
               </div>
               
               {/* 日程区域 - 固定不滚动 */}
@@ -1445,6 +1500,15 @@ export default function NotePad() {
               </div>
         </div>
       </main>
+      
+      {/* 大日历弹窗 */}
+         <LargeCalendar
+           isOpen={isLargeCalendarOpen}
+           onClose={() => setIsLargeCalendarOpen(false)}
+           selectedDate={date}
+           onDateSelect={setDate}
+           schedulesByDate={schedulesByDate}
+         />
     </div>
   )
 }
