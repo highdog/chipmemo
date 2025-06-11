@@ -73,7 +73,7 @@ export function extractTags(content: string): string[] {
 export function removeTagsFromContent(content: string): string {
   return content
     .replace(/#[\w\u4e00-\u9fff]+/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/[ \t]+/g, " ") // 只替换空格和制表符，保留换行符
     .trim()
 }
 

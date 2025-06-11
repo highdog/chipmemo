@@ -57,11 +57,13 @@ function SearchBar({
   onClearSearch,
   searchTerm,
   placeholder = "搜索笔记内容或标签...",
+  popularTags = [],
 }: {
   onSearch: (searchTerm: string) => void
   onClearSearch: () => void
   searchTerm: string
   placeholder?: string
+  popularTags?: string[]
 }) {
   const [inputValue, setInputValue] = useState("")
 
@@ -87,36 +89,61 @@ function SearchBar({
     }
   }
 
+  const handleTagClick = (tag: string) => {
+    const searchQuery = `#${tag}`
+    setInputValue(searchQuery)
+    onSearch(searchQuery)
+  }
+
   return (
-    <div className="flex items-center gap-2 max-w-md">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="pl-10 pr-10"
-        />
-        {inputValue && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-          >
-            <X className="h-3 w-3" />
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 max-w-md">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="pl-10 pr-10"
+          />
+          {inputValue && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <Button onClick={handleSearch} size="sm">
+          搜索
+        </Button>
+        {searchTerm && (
+          <Button onClick={onClearSearch} variant="outline" size="sm">
+            <Home className="h-4 w-4 mr-1" />
+            显示全部
           </Button>
         )}
       </div>
-      <Button onClick={handleSearch} size="sm">
-        搜索
-      </Button>
-      {searchTerm && (
-        <Button onClick={onClearSearch} variant="outline" size="sm">
-          <Home className="h-4 w-4 mr-1" />
-          显示全部
-        </Button>
+      {popularTags.length > 0 && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground whitespace-nowrap"></span>
+          <div className="flex gap-1 flex-wrap">
+            {popularTags.slice(0, 5).map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
+                onClick={() => handleTagClick(tag)}
+              >
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -573,6 +600,7 @@ export default function NotePad() {
   const [schedulesByDate, setSchedulesByDate] = useState<Record<string, any[]>>({}) // 日程数据
   const [isExporting, setIsExporting] = useState(false) // 导出状态
   const [isImporting, setIsImporting] = useState(false) // 导入状态
+  const [searchHistory, setSearchHistory] = useState<string[]>([]) // 搜索历史记录
 
   // 加载所有日程数据
   const loadAllSchedules = useCallback(() => {
@@ -693,6 +721,13 @@ export default function NotePad() {
   const handleSearch = async (term: string) => {
     setSearchTerm(term)
     setIsSearching(true)
+
+    // 更新搜索历史记录
+    if (term.trim()) {
+      const updatedHistory = [term, ...searchHistory.filter(item => item !== term)].slice(0, 10)
+      setSearchHistory(updatedHistory)
+      localStorage.setItem('searchHistory', JSON.stringify(updatedHistory))
+    }
 
     try {
       let searchResults: Note[]
@@ -1366,30 +1401,31 @@ export default function NotePad() {
       if (inputMode === 'todo') {
         // Todo模式：添加到TodoList
         const { cleanContent, tags } = extractTagsAndCleanContent(inputValue.trim())
-        const newTodo = {
-          id: Date.now().toString(),
-          content: cleanContent,
-          completed: false,
+        
+        // 调用后端API创建todo
+        const todoResult = await apiClient.createTodo({
+          text: cleanContent,
           tags,
           dueDate: todoDueDate || undefined,
-          startDate: todoStartDate || undefined
-        }
-        
-        // 将todo添加到所有相关日期
-        const currentDateKey = date.toDateString()
-        setTodosByDate(prev => ({
-          ...prev,
-          [currentDateKey]: [...(prev[currentDateKey] || []), newTodo]
-        }))
-        
-        setInputValue('')
-        setTodoDueDate('')
-        setTodoStartDate('')
-        
-        toast({
-          title: "成功",
-          description: "Todo已添加",
+          startDate: todoStartDate || undefined,
+          completed: false
         })
+        
+        if (todoResult.success && todoResult.data) {
+          // 重新加载todos数据以确保同步
+          await loadTodosData()
+          
+          setInputValue('')
+          setTodoDueDate('')
+          setTodoStartDate('')
+          
+          toast({
+            title: "成功",
+            description: "Todo已添加并保存到服务器",
+          })
+        } else {
+          throw new Error(todoResult.error || '创建Todo失败')
+        }
       } else {
         // 笔记模式：原有逻辑
         const result = await addNote(inputValue, date.toISOString(), selectedImage || undefined)
@@ -1681,6 +1717,12 @@ export default function NotePad() {
   // 组件加载时获取笔记和todos（仅在已登录时）
   useEffect(() => {
     if (isLoggedIn && !isCheckingAuth) {
+      // 加载搜索历史记录
+      const savedSearchHistory = localStorage.getItem('searchHistory')
+      if (savedSearchHistory) {
+        setSearchHistory(JSON.parse(savedSearchHistory))
+      }
+      
       loadNotes().then(() => {
         // 页面加载完成后自动滚动到最新笔记
         setTimeout(() => {
@@ -1774,8 +1816,35 @@ export default function NotePad() {
              <div className="flex items-center gap-4 flex-1">
                <h1 className="text-xl font-bold whitespace-nowrap">土豆笔记</h1>
                <div className="flex-1 max-w-md">
-                 <SearchBar onSearch={handleSearch} onClearSearch={handleClearSearch} searchTerm={searchTerm} />
+                 <SearchBar 
+                   onSearch={handleSearch} 
+                   onClearSearch={handleClearSearch} 
+                   searchTerm={searchTerm}
+                 />
                </div>
+               
+               {/* 热门标签区域 */}
+               {searchHistory.filter(item => item.startsWith('#')).length > 0 && (
+                 <div className="flex items-center gap-2">
+                   <span className="text-sm text-muted-foreground whitespace-nowrap"></span>
+                   <div className="flex gap-1">
+                     {searchHistory.filter(item => item.startsWith('#')).map(item => item.substring(1)).slice(0, 5).map((tag) => (
+                       <Badge
+                         key={tag}
+                         variant="outline"
+                         className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 whitespace-nowrap"
+                         onClick={() => {
+                           const tagSearch = `#${tag}`
+                           setSearchTerm(tagSearch)
+                           handleSearch(tagSearch)
+                         }}
+                       >
+                         #{tag}
+                       </Badge>
+                     ))}
+                   </div>
+                 </div>
+               )}
              </div>
              
              {/* 右侧：深浅色切换按钮和用户图标 */}

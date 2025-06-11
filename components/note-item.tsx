@@ -71,20 +71,20 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     const components = {
       p: ({ children, ...props }: any) => {
         return (
-          <p {...props} className="mb-2 last:mb-0">
+          <p {...props} className="mb-1 last:mb-0 leading-tight" style={{ lineHeight: '1' }}>
             {processTextWithTags(children)}
           </p>
         );
       },
       // 处理其他Markdown元素
-      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-2">{processTextWithTags(children)}</h1>,
-      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-2">{processTextWithTags(children)}</h2>,
-      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-1">{processTextWithTags(children)}</h3>,
-      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-2">{children}</ul>,
-      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-2">{children}</ol>,
+      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h1>,
+      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h2>,
+      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h3>,
+      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{children}</ul>,
+      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{children}</ol>,
       li: ({ children, ...props }: any) => <li {...props}>{processTextWithTags(children)}</li>,
       blockquote: ({ children, ...props }: any) => (
-        <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-2">
+        <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-1 leading-tight" style={{ lineHeight: '1.2' }}>
           {processTextWithTags(children)}
         </blockquote>
       ),
@@ -100,6 +100,10 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
       ),
     };
 
+    // 调试：打印笔记内容
+    console.log('Note content in renderNoteContent:', JSON.stringify(note.content));
+    console.log('Note content raw:', note.content);
+    
     return (
       <div className="markdown-content">
         <ReactMarkdown
@@ -207,36 +211,14 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           )}
         </div>
 
-        {/* 右上角：标签和删除按钮 */}
+        {/* 右上角：按钮和标签 */}
         <div className="flex items-center gap-2">
-          {note.tags.length > 0 && (
-            <div className="flex items-center gap-1">
-              <Tag className="h-3 w-3 text-muted-foreground" />
-              <div className="flex gap-1">
-                {note.tags.slice(0, 3).map((tag) => (
-                  <Badge 
-                    key={tag} 
-                    variant="outline" 
-                    className="text-xs cursor-pointer hover:bg-muted"
-                    onClick={() => onTagClick && onTagClick(tag)}
-                  >
-                    #{tag}
-                  </Badge>
-                ))}
-                {note.tags.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{note.tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
           <Button
             variant="ghost"
             size="sm"
             onClick={handleConvertToTodo}
             disabled={isConverting}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 mr-1"
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
             title="转换为Todo"
           >
             <ListTodo className="h-3 w-3" />
@@ -250,11 +232,33 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           >
             <Trash2 className="h-3 w-3" />
           </Button>
+          {note.tags.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Tag className="h-3 w-3 text-muted-foreground" />
+              <div className="flex gap-1">
+                {note.tags.slice(0, 3).map((tag) => (
+                  <Badge 
+                    key={tag} 
+                    variant="outline" 
+                    className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
+                    onClick={() => onTagClick && onTagClick(tag)}
+                  >
+                    #{tag}
+                  </Badge>
+                ))}
+                {note.tags.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{note.tags.length - 3}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div 
-        className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-        style={{ whiteSpace: 'pre-wrap' }}
+        className="text-sm leading-tight whitespace-pre-wrap break-words"
+        style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
         onClick={handleContentClick}
       >
         {renderNoteContent()}
