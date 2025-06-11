@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
@@ -31,11 +31,25 @@ import {
   searchNotesByTag,
   type Note,
 } from "@/lib/actions"
-import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn } from "@/lib/utils"
+import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn, extractTags } from "@/lib/utils"
 import { format } from 'date-fns'
 import { toast } from "@/hooks/use-toast"
-import { apiClient } from "@/lib/api"
+import { apiClient, notesApi } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
+
+// 提取标签和清理内容的函数
+const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
+  const tagRegex = /#([\u4e00-\u9fa5\w]+)/g
+  const tags: string[] = []
+  let match
+  
+  while ((match = tagRegex.exec(content)) !== null) {
+    tags.push(match[1])
+  }
+  
+  const cleanContent = content.replace(tagRegex, '').trim()
+  return { cleanContent, tags }
+}
 
 // SearchBar Component
 function SearchBar({
@@ -238,7 +252,7 @@ function TodoList({
   }
 
   const handleEditTodo = (todo: any) => {
-    console.log('handleEditTodo被调用', todo)
+    // handleEditTodo被调用
     setEditingTodo(todo.id)
     setEditContent(todo.content)
     setEditStartDate(todo.startDate || '')
@@ -272,7 +286,7 @@ function TodoList({
   }
 
   const handleDeleteTodo = async (todoId: string) => {
-    console.log('handleDeleteTodo被调用', todoId)
+    // handleDeleteTodo被调用
     
     try {
       // 调用父组件的删除函数
@@ -472,9 +486,9 @@ function TodoList({
                           size="sm"
                           variant="ghost"
                           onClick={() => {
-                            console.log('三个小点按钮被点击', todo.id, menuOpenTodo)
+                            // 三个小点按钮被点击
                             const newState = menuOpenTodo === todo.id ? null : todo.id
-                            console.log('设置菜单状态为:', newState)
+                            // 设置菜单状态
                             setMenuOpenTodo(newState)
                           }}
                           className="h-6 w-6 p-0"
@@ -487,7 +501,7 @@ function TodoList({
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                console.log('编辑按钮被点击', todo)
+                                // 编辑按钮被点击
                                 handleEditTodo(todo)
                                 setMenuOpenTodo(null)
                               }}
@@ -500,7 +514,7 @@ function TodoList({
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                console.log('删除按钮被点击', todo.id)
+                                // 删除按钮被点击
                                 handleDeleteTodo(todo.id)
                                 setMenuOpenTodo(null)
                               }}
@@ -557,9 +571,11 @@ export default function NotePad() {
   const [isLoggedIn, setIsLoggedIn] = useState(false) // 用户登录状态
   const [isLargeCalendarOpen, setIsLargeCalendarOpen] = useState(false) // 大日历弹窗状态
   const [schedulesByDate, setSchedulesByDate] = useState<Record<string, any[]>>({}) // 日程数据
+  const [isExporting, setIsExporting] = useState(false) // 导出状态
+  const [isImporting, setIsImporting] = useState(false) // 导入状态
 
   // 加载所有日程数据
-  const loadAllSchedules = () => {
+  const loadAllSchedules = useCallback(() => {
     const schedules: Record<string, any[]> = {}
     // 遍历localStorage中的所有键，找到日程数据
     for (let i = 0; i < localStorage.length; i++) {
@@ -572,12 +588,12 @@ export default function NotePad() {
             schedules[dateKey] = JSON.parse(data)
           }
         } catch (error) {
-          console.error('解析日程数据失败:', error)
+          // 解析日程数据失败
         }
       }
     }
     setSchedulesByDate(schedules)
-  }
+  }, [])
 
   // 监听localStorage变化和自定义事件，实时更新日程数据
   useEffect(() => {
@@ -638,22 +654,27 @@ export default function NotePad() {
   // 处理日历日期选择
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
-      setDate(selectedDate)
+      // 保留当前时间，只更新日期部分
+      const currentTime = new Date()
+      const newDate = new Date(selectedDate)
+      newDate.setHours(currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds(), currentTime.getMilliseconds())
+      
+      setDate(newDate)
       // 如果不是在搜索状态，则跳转到对应日期的笔记
       if (!searchTerm) {
-        scrollToDate(selectedDate)
+        scrollToDate(newDate)
       }
       // 显示提示信息，告知用户现在可以添加笔记到选中的日期
       toast({
         title: "日期已选择",
-        description: `现在添加的笔记将保存到 ${selectedDate.toLocaleDateString('zh-CN')}`,
+        description: `现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
         duration: 2000,
       })
     }
   }
 
   // 加载笔记
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     try {
       const fetchedNotes = await getNotes()
       setNotes(fetchedNotes)
@@ -666,7 +687,7 @@ export default function NotePad() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   // 搜索笔记
   const handleSearch = async (term: string) => {
@@ -798,6 +819,544 @@ export default function NotePad() {
     setSelectedImage(null)
   }
 
+  // 导出笔记、Todo和日程为Markdown文档
+  const handleExportNotes = async () => {
+    setIsExporting(true)
+    try {
+      // 获取要导出的笔记
+      const notesToExport = searchTerm ? notes : await getNotes()
+      
+      // 获取所有Todo数据
+      const allTodos = Object.values(todosByDate).flat()
+      
+      // 获取所有日程数据
+      const allSchedules = Object.values(schedulesByDate).flat()
+      
+      if (notesToExport.length === 0 && allTodos.length === 0 && allSchedules.length === 0) {
+        toast({
+          title: "导出失败",
+          description: "没有可导出的数据",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // 生成Markdown内容
+      let markdownContent = `# 土豆笔记完整导出\n\n`
+      markdownContent += `导出时间: ${new Date().toLocaleString('zh-CN')}\n\n`
+      markdownContent += `包含内容:\n`
+      markdownContent += `- 笔记: ${notesToExport.length} 条\n`
+      markdownContent += `- Todo事项: ${allTodos.length} 条\n`
+      markdownContent += `- 日程安排: ${allSchedules.length} 条\n\n`
+      markdownContent += `---\n\n`
+
+      // 按日期分组并排序笔记
+      const groupedNotes = groupNotesByDate(notesToExport)
+      
+      // 按日期分组Todo
+      const groupedTodos: Record<string, any[]> = {}
+      Object.entries(todosByDate).forEach(([dateKey, todos]) => {
+        if (todos.length > 0) {
+          groupedTodos[dateKey] = todos
+        }
+      })
+      
+      // 按日期分组日程
+      const groupedSchedules: Record<string, any[]> = {}
+      Object.entries(schedulesByDate).forEach(([dateKey, schedules]) => {
+        if (schedules.length > 0) {
+          groupedSchedules[dateKey] = schedules
+        }
+      })
+      
+      // 获取所有有数据的日期并排序
+      const allDates = new Set([
+        ...groupedNotes.map(([dateKey]) => dateKey),
+        ...Object.keys(groupedTodos),
+        ...Object.keys(groupedSchedules)
+      ])
+      
+      const sortedDates = Array.from(allDates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+      
+      sortedDates.forEach(dateKey => {
+        const date = new Date(dateKey)
+        const formattedDate = date.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'long'
+        })
+        
+        markdownContent += `## ${formattedDate}\n\n`
+        
+        // 添加该日期的笔记
+        const dayNotes = groupedNotes.find(([key]) => key === dateKey)?.[1] || []
+        if (dayNotes.length > 0) {
+          markdownContent += `### 📝 笔记 (${dayNotes.length}条)\n\n`
+          dayNotes.forEach((note, index) => {
+            const noteTime = new Date(note.createdAt).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+            
+            markdownContent += `#### ${noteTime} - 笔记 ${index + 1}\n\n`
+            
+            // 添加标签
+            if (note.tags && note.tags.length > 0) {
+              markdownContent += `**标签:** ${note.tags.map(tag => `#${tag}`).join(' ')}\n\n`
+            }
+            
+            // 添加笔记内容
+            markdownContent += `${note.originalContent || note.content}\n\n`
+          })
+        }
+        
+        // 添加该日期的Todo事项
+        const dayTodos = groupedTodos[dateKey] || []
+        if (dayTodos.length > 0) {
+          markdownContent += `### ✅ Todo事项 (${dayTodos.length}条)\n\n`
+          dayTodos.forEach((todo, index) => {
+            const status = todo.completed ? '✅' : '⬜'
+            markdownContent += `${index + 1}. ${status} ${todo.content}\n`
+            
+            if (todo.tags && todo.tags.length > 0) {
+              markdownContent += `   **标签:** ${todo.tags.map((tag: string) => `#${tag}`).join(' ')}\n`
+            }
+            
+            if (todo.dueDate) {
+              markdownContent += `   **截止日期:** ${todo.dueDate}\n`
+            }
+            
+            if (todo.startDate) {
+              markdownContent += `   **开始日期:** ${todo.startDate}\n`
+            }
+            
+            markdownContent += `\n`
+          })
+          markdownContent += `\n`
+        }
+        
+        // 添加该日期的日程安排
+        const daySchedules = groupedSchedules[dateKey] || []
+        if (daySchedules.length > 0) {
+          markdownContent += `### 📅 日程安排 (${daySchedules.length}条)\n\n`
+          daySchedules.forEach((schedule, index) => {
+            markdownContent += `${index + 1}. **${schedule.time}** - ${schedule.title}\n`
+            
+            if (schedule.description) {
+              markdownContent += `   ${schedule.description}\n`
+            }
+            
+            if (schedule.type) {
+              markdownContent += `   **类型:** ${schedule.type}\n`
+            }
+            
+            markdownContent += `\n`
+          })
+          markdownContent += `\n`
+        }
+        
+        markdownContent += `---\n\n`
+      })
+
+      // 创建并下载文件
+      const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // 生成文件名
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      const filename = searchTerm 
+        ? `土豆笔记-搜索结果-${searchTerm}-${timestamp}.md`
+        : `土豆笔记-全部-${timestamp}.md`
+      
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "导出成功",
+        description: `已导出 ${notesToExport.length} 条笔记到 ${filename}`,
+      })
+    } catch (error) {
+      console.error('导出失败:', error)
+      toast({
+        title: "导出失败",
+        description: "导出过程中出现错误，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // 导入笔记、Todo和日程从Markdown文档
+  const handleImportNotes = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.md,.markdown,.txt'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      setIsImporting(true)
+      try {
+        const text = await file.text()
+        const { notes: importedNotes, todos: importedTodos, schedules: importedSchedules } = parseMarkdownToData(text)
+        
+        if (importedNotes.length === 0 && importedTodos.length === 0 && importedSchedules.length === 0) {
+          toast({
+            title: "导入失败",
+            description: "文件中没有找到有效的数据",
+            variant: "destructive",
+          })
+          return
+        }
+
+        let notesSuccessCount = 0
+        let todosSuccessCount = 0
+        let schedulesSuccessCount = 0
+
+        // 批量添加笔记
+        for (const noteData of importedNotes) {
+          try {
+            // 重新构建包含标签的内容
+            let contentWithTags = noteData.content
+            if (noteData.tags.length > 0) {
+              contentWithTags += '\n\n' + noteData.tags.map(tag => `#${tag}`).join(' ')
+            }
+            
+            // 使用完整的ISO时间字符串
+            const customDate = noteData.createdAt.toISOString()
+            
+            // 直接调用API而不是通过addNote函数，以便传递customDate
+            // 使用utils.ts中的extractTags函数，返回string[]格式
+            const tags = extractTags(contentWithTags)
+            // 确保title不为空且不超过200字符
+            const firstLine = contentWithTags.trim().split('\n')[0] || ''
+            const title = firstLine.length > 0 ? firstLine.substring(0, 200) : '导入的笔记'
+            
+            const response = await notesApi.create({
+              title,
+              content: contentWithTags,
+              tags,
+              customDate
+            })
+            
+            if (response.success) {
+              notesSuccessCount++
+            } else {
+              console.error('添加笔记失败:', response.error)
+            }
+          } catch (error) {
+            console.error('添加笔记失败:', error)
+          }
+        }
+
+        // 批量添加Todo事项
+        for (const todoData of importedTodos) {
+          try {
+            const dateKey = todoData.date
+            setTodosByDate(prev => ({
+              ...prev,
+              [dateKey]: [...(prev[dateKey] || []), todoData.todo]
+            }))
+            todosSuccessCount++
+          } catch (error) {
+            console.error('添加Todo失败:', error)
+          }
+        }
+
+        // 批量添加日程安排
+        for (const scheduleData of importedSchedules) {
+          try {
+            const dateKey = scheduleData.date
+            const currentSchedules = localStorage.getItem(`schedules_${dateKey}`)
+            const schedules = currentSchedules ? JSON.parse(currentSchedules) : []
+            schedules.push(scheduleData.schedule)
+            localStorage.setItem(`schedules_${dateKey}`, JSON.stringify(schedules))
+            
+            // 触发日程更新事件
+            window.dispatchEvent(new CustomEvent('scheduleUpdated', { 
+              detail: { dateKey, schedules } 
+            }))
+            
+            schedulesSuccessCount++
+          } catch (error) {
+            console.error('添加日程失败:', error)
+          }
+        }
+
+        // 重新加载数据
+        await loadNotes()
+        loadAllSchedules()
+        
+        const totalSuccess = notesSuccessCount + todosSuccessCount + schedulesSuccessCount
+        let description = `成功导入 ${totalSuccess} 条数据`
+        if (notesSuccessCount > 0) description += `\n- 笔记: ${notesSuccessCount} 条`
+        if (todosSuccessCount > 0) description += `\n- Todo: ${todosSuccessCount} 条`
+        if (schedulesSuccessCount > 0) description += `\n- 日程: ${schedulesSuccessCount} 条`
+        
+        toast({
+          title: "导入成功",
+          description,
+        })
+      } catch (error) {
+        console.error('导入失败:', error)
+        toast({
+          title: "导入失败",
+          description: "文件解析失败，请检查文件格式",
+          variant: "destructive",
+        })
+      } finally {
+        setIsImporting(false)
+      }
+    }
+    input.click()
+  }
+
+  // 解析Markdown文本为笔记、Todo和日程数据
+  const parseMarkdownToData = (text: string) => {
+    const notes: Array<{ content: string; tags: string[]; createdAt: Date }> = []
+    const todos: Array<{ date: string; todo: any }> = []
+    const schedules: Array<{ date: string; schedule: any }> = []
+    const lines = text.split('\n')
+    
+    let currentDate: Date | null = null
+    let currentDateKey: string = ''
+    let currentTime: string | null = null
+    let currentContent = ''
+    let currentTags: string[] = []
+    let inNoteContent = false
+    let currentSection: 'notes' | 'todos' | 'schedules' | null = null
+    
+    // 开始解析文件
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      
+      // 匹配日期标题 (## 2024年1月1日 星期一 或 ## 2024年1月1日星期一)
+      const dateMatch = line.match(/^##\s*(.+)$/) && !line.match(/^###\s*[📝✅📅]/)
+      if (dateMatch) {
+        const actualDateMatch = line.match(/^##\s*(.+)$/)
+        // 找到日期行
+        
+        // 保存上一个笔记
+        if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
+          const [hours, minutes] = currentTime.split(':')
+          const noteDate = new Date(currentDate)
+          noteDate.setHours(parseInt(hours), parseInt(minutes))
+          
+          notes.push({
+            content: currentContent.trim(),
+            tags: [...currentTags],
+            createdAt: noteDate
+          })
+        }
+        
+        // 重置状态
+        currentContent = ''
+        currentTags = []
+        currentTime = null
+        inNoteContent = false
+        currentSection = null
+        
+        // 尝试解析日期 - 支持多种格式
+        try {
+          const dateStr = actualDateMatch![1]
+          
+          // 匹配 "2024年1月1日 星期一" 或 "2024年1月1日星期一" 格式
+          const dateRegex = /(\d{4})年(\d{1,2})月(\d{1,2})日/
+          const match = dateStr.match(dateRegex)
+          if (match) {
+            const [, year, month, day] = match
+            currentDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+            currentDateKey = currentDate.toDateString()
+          } else {
+            // 尝试其他日期格式
+            const isoMatch = dateStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/)
+            if (isoMatch) {
+              const [, year, month, day] = isoMatch
+              currentDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+              currentDateKey = currentDate.toDateString()
+            }
+          }
+        } catch (error) {
+          console.error('日期解析失败:', error)
+        }
+        continue
+      }
+      
+      // 匹配章节标题
+      const sectionMatch = line.match(/^###\s*([📝✅📅])\s*(.+)$/)
+      if (sectionMatch) {
+        const emoji = sectionMatch[1]
+        if (emoji === '📝') {
+          currentSection = 'notes'
+        } else if (emoji === '✅') {
+          currentSection = 'todos'
+        } else if (emoji === '📅') {
+          currentSection = 'schedules'
+        }
+        continue
+      }
+      
+      // 匹配笔记时间标题 (#### 14:30 - 笔记 1)
+      const noteTimeMatch = line.match(/^####\s*(\d{1,2}:\d{2})\s*-\s*笔记\s*\d+$/)
+      if (noteTimeMatch && currentSection === 'notes') {
+        // 保存上一个笔记
+        if (currentContent.trim() && currentDate && currentTime) {
+          const [hours, minutes] = currentTime.split(':')
+          const noteDate = new Date(currentDate)
+          noteDate.setHours(parseInt(hours), parseInt(minutes))
+          
+          notes.push({
+            content: currentContent.trim(),
+            tags: [...currentTags],
+            createdAt: noteDate
+          })
+        }
+        
+        // 重置笔记内容和标签
+        currentContent = ''
+        currentTags = []
+        currentTime = noteTimeMatch[1]
+        inNoteContent = false
+        continue
+      }
+      
+      // 匹配Todo项目
+      const todoMatch = line.match(/^(\d+)\. ([✅⬜])\s*(.+)$/)
+      if (todoMatch && currentSection === 'todos' && currentDate) {
+        const [, , status, content] = todoMatch
+        const completed = status === '✅'
+        
+        // 创建todo对象
+        const todo = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          content: content.trim(),
+          completed,
+          tags: [] as string[],
+          dueDate: undefined as string | undefined,
+          startDate: undefined as string | undefined
+        }
+        
+        // 检查接下来的几行是否有标签、截止日期等信息
+        let nextLineIndex = i + 1
+        while (nextLineIndex < lines.length) {
+          const nextLine = lines[nextLineIndex].trim()
+          if (nextLine.startsWith('**标签:**')) {
+            const tagStr = nextLine.replace('**标签:**', '').trim()
+            todo.tags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+            i = nextLineIndex
+          } else if (nextLine.startsWith('**截止日期:**')) {
+            todo.dueDate = nextLine.replace('**截止日期:**', '').trim()
+            i = nextLineIndex
+          } else if (nextLine.startsWith('**开始日期:**')) {
+            todo.startDate = nextLine.replace('**开始日期:**', '').trim()
+            i = nextLineIndex
+          } else if (nextLine === '' || nextLine.match(/^\d+\. [✅⬜]/)) {
+            break
+          } else {
+            break
+          }
+          nextLineIndex++
+        }
+        
+        todos.push({ date: currentDateKey, todo })
+        continue
+      }
+      
+      // 匹配日程项目
+      const scheduleMatch = line.match(/^(\d+)\. \*\*([^*]+)\*\*\s*-\s*(.+)$/)
+      if (scheduleMatch && currentSection === 'schedules' && currentDate) {
+        const [, , time, title] = scheduleMatch
+        
+        // 创建schedule对象
+        const schedule = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          title: title.trim(),
+          time: time.trim(),
+          description: undefined as string | undefined,
+          type: 'event' as 'meeting' | 'appointment' | 'event' | 'reminder'
+        }
+        
+        // 检查接下来的几行是否有描述、类型等信息
+        let nextLineIndex = i + 1
+        while (nextLineIndex < lines.length) {
+          const nextLine = lines[nextLineIndex].trim()
+          if (nextLine.startsWith('**类型:**')) {
+            const typeStr = nextLine.replace('**类型:**', '').trim()
+            if (['meeting', 'appointment', 'event', 'reminder'].includes(typeStr)) {
+              schedule.type = typeStr as any
+            }
+            i = nextLineIndex
+          } else if (!nextLine.startsWith('**') && nextLine !== '' && !nextLine.match(/^\d+\. \*\*/)) {
+            // 这是描述内容
+            schedule.description = nextLine
+            i = nextLineIndex
+          } else if (nextLine === '' || nextLine.match(/^\d+\. \*\*/)) {
+            break
+          } else {
+            break
+          }
+          nextLineIndex++
+        }
+        
+        schedules.push({ date: currentDateKey, schedule })
+        continue
+      }
+      
+      // 匹配标签行 (**标签:** #tag1 #tag2)
+      const tagMatch = line.match(/^\*\*标签:\*\*\s*(.+)$/)
+      if (tagMatch && currentSection === 'notes') {
+        const tagStr = tagMatch[1]
+        currentTags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+        inNoteContent = true
+        continue
+      }
+      
+      // 跳过分隔线、空行和标题行
+      if (line === '---' || line === '' || line.startsWith('#')) {
+        if (line === '---' && inNoteContent) {
+          inNoteContent = false
+        }
+        continue
+      }
+      
+      // 收集笔记内容（仅在notes section中）
+      if (currentSection === 'notes' && currentTime && line !== '') {
+        if (!inNoteContent && !line.startsWith('**')) {
+          inNoteContent = true
+        }
+        
+        if (inNoteContent && !line.startsWith('**')) {
+          if (currentContent) currentContent += '\n'
+          currentContent += lines[i] // 使用原始行，保持格式
+        }
+      }
+    }
+    
+    // 保存最后一个笔记
+    if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
+      const [hours, minutes] = currentTime.split(':')
+      const noteDate = new Date(currentDate)
+      noteDate.setHours(parseInt(hours), parseInt(minutes))
+      
+      notes.push({
+        content: currentContent.trim(),
+        tags: [...currentTags],
+        createdAt: noteDate
+      })
+    }
+    
+    // 解析完成，返回所有数据
+    return { notes, todos, schedules }
+  }
+
   // 添加笔记
   const handleAddNote = async () => {
     if (!inputValue.trim() && !selectedImage) return
@@ -806,7 +1365,7 @@ export default function NotePad() {
     try {
       if (inputMode === 'todo') {
         // Todo模式：添加到TodoList
-        const { cleanContent, tags } = extractTags(inputValue.trim())
+        const { cleanContent, tags } = extractTagsAndCleanContent(inputValue.trim())
         const newTodo = {
           id: Date.now().toString(),
           content: cleanContent,
@@ -887,18 +1446,7 @@ export default function NotePad() {
     }
   }
   
-  const extractTags = (content: string): { cleanContent: string; tags: string[] } => {
-     const tagRegex = /#([\u4e00-\u9fa5\w]+)/g
-     const tags: string[] = []
-     let match
-     
-     while ((match = tagRegex.exec(content)) !== null) {
-       tags.push(match[1])
-     }
-     
-     const cleanContent = content.replace(tagRegex, '').trim()
-     return { cleanContent, tags }
-   }
+  // extractTagsAndCleanContent函数已移到组件外部
    
    const handleToggleTodo = async (todoId: string) => {
     try {
@@ -1158,7 +1706,7 @@ export default function NotePad() {
   }, [isLoggedIn, isCheckingAuth])
 
   // 加载todo数据
-  const loadTodosData = async () => {
+  const loadTodosData = useCallback(async () => {
     try {
       // 获取所有todos并按日期分组
       const response = await apiClient.getTodos({ limit: 100 })
@@ -1190,9 +1738,9 @@ export default function NotePad() {
         setTodosByDate(todosByDateMap)
       }
     } catch (error) {
-      console.error('加载todos失败:', error)
+      // 加载todos失败
     }
-  }
+  }, [])
 
 
   const groupedNotes = groupNotesByDate(notes)
@@ -1240,7 +1788,13 @@ export default function NotePad() {
                  )}
                  {theme === 'dark' ? '浅色' : '深色'}
                </Button>
-               <UserNav onLogout={handleLogout} />
+               <UserNav 
+                 onLogout={handleLogout}
+                 onExport={handleExportNotes}
+                 onImport={handleImportNotes}
+                 isExporting={isExporting}
+                 isImporting={isImporting}
+               />
              </div>
           </div>
           

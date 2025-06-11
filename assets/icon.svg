@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="64" fill="#2563eb"/>
+  
+  <!-- 笔记本 -->
+  <rect x="96" y="80" width="320" height="352" rx="16" fill="white"/>
+  
+  <!-- 螺旋装订线 -->
+  <circle cx="144" cy="128" r="8" fill="#e5e7eb"/>
+  <circle cx="144" cy="176" r="8" fill="#e5e7eb"/>
+  <circle cx="144" cy="224" r="8" fill="#e5e7eb"/>
+  <circle cx="144" cy="272" r="8" fill="#e5e7eb"/>
+  <circle cx="144" cy="320" r="8" fill="#e5e7eb"/>
+  <circle cx="144" cy="368" r="8" fill="#e5e7eb"/>
+  
+  <!-- 文本线条 -->
+  <rect x="176" y="144" width="192" height="4" rx="2" fill="#6b7280"/>
+  <rect x="176" y="168" width="160" height="4" rx="2" fill="#6b7280"/>
+  <rect x="176" y="192" width="176" height="4" rx="2" fill="#6b7280"/>
+  <rect x="176" y="216" width="144" height="4" rx="2" fill="#6b7280"/>
+  <rect x="176" y="240" width="168" height="4" rx="2" fill="#6b7280"/>
+  <rect x="176" y="264" width="152" height="4" rx="2" fill="#6b7280"/>
+  
+  <!-- 笔 -->
+  <path d="M320 288L352 320L368 304L336 272L320 288Z" fill="#fbbf24"/>
+  <path d="M352 320L368 304L376 312L360 328L352 320Z" fill="#f59e0b"/>
+  <path d="M368 304L384 288L392 296L376 312L368 304Z" fill="#dc2626"/>
+  <circle cx="388" cy="292" r="4" fill="#991b1b"/>
+</svg>

@@ -14,12 +14,17 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
+import { Download, Upload, Loader2 } from "lucide-react"
 
 interface UserNavProps {
   onLogout?: () => void
+  onExport?: () => void
+  onImport?: () => void
+  isExporting?: boolean
+  isImporting?: boolean
 }
 
-export function UserNav({ onLogout }: UserNavProps) {
+export function UserNav({ onLogout, onExport, onImport, isExporting = false, isImporting = false }: UserNavProps) {
   const router = useRouter()
   const { user, loading: isLoading, logout } = useAuth()
 
@@ -80,6 +85,23 @@ export function UserNav({ onLogout }: UserNavProps) {
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onExport} disabled={isExporting}>
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          {isExporting ? '导出中...' : '导出MD'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onImport} disabled={isImporting}>
+          {isImporting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4 mr-2" />
+          )}
+          {isImporting ? '导入中...' : '导入MD'}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           个人资料

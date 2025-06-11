@@ -60,7 +60,12 @@ const LargeCalendar: React.FC<LargeCalendarProps> = ({ isOpen, onClose, selected
   const allDays = eachDayOfInterval({ start: startDate, end: endDate })
 
   const handleDateClick = (date: Date) => {
-    onDateSelect(date)
+    // 保留当前时间，只更新日期部分
+    const currentTime = new Date()
+    const newDate = new Date(date)
+    newDate.setHours(currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds(), currentTime.getMilliseconds())
+    
+    onDateSelect(newDate)
     onClose()
   }
 
