@@ -1500,60 +1500,59 @@ export default function NotePad() {
       
       // 如果todo从未完成变为完成，则删除todo并创建笔记
       if (!targetTodo.completed) {
-        // 删除todo
-        setTodosByDate(prev => {
-          const newTodosByDate = { ...prev }
-          for (const dateKey in newTodosByDate) {
-            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
-          }
-          return newTodosByDate
-        })
-        
         // 创建笔记内容，包含原todo的内容和标签
         const noteContent = targetTodo.content + (targetTodo.tags && targetTodo.tags.length > 0 ? ' ' + targetTodo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
         
         // 调用addNote API创建新笔记
         const result = await addNote(noteContent, new Date().toISOString())
         if (result.success) {
-          // 重新加载笔记列表
-          if (searchTerm) {
-            await handleSearch(searchTerm)
+          // 创建笔记成功后，删除后端的todo
+          const deleteResult = await apiClient.deleteTodo(todoId)
+          if (deleteResult.success) {
+            // 重新加载todos数据以确保同步
+            await loadTodosData()
+            
+            // 重新加载笔记列表
+            if (searchTerm) {
+              await handleSearch(searchTerm)
+            } else {
+              await loadNotes()
+            }
+            toast({
+              title: "成功",
+              description: "Todo已完成并转换为笔记",
+            })
           } else {
-            await loadNotes()
+            toast({
+              title: "警告",
+              description: "笔记已创建，但删除Todo失败",
+              variant: "destructive",
+            })
           }
-          toast({
-            title: "成功",
-            description: "Todo已完成并转换为笔记",
-          })
         } else {
           toast({
             title: "错误",
             description: "创建笔记失败：" + (result.error || "未知错误"),
             variant: "destructive",
           })
-          // 如果创建笔记失败，恢复todo
-          setTodosByDate(prev => {
-            const newTodosByDate = { ...prev }
-            const currentDateKey = date.toDateString()
-            newTodosByDate[currentDateKey] = [...(newTodosByDate[currentDateKey] || []), targetTodo]
-            return newTodosByDate
-          })
         }
       } else {
-        // 如果是从完成变为未完成，只切换状态
-        setTodosByDate(prev => {
-          const newTodosByDate = { ...prev }
-          for (const dateKey in newTodosByDate) {
-            newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
-              todo.id === todoId ? { ...todo, completed: false } : todo
-            )
-          }
-          return newTodosByDate
-        })
-        toast({
-          title: "成功",
-          description: "Todo状态已更新",
-        })
+        // 如果是从完成变为未完成，调用后端API切换状态
+        const toggleResult = await apiClient.toggleTodo(todoId)
+        if (toggleResult.success) {
+          // 重新加载todos数据以确保同步
+          await loadTodosData()
+          toast({
+            title: "成功",
+            description: "Todo状态已更新",
+          })
+        } else {
+          toast({
+            title: "错误",
+            description: "更新Todo状态失败",
+            variant: "destructive",
+          })
+        }
       }
     } catch (error) {
       toast({
@@ -1566,20 +1565,27 @@ export default function NotePad() {
 
   const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => {
     try {
-      // 在所有日期中查找并更新todo
-      setTodosByDate(prev => {
-        const newTodosByDate = { ...prev }
-        for (const dateKey in newTodosByDate) {
-          newTodosByDate[dateKey] = newTodosByDate[dateKey].map(todo =>
-            todo.id === todoId ? { ...todo, ...updates } : todo
-          )
-        }
-        return newTodosByDate
-      })
-      toast({
-        title: "成功",
-        description: "Todo已更新",
-      })
+      // 调用后端API更新todo
+      const updateData: any = {}
+      if (updates.content !== undefined) updateData.text = updates.content
+      if (updates.startDate !== undefined) updateData.startDate = updates.startDate
+      if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate
+      
+      const result = await apiClient.updateTodo(todoId, updateData)
+      if (result.success) {
+        // 重新加载todos数据以确保同步
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "Todo已更新",
+        })
+      } else {
+        toast({
+          title: "更新失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
     } catch (error) {
       toast({
         title: "错误",
@@ -1594,14 +1600,8 @@ export default function NotePad() {
       // 调用后端API删除todo
       const result = await apiClient.deleteTodo(todoId)
       if (result.success) {
-        // 在所有日期中查找并删除todo
-        setTodosByDate(prev => {
-          const newTodosByDate = { ...prev }
-          for (const dateKey in newTodosByDate) {
-            newTodosByDate[dateKey] = newTodosByDate[dateKey].filter(todo => todo.id !== todoId)
-          }
-          return newTodosByDate
-        })
+        // 重新加载todos数据以确保同步
+        await loadTodosData()
         toast({
           title: "成功",
           description: "Todo已删除",
