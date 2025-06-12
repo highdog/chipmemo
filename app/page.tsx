@@ -485,9 +485,8 @@ function TodoList({
                       />
                       <div className="flex-1">
                         <label
-                          htmlFor={todo.id}
                           className={cn(
-                             "text-sm cursor-pointer block",
+                             "text-sm block",
                              todo.completed ? "line-through text-muted-foreground" : "text-foreground"
                            )}
                         >

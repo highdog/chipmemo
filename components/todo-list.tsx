@@ -109,8 +109,7 @@ export function TodoList({ selectedDate }: TodoListProps) {
                   className="mt-0.5"
                 />
                 <label
-                  htmlFor={item.todo.id}
-                  className={`text-sm flex-1 cursor-pointer ${
+                  className={`text-sm flex-1 ${
                     item.todo.completed ? "line-through text-muted-foreground" : "text-foreground"
                   }`}
                 >
