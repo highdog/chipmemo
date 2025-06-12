@@ -1718,7 +1718,7 @@ export default function NotePad() {
           }
         }
         
-        const result = await addNote(noteContent, date.toISOString(), selectedImage || undefined)
+        const result = await addNote(noteContent, new Date().toISOString(), selectedImage || undefined)
         if (result.success) {
           setInputValue("")
           setSelectedImage(null) // 清除已选择的图片
