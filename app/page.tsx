@@ -2140,8 +2140,34 @@ export default function NotePad() {
       <main className="flex-1 flex overflow-hidden">
         <div className="container mx-auto max-w-7xl flex-1 flex flex-col">
           <div className="flex flex-1 overflow-hidden">
-            {/* 记事本区域 (3/4宽度) */}
-            <div className="w-full md:w-3/4 flex flex-col border-r bg-background">
+            {/* 日历和日程区域 (1/4宽度) - 最左边 */}
+            <div className="hidden md:flex md:flex-col w-1/4 bg-background border-r">
+              {/* 日历区域 - 固定不滚动 */}
+              <div className="p-4 border-b">
+                <div className="relative">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={handleDateSelect}
+                    className="rounded-md border"
+                  />
+                  {/* 月份点击区域覆盖层 */}
+                  <div 
+                    className="absolute top-2 left-2 right-2 h-8 cursor-pointer z-10 hover:bg-muted/20 rounded transition-colors"
+                    onClick={() => setIsLargeCalendarOpen(true)}
+                    title="点击查看大日历"
+                  />
+                </div>
+              </div>
+              
+              {/* 日程区域 - 固定不滚动 */}
+              <div className="p-4 border-b">
+                <ScheduleList selectedDate={date} />
+              </div>
+            </div>
+
+            {/* 记事本区域 (2/4宽度) - 中间 */}
+            <div className="w-full md:w-2/4 flex flex-col border-r bg-background">
               {/* 当点击标签时，显示左右布局 */}
               {currentTag ? (
                 <div className="flex-1 flex overflow-hidden">
@@ -2345,31 +2371,8 @@ export default function NotePad() {
                               </div>
                 </div>
 
-            {/* 日历和Todo区域 (1/4宽度) - 日历固定，Todo列表独立滚动 */}
+            {/* Todo区域 (1/4宽度) - 最右边 */}
             <div className="hidden md:flex md:flex-col w-1/4 bg-background">
-              {/* 日历区域 - 固定不滚动 */}
-              <div className="p-4 border-b">
-                <div className="relative">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    className="rounded-md border"
-                  />
-                  {/* 月份点击区域覆盖层 */}
-                  <div 
-                    className="absolute top-2 left-2 right-2 h-8 cursor-pointer z-10 hover:bg-muted/20 rounded transition-colors"
-                    onClick={() => setIsLargeCalendarOpen(true)}
-                    title="点击查看大日历"
-                  />
-                </div>
-              </div>
-              
-              {/* 日程区域 - 固定不滚动 */}
-              <div className="p-4 border-b">
-                <ScheduleList selectedDate={date} />
-              </div>
-              
               {/* Todo列表区域 - 独立滚动 */}
               <div className="flex-1 overflow-hidden">
                 <TodoList 
