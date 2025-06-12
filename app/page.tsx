@@ -2169,11 +2169,7 @@ export default function NotePad() {
             {/* 记事本区域 (2/4宽度) - 中间 */}
             <div className="w-full md:w-2/4 flex flex-col border-r bg-background">
               {/* 输入区域 - 放在最上面 */}
-              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-4 shadow-lg">
-                {/* 当前选中日期显示 */}
-                <div className="mb-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1 text-center">
-                  📅 当前选中日期: {date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-                </div>
+              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 shadow-lg">
                 <div className="mb-2 flex items-center justify-between">
                   {/* 模式切换按钮 */}
                   <div className="flex items-center gap-1 bg-muted rounded-md p-1">
@@ -2194,10 +2190,17 @@ export default function NotePad() {
                       Todo
                     </Button>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Info className="h-3 w-3" />
-                    <span>使用 #标签 创建标签（支持中英文）</span>
-                  </div>
+                  {/* 添加按钮移到这里 */}
+                  <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))} size="sm">
+                    {isAdding ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        {inputMode === 'todo' ? 'Todo添加中' : '保存中'}
+                      </>
+                    ) : (
+                      inputMode === 'todo' ? '添加Todo' : '添加笔记'
+                    )}
+                  </Button>
                 </div>
                 <div className="flex flex-col space-y-2">
                   <Textarea
@@ -2205,7 +2208,7 @@ export default function NotePad() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
-                    className="flex-1 min-h-[120px] resize-none font-mono text-sm"
+                    className="flex-1 min-h-[80px] resize-none font-mono text-sm"
                     disabled={isAdding}
                   />
                   
@@ -2280,19 +2283,6 @@ export default function NotePad() {
                       )}
                     </>
                   )}
-                  
-                  <div className="flex justify-end">
-                    <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))}>
-                      {isAdding ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          {inputMode === 'todo' ? 'Todo添加中' : '保存中'}
-                        </>
-                      ) : (
-                        inputMode === 'todo' ? '添加Todo' : '添加笔记'
-                      )}
-                    </Button>
-                  </div>
                 </div>
               </div>
               
