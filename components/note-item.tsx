@@ -71,23 +71,23 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     const components = {
       p: ({ children, ...props }: any) => {
         return (
-          <p {...props} className="mb-1 last:mb-0 leading-tight" style={{ lineHeight: '1' }}>
+          <p {...props} className="mb-2 last:mb-0" style={{ lineHeight: '1.5' }}>
             {processTextWithTags(children)}
           </p>
         );
       },
       // 处理其他Markdown元素
-      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h1>,
-      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h2>,
-      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{processTextWithTags(children)}</h3>,
-      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{children}</ul>,
-      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-1 leading-tight" style={{ lineHeight: '1.2' }}>{children}</ol>,
+      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h1>,
+      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h2>,
+      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h3>,
+      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-2" style={{ lineHeight: '1.5' }}>{children}</ul>,
+      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-2" style={{ lineHeight: '1.5' }}>{children}</ol>,
       li: ({ children, ...props }: any) => <li {...props}>{processTextWithTags(children)}</li>,
       blockquote: ({ children, ...props }: any) => (
-        <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-1 leading-tight" style={{ lineHeight: '1.2' }}>
-          {processTextWithTags(children)}
-        </blockquote>
-      ),
+          <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-2" style={{ lineHeight: '1.5' }}>
+            {processTextWithTags(children)}
+          </blockquote>
+        ),
       code: ({ children, ...props }: any) => (
         <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">
           {children}
@@ -257,7 +257,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
         </div>
       </div>
       <div 
-        className="text-sm leading-tight whitespace-pre-wrap break-words"
+        className="text-sm whitespace-pre-wrap break-words"
         style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
         onClick={handleContentClick}
       >
