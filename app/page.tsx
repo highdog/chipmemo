@@ -824,6 +824,7 @@ function TodoList({
                 </div>
               )}
             </div>
+            
           </div>
         </div>
       )}
@@ -2131,7 +2132,8 @@ export default function NotePad() {
       <main className="flex-1 flex overflow-hidden">
         <div className="container mx-auto max-w-7xl flex-1 flex flex-col">
           <div className="flex flex-1 overflow-hidden">
-            {/* 日历和日程区域 (1/4宽度) - 最左边 */}
+            {/* 日历和日程区域 (1/4宽度) - 最左边 - 标签搜索时隐藏 */}
+            {!searchTerm.startsWith('#') && (
             <div className="hidden md:flex md:flex-col w-1/4 bg-background border-r">
               {/* 日历区域 - 固定不滚动 */}
               <div className="p-4 border-b">
@@ -2156,8 +2158,8 @@ export default function NotePad() {
                 <ScheduleList selectedDate={date} />
               </div>
               
-              {/* 常用标签区域 */}
-              {searchHistory.filter(item => item.startsWith('#')).length > 0 && (
+              {/* 常用标签区域 - 标签搜索时隐藏 */}
+              {!searchTerm.startsWith('#') && searchHistory.filter(item => item.startsWith('#')).length > 0 && (
                 <div className="p-4 border-b">
                   <div className="mb-2">
                     <span className="text-sm text-muted-foreground">常用标签</span>
@@ -2181,9 +2183,12 @@ export default function NotePad() {
                 </div>
               )}
             </div>
+            )}
 
-            {/* 记事本区域 (2/4宽度) - 中间 */}
-            <div className="w-full md:w-2/4 flex flex-col border-r bg-background">
+            {/* 记事本区域 - 中间，标签搜索时扩展宽度 */}
+            <div className={`w-full flex flex-col border-r bg-background ${
+              searchTerm.startsWith('#') ? 'md:w-full' : 'md:w-2/4'
+            }`}>
               {/* 输入区域 - 放在最上面 */}
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -2378,20 +2383,22 @@ export default function NotePad() {
 
                 </div>
 
-            {/* Todo区域 (1/4宽度) - 最右边 */}
-            <div className="hidden md:flex md:flex-col w-1/4 bg-background">
-              {/* Todo列表区域 - 独立滚动 */}
-              <div className="flex-1 overflow-hidden">
-                <TodoList 
-                  selectedDate={date} 
-                  todosByDate={todosByDate}
-                  onToggleTodo={handleToggleTodo}
-                  onUpdateTodo={handleUpdateTodo}
-                  onDeleteTodo={handleDeleteTodo}
-                  onLoadTodos={loadTodosData}
-                />
+            {/* Todo区域 (1/4宽度) - 最右边，标签搜索时隐藏 */}
+            {!searchTerm.startsWith('#') && (
+              <div className="hidden md:flex md:flex-col w-1/4 bg-background">
+                {/* Todo列表区域 - 独立滚动 */}
+                <div className="flex-1 overflow-hidden">
+                  <TodoList 
+                    selectedDate={date} 
+                    todosByDate={todosByDate}
+                    onToggleTodo={handleToggleTodo}
+                    onUpdateTodo={handleUpdateTodo}
+                    onDeleteTodo={handleDeleteTodo}
+                    onLoadTodos={loadTodosData}
+                  />
+                </div>
               </div>
-            </div>
+            )}
               </div>
         </div>
       </main>
