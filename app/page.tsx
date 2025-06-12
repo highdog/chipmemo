@@ -408,6 +408,20 @@ function TodoList({
       {/* 可滚动的Todo列表区域 */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
+          {/* 添加新Todo按钮 - 仅在选择了特定标签时显示 */}
+          {selectedTag !== 'all' && (
+            <div className="mb-3">
+              <Button
+                onClick={() => setNewTodoTag(selectedTag)}
+                className="w-full flex items-center justify-center py-1 text-sm"
+                variant="outline"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                添加 #{selectedTag} 标签的Todo
+              </Button>
+            </div>
+          )}
+          
           {isLoading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
