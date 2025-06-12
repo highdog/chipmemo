@@ -1704,13 +1704,19 @@ export default function NotePad() {
           
           // 自动滚动到最新添加的笔记
           setTimeout(() => {
-            // 重新加载笔记后，找到最新的笔记进行滚动
-            const allNoteElements = document.querySelectorAll('[id^="note-"]')
-            if (allNoteElements.length > 0) {
-              const lastNote = allNoteElements[allNoteElements.length - 1]
-              lastNote.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            if (notes.length > 0) {
+              // 找到最新的笔记（按创建时间排序）
+              const latestNote = notes.reduce((latest, current) => {
+                return new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+              })
+              
+              // 滚动到最新笔记
+              const noteElement = document.getElementById(`note-${latestNote.id}`)
+              if (noteElement) {
+                noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }
             } else {
-              // 如果没有找到笔记元素，回退到日期滚动
+              // 如果没有笔记，滚动到当前日期
               const currentDateString = date.toDateString()
               const dateElement = document.getElementById(`date-${currentDateString}`) || 
                                  document.getElementById(`date-group-${currentDateString}`)
@@ -2079,39 +2085,18 @@ export default function NotePad() {
       <header className="flex-shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto py-3 px-4 max-w-7xl">
           <div className="flex items-center justify-between gap-4">
-             {/* 左侧：土豆笔记标题和搜索框 */}
-             <div className="flex items-center gap-4 flex-1">
+             {/* 左侧：土豆笔记标题 */}
+             <div className="flex items-center">
                <h1 className="text-xl font-bold whitespace-nowrap">土豆笔记</h1>
-               <div className="flex-1 max-w-md">
-                 <SearchBar 
-                   onSearch={handleSearch} 
-                   onClearSearch={handleClearSearch} 
-                   searchTerm={searchTerm}
-                 />
-               </div>
-               
-               {/* 热门标签区域 */}
-               {searchHistory.filter(item => item.startsWith('#')).length > 0 && (
-                 <div className="flex items-center gap-2">
-                   <span className="text-sm text-muted-foreground whitespace-nowrap"></span>
-                   <div className="flex gap-1">
-                     {searchHistory.filter(item => item.startsWith('#')).map(item => item.substring(1)).slice(0, 5).map((tag) => (
-                       <Badge
-                         key={tag}
-                         variant="outline"
-                         className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 whitespace-nowrap"
-                         onClick={() => {
-                           const tagSearch = `#${tag}`
-                           setSearchTerm(tagSearch)
-                           handleSearch(tagSearch)
-                         }}
-                       >
-                         #{tag}
-                       </Badge>
-                     ))}
-                   </div>
-                 </div>
-               )}
+             </div>
+             
+             {/* 中间：搜索框 */}
+             <div className="flex-1 max-w-md">
+               <SearchBar 
+                 onSearch={handleSearch} 
+                 onClearSearch={handleClearSearch} 
+                 searchTerm={searchTerm}
+               />
              </div>
              
              {/* 右侧：深浅色切换按钮和用户图标 */}
@@ -2170,6 +2155,31 @@ export default function NotePad() {
               <div className="p-4 border-b">
                 <ScheduleList selectedDate={date} />
               </div>
+              
+              {/* 常用标签区域 */}
+              {searchHistory.filter(item => item.startsWith('#')).length > 0 && (
+                <div className="p-4 border-b">
+                  <div className="mb-2">
+                    <span className="text-sm text-muted-foreground">常用标签</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {searchHistory.filter(item => item.startsWith('#')).map(item => item.substring(1)).slice(0, 8).map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
+                        onClick={() => {
+                          const tagSearch = `#${tag}`
+                          setSearchTerm(tagSearch)
+                          handleSearch(tagSearch)
+                        }}
+                      >
+                        #{tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 记事本区域 (2/4宽度) - 中间 */}
