@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
@@ -211,6 +211,7 @@ function TodoList({
   const [editStartDate, setEditStartDate] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
   const [menuOpenTodo, setMenuOpenTodo] = useState<string | null>(null)
+  const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
 
   const selectedDateObj = new Date(selectedDate)
   
@@ -354,7 +355,13 @@ function TodoList({
       {/* 固定的标题和标签筛选区域 */}
       <div className="p-4 border-b bg-background">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-sm">Todo 列表</h3>
+          <h3 
+            className="font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+            onClick={() => setIsLargeTodoListOpen(true)}
+            title="点击查看大的Todo列表"
+          >
+            Todo 列表
+          </h3>
           <div className="text-xs text-muted-foreground">
             {completedCount}/{totalCount}
           </div>
@@ -562,9 +569,143 @@ function TodoList({
             <div className="text-center py-4 text-sm text-muted-foreground">
               暂无Todo事项
             </div>
-          )}
+          )})}}
         </div>
       </div>
+      
+      {/* 大的Todo列表弹窗 */}
+      {isLargeTodoListOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-7xl h-[80vh] flex flex-col">
+            {/* 弹窗标题栏 */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Todo 列表总览</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsLargeTodoListOpen(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* 按标签分列的Todo内容 */}
+             <div className="flex-1 overflow-hidden p-2">
+               {allTags.length > 0 ? (
+                 <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `repeat(${allTags.filter(tag => allTodos.filter(todo => todo.tags.includes(tag) && todo.tags[0] === tag).length > 0).length}, 1fr)` }}>
+                  {allTags.map((tag) => {
+                      const tagTodos = allTodos.filter(todo => todo.tags.includes(tag) && todo.tags[0] === tag)
+                     if (tagTodos.length === 0) return null
+                     return (
+                       <div key={tag} className="border rounded-lg p-2 flex flex-col">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                          <h3 className="font-medium text-sm">#{tag}</h3>
+                          <span className="text-xs text-muted-foreground">
+                            {tagTodos.filter(t => t.completed).length}/{tagTodos.length}
+                          </span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                           {tagTodos.map((todo, index) => (
+                             <div key={todo.id}>
+                               <div
+                                  className="p-2 hover:bg-accent/50 transition-colors cursor-pointer relative"
+                                 onClick={() => {
+                                   const newState = menuOpenTodo === todo.id ? null : todo.id
+                                   setMenuOpenTodo(newState)
+                                 }}
+                               >
+                                 <div
+                                   className={cn(
+                                     "text-sm",
+                                     todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                                   )}
+                                 >
+                                   {todo.content}
+                                 </div>
+                                 {/* 显示日期信息 */}
+                                 <div className="text-xs text-muted-foreground mt-1">
+                                   {todo.startDate && todo.dueDate ? (
+                                     <span>
+                                       {new Date(todo.startDate).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })} - {new Date(todo.dueDate).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                                     </span>
+                                   ) : todo.startDate ? (
+                                     <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}</span>
+                                   ) : todo.dueDate ? (
+                                     <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}</span>
+                                   ) : null}
+                                 </div>
+                                 
+                                 {/* 菜单 */}
+                                 {menuOpenTodo === todo.id && (
+                                   <div className="todo-menu absolute right-2 top-2 bg-background border rounded-md shadow-lg z-10 min-w-[100px]">
+                                     <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       onClick={(e) => {
+                                         e.stopPropagation()
+                                         handleEditTodo(todo)
+                                         setMenuOpenTodo(null)
+                                       }}
+                                       className="w-full justify-start h-8 px-3 text-xs"
+                                     >
+                                       <Edit className="h-3 w-3 mr-2" />
+                                       编辑
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       onClick={(e) => {
+                                         e.stopPropagation()
+                                         handleDeleteTodo(todo.id)
+                                         setMenuOpenTodo(null)
+                                       }}
+                                       className="w-full justify-start h-8 px-3 text-xs text-red-500 hover:text-red-700"
+                                     >
+                                       <Trash2 className="h-3 w-3 mr-2" />
+                                       删除
+                                     </Button>
+                                     <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       onClick={(e) => {
+                                         e.stopPropagation()
+                                         handleToggleTodo(todo.id)
+                                         setMenuOpenTodo(null)
+                                       }}
+                                       className="w-full justify-start h-8 px-3 text-xs"
+                                     >
+                                       <Check className="h-3 w-3 mr-2" />
+                                       {todo.completed ? '取消完成' : '完成'}
+                                     </Button>
+                                   </div>
+                                 )}
+                               </div>
+                               {/* 分割线 */}
+                               {index < tagTodos.length - 1 && (
+                                 <div className="border-b border-border/50" />
+                               )}
+                             </div>
+                           ))}
+                          {tagTodos.length === 0 && (
+                            <div className="text-center py-4 text-xs text-muted-foreground">
+                              暂无Todo
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  暂无Todo标签
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
