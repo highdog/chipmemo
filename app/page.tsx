@@ -190,7 +190,8 @@ function TodoList({
   onToggleTodo,
   onUpdateTodo,
   onDeleteTodo,
-  onLoadTodos
+  onLoadTodos,
+  onShowTodoDetail
 }: { 
   selectedDate: Date;
   todosByDate: Record<string, Array<{ 
@@ -205,6 +206,7 @@ function TodoList({
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
+  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -486,9 +488,17 @@ function TodoList({
                       <div className="flex-1">
                         <label
                           className={cn(
-                             "text-sm block",
+                             "text-sm block cursor-pointer hover:bg-accent/50 p-1 rounded transition-colors",
                              todo.completed ? "line-through text-muted-foreground" : "text-foreground"
                            )}
+                          onClick={() => onShowTodoDetail({
+                            id: todo.id,
+                            content: todo.content,
+                            completed: todo.completed,
+                            tags: todo.tags,
+                            startDate: todo.startDate,
+                            dueDate: todo.dueDate
+                          })}
                         >
                           {todo.content}
                           {/* 标签跟在文字后面 */}
@@ -863,6 +873,14 @@ export default function NotePad() {
   const [isExporting, setIsExporting] = useState(false) // 导出状态
   const [isImporting, setIsImporting] = useState(false) // 导入状态
   const [searchHistory, setSearchHistory] = useState<string[]>([]) // 搜索历史记录
+  const [selectedTodoDetail, setSelectedTodoDetail] = useState<{
+    id: string;
+    content: string;
+    completed: boolean;
+    tags: string[];
+    startDate?: string;
+    dueDate?: string;
+  } | null>(null) // 选中的todo详情
 
   // 加载所有日程数据
   const loadAllSchedules = useCallback(() => {
@@ -2439,6 +2457,7 @@ export default function NotePad() {
                     onUpdateTodo={handleUpdateTodo}
                     onDeleteTodo={handleDeleteTodo}
                     onLoadTodos={loadTodosData}
+                    onShowTodoDetail={setSelectedTodoDetail}
                   />
                 </div>
               </div>
@@ -2455,6 +2474,132 @@ export default function NotePad() {
            onDateSelect={setDate}
            schedulesByDate={schedulesByDate}
          />
+
+      {/* Todo详情弹框 */}
+      {selectedTodoDetail && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            {/* 弹窗标题栏 */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">Todo 详情</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedTodoDetail(null)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* 弹窗内容 */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* 完成状态 */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {selectedTodoDetail.completed ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <Circle className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <span className={cn(
+                      "text-sm font-medium",
+                      selectedTodoDetail.completed ? "text-green-600" : "text-muted-foreground"
+                    )}>
+                      {selectedTodoDetail.completed ? "已完成" : "未完成"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Todo内容 */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">内容</h3>
+                  <div className={cn(
+                    "text-base p-3 bg-muted/30 rounded-md",
+                    selectedTodoDetail.completed ? "line-through text-muted-foreground" : "text-foreground"
+                  )}>
+                    {selectedTodoDetail.content}
+                  </div>
+                </div>
+
+                {/* 标签 */}
+                {selectedTodoDetail.tags.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">标签</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTodoDetail.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 日期信息 */}
+                {(selectedTodoDetail.startDate || selectedTodoDetail.dueDate) && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">日期</h3>
+                    <div className="space-y-2">
+                      {selectedTodoDetail.startDate && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">开始日期:</span>
+                          <span className="font-medium">
+                            {new Date(selectedTodoDetail.startDate).toLocaleDateString('zh-CN', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {selectedTodoDetail.dueDate && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">截止日期:</span>
+                          <span className="font-medium">
+                            {new Date(selectedTodoDetail.dueDate).toLocaleDateString('zh-CN', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 弹窗底部操作按钮 */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedTodoDetail(null)}
+              >
+                关闭
+              </Button>
+              <Button
+                onClick={() => {
+                  handleToggleTodo(selectedTodoDetail.id)
+                  setSelectedTodoDetail(null)
+                }}
+                className={cn(
+                  selectedTodoDetail.completed 
+                    ? "bg-orange-500 hover:bg-orange-600" 
+                    : "bg-green-500 hover:bg-green-600"
+                )}
+              >
+                {selectedTodoDetail.completed ? "标记为未完成" : "标记为已完成"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
