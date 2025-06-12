@@ -157,6 +157,7 @@ function NoteGroup({
   searchTerm,
   onTagClick,
   onConvertToTodo,
+  onUpdate,
 }: {
   date: string
   notes: Note[]
@@ -164,6 +165,7 @@ function NoteGroup({
   searchTerm?: string
   onTagClick: (tag: string) => void
   onConvertToTodo: (note: Note) => void
+  onUpdate: (noteId: string, content: string, tags: string[]) => Promise<void>
 }) {
   return (
     <div id={`date-group-${date}`} className="mb-6">
@@ -176,7 +178,15 @@ function NoteGroup({
       {/* 该日期下的所有笔记 */}
       <div className="space-y-3 ml-4">
         {notes.map((note) => (
-          <NoteItem key={note.id} note={note} onDelete={onDelete} searchTerm={searchTerm} onTagClick={onTagClick} onConvertToTodo={() => onConvertToTodo(note)} />
+          <NoteItem 
+            key={note.id} 
+            note={note} 
+            onDelete={onDelete} 
+            searchTerm={searchTerm} 
+            onTagClick={onTagClick} 
+            onConvertToTodo={() => onConvertToTodo(note)} 
+            onUpdate={onUpdate}
+          />
         ))}
       </div>
     </div>
@@ -2054,6 +2064,41 @@ export default function NotePad() {
     }
   }
 
+  // 处理笔记更新
+  const handleUpdateNote = async (noteId: string, content: string, tags: string[]) => {
+    try {
+      const result = await apiClient.updateNote(noteId, {
+        content,
+        tags
+      })
+      
+      if (result.success) {
+        // 刷新笔记列表
+        if (searchTerm) {
+          handleSearch(searchTerm)
+        } else {
+          loadNotes()
+        }
+        toast({
+          title: "更新成功",
+          description: "笔记已更新",
+        })
+      } else {
+        toast({
+          title: "更新失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "更新笔记失败",
+        variant: "destructive",
+      })
+    }
+  }
+
   // 处理笔记转换为Todo
   const handleConvertToTodo = async (note: Note) => {
     try {
@@ -2517,6 +2562,7 @@ export default function NotePad() {
                                 searchTerm={searchTerm}
                                 onTagClick={handleTagClick}
                                 onConvertToTodo={handleConvertToTodo}
+                                onUpdate={handleUpdateNote}
                               />
                             ))}
                           </div>
@@ -2549,6 +2595,7 @@ export default function NotePad() {
                             searchTerm={searchTerm}
                             onTagClick={handleTagClick}
                             onConvertToTodo={handleConvertToTodo}
+                            onUpdate={handleUpdateNote}
                           />
                         ))}
                       </div>

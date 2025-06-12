@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CheckSquare, Tag, ListTodo } from "lucide-react"
+import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X } from "lucide-react"
 import { deleteNote, type Note } from "@/lib/actions"
 import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
@@ -12,6 +12,8 @@ import { apiClient } from "@/lib/api"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 
 
 interface NoteItemProps {
@@ -20,11 +22,16 @@ interface NoteItemProps {
   searchTerm?: string
   onTagClick?: (tag: string) => void
   onConvertToTodo?: () => void
+  onUpdate?: (noteId: string, content: string, tags: string[]) => Promise<void>
 }
 
-export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTodo }: NoteItemProps) {
+export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTodo, onUpdate }: NoteItemProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [editTags, setEditTags] = useState<string[]>([])
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -63,6 +70,60 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
         setIsConverting(false)
       }
     }
+  }
+
+  // 开始编辑笔记
+  const handleEdit = () => {
+    setEditContent(note.originalContent || note.content)
+    setEditTags([...note.tags])
+    setIsEditing(true)
+  }
+
+  // 保存编辑后的笔记
+  const handleSave = async () => {
+    if (!editContent.trim()) {
+      toast({
+        title: "内容不能为空",
+        description: "请输入笔记内容",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (onUpdate) {
+        await onUpdate(note.id, editContent, editTags)
+        setIsEditing(false)
+        toast({
+          title: "保存成功",
+          description: "笔记已更新",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: "更新笔记失败，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditContent('')
+    setEditTags([])
+  }
+
+  // 处理标签输入
+  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const tagsInput = e.target.value
+    // 将输入的标签字符串分割成数组
+    const tagsArray = tagsInput.split(/[,\s]+/).filter(tag => tag.trim() !== '')
+    setEditTags(tagsArray)
   }
 
   // 渲染笔记内容的组件
@@ -216,8 +277,18 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           <Button
             variant="ghost"
             size="sm"
+            onClick={handleEdit}
+            disabled={isEditing}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+            title="编辑笔记"
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleConvertToTodo}
-            disabled={isConverting}
+            disabled={isConverting || isEditing}
             className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
             title="转换为Todo"
           >
@@ -227,8 +298,9 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             variant="ghost"
             size="sm"
             onClick={handleDelete}
-            disabled={isDeleting}
+            disabled={isDeleting || isEditing}
             className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
+            title="删除笔记"
           >
             <Trash2 className="h-3 w-3" />
           </Button>
@@ -256,13 +328,60 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           )}
         </div>
       </div>
-      <div 
-        className="text-sm whitespace-pre-wrap break-words"
-        style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
-        onClick={handleContentClick}
-      >
-        {renderNoteContent()}
-      </div>
+      {isEditing ? (
+        <div className="space-y-3">
+          <Textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="min-h-[100px] text-sm"
+            placeholder="输入笔记内容..."
+          />
+          <div className="flex flex-col space-y-2">
+            <div className="text-sm font-medium">标签:</div>
+            <Input
+              value={editTags.join(', ')}
+              onChange={handleTagsChange}
+              className="text-sm"
+              placeholder="输入标签，用逗号或空格分隔"
+            />
+            <div className="flex justify-end space-x-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelEdit}
+                className="h-8"
+              >
+                <X className="h-3 w-3 mr-1" />
+                取消
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="h-8"
+              >
+                {isSaving ? (
+                  <span>保存中...</span>
+                ) : (
+                  <>
+                    <Save className="h-3 w-3 mr-1" />
+                    保存
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="text-sm whitespace-pre-wrap break-words"
+          style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
+          onClick={handleContentClick}
+        >
+          {renderNoteContent()}
+        </div>
+      )}
         {note.imageUrl && note.imageUrl.trim() !== "" && (
           <div className="mt-2">
             <img 
