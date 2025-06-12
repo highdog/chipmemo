@@ -1690,7 +1690,18 @@ export default function NotePad() {
         }
       } else {
         // 笔记模式：原有逻辑
-        const result = await addNote(inputValue, date.toISOString(), selectedImage || undefined)
+        let noteContent = inputValue
+        
+        // 如果是标签搜索模式，自动添加当前标签
+        if (searchTerm.startsWith('#')) {
+          const currentTag = searchTerm.slice(1) // 移除#号
+          // 检查内容中是否已包含该标签
+          if (!noteContent.includes(searchTerm)) {
+            noteContent = noteContent + ' ' + searchTerm
+          }
+        }
+        
+        const result = await addNote(noteContent, date.toISOString(), selectedImage || undefined)
         if (result.success) {
           setInputValue("")
           setSelectedImage(null) // 清除已选择的图片
@@ -2189,7 +2200,8 @@ export default function NotePad() {
             <div className={`w-full flex flex-col border-r bg-background ${
               searchTerm.startsWith('#') ? 'md:w-full' : 'md:w-2/4'
             }`}>
-              {/* 输入区域 - 放在最上面 */}
+              {/* 输入区域 - 放在最上面 - 标签搜索时隐藏 */}
+              {!searchTerm.startsWith('#') && (
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
                 <div className="mb-2 flex items-center justify-between">
                   {/* 模式切换按钮 */}
@@ -2306,6 +2318,9 @@ export default function NotePad() {
                   )}
                 </div>
               </div>
+              )}
+              
+
               
               {/* 当点击标签时，显示左右布局 */}
               {currentTag ? (
@@ -2319,6 +2334,36 @@ export default function NotePad() {
                   
                   {/* 右侧：可滚动的有日期笔记区域 */}
                   <div className="flex-1 flex flex-col">
+                    {/* 标签搜索时的简化笔记输入区域 - 只在右侧显示 */}
+                    {searchTerm.startsWith('#') && (
+                      <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
+                        <div className="flex items-center space-x-2">
+                          <Textarea
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder={`输入新笔记... (将自动添加标签 ${searchTerm})`}
+                            className="flex-1 min-h-[60px] resize-none font-mono text-sm"
+                            disabled={isAdding}
+                          />
+                          <Button 
+                            onClick={handleAddNote} 
+                            disabled={isAdding || !inputValue.trim()} 
+                            size="sm" 
+                            className="h-[60px] px-4"
+                          >
+                            {isAdding ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                <span>保存中</span>
+                              </>
+                            ) : (
+                              <span>添加笔记</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-1 overflow-y-auto">
                       <div className="p-4">
                         {isLoading || isSearching ? (
