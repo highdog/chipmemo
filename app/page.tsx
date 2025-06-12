@@ -419,6 +419,110 @@ function TodoList({
                 <Plus className="h-3 w-3 mr-1" />
                 添加 #{selectedTag} 标签的Todo
               </Button>
+              
+              {/* 新建todo区域 - 紧跟在按钮下面 */}
+              {newTodoTag && (
+                <div className="mt-3 p-3 border rounded-lg bg-accent/20">
+                  <Input
+                    value={newTodoContent}
+                    onChange={(e) => setNewTodoContent(e.target.value)}
+                    placeholder={`输入 #${newTodoTag} 标签的todo内容...`}
+                    className="text-sm h-8 mb-2"
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter' && newTodoContent.trim()) {
+                        try {
+                          const todoResult = await apiClient.createTodo({
+                             text: newTodoContent.trim(),
+                             tags: [newTodoTag]
+                           })
+                          
+                          if (!todoResult.error) {
+                            await onLoadTodos()
+                            setNewTodoContent('')
+                            setNewTodoTag(null)
+                            toast({
+                              title: "成功",
+                              description: "Todo已添加",
+                            })
+                          } else {
+                            toast({
+                              title: "错误",
+                              description: todoResult.error || "添加Todo失败",
+                              variant: "destructive"
+                            })
+                          }
+                        } catch (error) {
+                          console.error('Create todo error:', error)
+                          toast({
+                            title: "错误",
+                            description: error instanceof Error ? error.message : "添加Todo失败",
+                            variant: "destructive"
+                          })
+                        }
+                      } else if (e.key === 'Escape') {
+                        setNewTodoTag(null)
+                        setNewTodoContent('')
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 px-2 text-xs"
+                      onClick={async () => {
+                        if (newTodoContent.trim()) {
+                          try {
+                            const todoResult = await apiClient.createTodo({
+                               text: newTodoContent.trim(),
+                               tags: [newTodoTag]
+                             })
+                            
+                            if (!todoResult.error) {
+                              await onLoadTodos()
+                              setNewTodoContent('')
+                              setNewTodoTag(null)
+                              toast({
+                                title: "成功",
+                                description: "Todo已添加",
+                              })
+                            } else {
+                              toast({
+                                title: "错误",
+                                description: todoResult.error || "添加Todo失败",
+                                variant: "destructive"
+                              })
+                            }
+                          } catch (error) {
+                            console.error('Create todo error:', error)
+                            toast({
+                              title: "错误",
+                              description: error instanceof Error ? error.message : "添加Todo失败",
+                              variant: "destructive"
+                            })
+                          }
+                        }
+                      }}
+                    >
+                      <Save className="h-3 w-3 mr-1" />
+                      保存
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        setNewTodoTag(null)
+                        setNewTodoContent('')
+                      }}
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
