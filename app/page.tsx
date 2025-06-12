@@ -1987,11 +1987,17 @@ export default function NotePad() {
       loadNotes().then(() => {
         // 页面加载完成后自动滚动到最新笔记
         setTimeout(() => {
-          // 查找最新的笔记元素
-          const noteElements = document.querySelectorAll('[id^="note-"]')
-          if (noteElements.length > 0) {
-            const lastNote = noteElements[noteElements.length - 1]
-            lastNote.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          if (notes.length > 0) {
+            // 找到最新的笔记（按创建时间排序）
+            const latestNote = notes.reduce((latest, current) => {
+              return new Date(current.createdAt) > new Date(latest.createdAt) ? current : latest
+            })
+            
+            // 滚动到最新笔记
+            const noteElement = document.getElementById(`note-${latestNote.id}`)
+            if (noteElement) {
+              noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
           } else {
             // 如果没有笔记，滚动到今天的日期
             const today = new Date().toDateString()
@@ -2169,7 +2175,7 @@ export default function NotePad() {
             {/* 记事本区域 (2/4宽度) - 中间 */}
             <div className="w-full md:w-2/4 flex flex-col border-r bg-background">
               {/* 输入区域 - 放在最上面 */}
-              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 shadow-lg">
+              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
                 <div className="mb-2 flex items-center justify-between">
                   {/* 模式切换按钮 */}
                   <div className="flex items-center gap-1 bg-muted rounded-md p-1">
@@ -2191,14 +2197,14 @@ export default function NotePad() {
                     </Button>
                   </div>
                   {/* 添加按钮移到这里 */}
-                  <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))} size="sm">
+                  <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        {inputMode === 'todo' ? 'Todo添加中' : '保存中'}
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        <span className="text-xs">{inputMode === 'todo' ? 'Todo添加中' : '保存中'}</span>
                       </>
                     ) : (
-                      inputMode === 'todo' ? '添加Todo' : '添加笔记'
+                      <span className="text-xs">{inputMode === 'todo' ? '添加Todo' : '添加笔记'}</span>
                     )}
                   </Button>
                 </div>
