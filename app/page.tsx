@@ -189,7 +189,8 @@ function TodoList({
   todosByDate, 
   onToggleTodo,
   onUpdateTodo,
-  onDeleteTodo
+  onDeleteTodo,
+  onLoadTodos
 }: { 
   selectedDate: Date;
   todosByDate: Record<string, Array<{ 
@@ -203,6 +204,7 @@ function TodoList({
   onToggleTodo: (todoId: string) => void;
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => void;
   onDeleteTodo: (todoId: string) => void;
+  onLoadTodos: () => Promise<void>;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -212,6 +214,8 @@ function TodoList({
   const [editDueDate, setEditDueDate] = useState('')
   const [menuOpenTodo, setMenuOpenTodo] = useState<string | null>(null)
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
+  const [newTodoTag, setNewTodoTag] = useState<string | null>(null)
+  const [newTodoContent, setNewTodoContent] = useState('')
 
   const selectedDateObj = new Date(selectedDate)
   
@@ -569,7 +573,7 @@ function TodoList({
             <div className="text-center py-4 text-sm text-muted-foreground">
               暂无Todo事项
             </div>
-          )})}}
+          )}
         </div>
       </div>
       
@@ -690,6 +694,123 @@ function TodoList({
                           {tagTodos.length === 0 && (
                             <div className="text-center py-4 text-xs text-muted-foreground">
                               暂无Todo
+                            </div>
+                          )}
+                          
+                          {/* 新建todo区域 */}
+                          {newTodoTag === tag ? (
+                            <div className="mt-2 p-2 border-t">
+                              <Input
+                                value={newTodoContent}
+                                onChange={(e) => setNewTodoContent(e.target.value)}
+                                placeholder="输入todo内容..."
+                                className="text-xs h-8 mb-2"
+                                onKeyDown={async (e) => {
+                                  if (e.key === 'Enter' && newTodoContent.trim()) {
+                                    try {
+                                      const todoResult = await apiClient.createTodo({
+                                         text: newTodoContent.trim(),
+                                         tags: [tag]
+                                       })
+                                      
+                                      if (!todoResult.error) {
+                                        await onLoadTodos()
+                                        setNewTodoContent('')
+                                        setNewTodoTag(null)
+                                        toast({
+                                          title: "成功",
+                                          description: "Todo已添加",
+                                        })
+                                      } else {
+                                        toast({
+                                          title: "错误",
+                                          description: todoResult.error || "添加Todo失败",
+                                          variant: "destructive"
+                                        })
+                                      }
+                                    } catch (error) {
+                                      console.error('Create todo error:', error)
+                                      toast({
+                                        title: "错误",
+                                        description: error instanceof Error ? error.message : "添加Todo失败",
+                                        variant: "destructive"
+                                      })
+                                    }
+                                  } else if (e.key === 'Escape') {
+                                    setNewTodoTag(null)
+                                    setNewTodoContent('')
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={async () => {
+                                    if (newTodoContent.trim()) {
+                                      try {
+                                        const todoResult = await apiClient.createTodo({
+                                           text: newTodoContent.trim(),
+                                           tags: [tag]
+                                         })
+                                        
+                                        if (!todoResult.error) {
+                                          await onLoadTodos()
+                                          setNewTodoContent('')
+                                          setNewTodoTag(null)
+                                          toast({
+                                            title: "成功",
+                                            description: "Todo已添加",
+                                          })
+                                        } else {
+                                          toast({
+                                            title: "错误",
+                                            description: todoResult.error || "添加Todo失败",
+                                            variant: "destructive"
+                                          })
+                                        }
+                                      } catch (error) {
+                                        console.error('Create todo error:', error)
+                                        toast({
+                                          title: "错误",
+                                          description: error instanceof Error ? error.message : "添加Todo失败",
+                                          variant: "destructive"
+                                        })
+                                      }
+                                    }
+                                  }}
+                                >
+                                  确定
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    setNewTodoTag(null)
+                                    setNewTodoContent('')
+                                  }}
+                                >
+                                  取消
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-2 border-t pt-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="w-full h-8 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setNewTodoTag(tag)
+                                  setNewTodoContent('')
+                                }}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                {/* 添加Todo */}
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -1548,11 +1669,10 @@ export default function NotePad() {
           text: cleanContent,
           tags,
           dueDate: todoDueDate || undefined,
-          startDate: todoStartDate || undefined,
-          completed: false
+          startDate: todoStartDate || undefined
         })
         
-        if (todoResult.success && todoResult.data) {
+        if (!todoResult.error) {
           // 重新加载todos数据以确保同步
           await loadTodosData()
           
@@ -1791,7 +1911,7 @@ export default function NotePad() {
         priority: 'medium'
       })
       
-      if (todoResult.success) {
+      if (!todoResult.error) {
         // 删除笔记
         const deleteResult = await deleteNote(note.id)
         if (deleteResult.success) {
@@ -2258,6 +2378,7 @@ export default function NotePad() {
                   onToggleTodo={handleToggleTodo}
                   onUpdateTodo={handleUpdateTodo}
                   onDeleteTodo={handleDeleteTodo}
+                  onLoadTodos={loadTodosData}
                 />
               </div>
             </div>
