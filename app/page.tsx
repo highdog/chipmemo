@@ -2326,8 +2326,8 @@ export default function NotePad() {
               {currentTag ? (
                 <div className="flex-1 flex overflow-hidden">
                   {/* 左侧：固定的标签内容区域 */}
-                  <div className="w-2/3 border-r bg-background flex-shrink-0">
-                    <div className="p-4 h-full overflow-y-auto">
+                  <div className="w-2/3 border-r bg-background flex-shrink-0 flex flex-col">
+                    <div className="p-4 flex-1 flex flex-col">
                       <TagContent tag={currentTag} />
                     </div>
                   </div>
@@ -2342,7 +2342,7 @@ export default function NotePad() {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder={`输入新笔记... (将自动添加标签 ${searchTerm})`}
+                            placeholder={`输入新笔记... ( ${searchTerm})`}
                             className="flex-1 min-h-[60px] resize-none font-mono text-sm"
                             disabled={isAdding}
                           />

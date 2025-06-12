@@ -258,6 +258,23 @@ class ApiClient {
     return this.get<Array<{ tag: string; count: number }>>('/notes/tags/all');
   }
 
+  // 标签内容相关API
+  async getTagContent(tag: string): Promise<ApiResponse<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string }>> {
+    return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
+  }
+
+  async saveTagContent(tag: string, content: string): Promise<ApiResponse<{ tag: string; content: string; updatedAt: string }>> {
+    return this.put<{ tag: string; content: string; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, { content });
+  }
+
+  async deleteTagContent(tag: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
+  }
+
+  async getAllTagContents(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string }>>> {
+    return this.get<Array<{ tag: string; content: string; updatedAt: string }>>('/tag-contents');
+  }
+
   // 待办事项相关API
   async getTodos(params?: {
     date?: string;
@@ -361,6 +378,13 @@ export const todosApi = {
   toggle: (id: string) => apiClient.toggleTodo(id),
   delete: (id: string) => apiClient.deleteTodo(id),
   getCategories: () => apiClient.getTodoCategories(),
+};
+
+export const tagContentsApi = {
+  get: (tag: string) => apiClient.getTagContent(tag),
+  save: (tag: string, content: string) => apiClient.saveTagContent(tag, content),
+  delete: (tag: string) => apiClient.deleteTagContent(tag),
+  getAll: () => apiClient.getAllTagContents(),
 };
 
 export default apiClient;
