@@ -1852,7 +1852,10 @@ export default function NotePad() {
           setSelectedImage(null) // 清除已选择的图片
           // 如果有搜索词，重新搜索；否则重新加载
           if (searchTerm) {
-            await handleSearch(searchTerm)
+            // 稍微延迟一下再搜索，确保服务器端数据已经更新
+            setTimeout(async () => {
+              await handleSearch(searchTerm)
+            }, 500)
           } else {
             await loadNotes()
           }
