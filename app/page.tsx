@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
@@ -22,6 +22,7 @@ import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
+import { TagSuggestion } from "@/components/tag-suggestion"
 import ScheduleList from "@/components/schedule-list"
 import LargeCalendar from "@/components/large-calendar"
 import {
@@ -881,6 +882,7 @@ export default function NotePad() {
   const [notes, setNotes] = useState<Note[]>([])
   const [inputValue, setInputValue] = useState("")
   const [date, setDate] = useState<Date>(new Date())
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
@@ -2324,14 +2326,23 @@ export default function NotePad() {
                   </Button>
                 </div>
                 <div className="flex flex-col space-y-2">
-                  <Textarea
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
-                    className="flex-1 min-h-[80px] resize-none font-mono text-sm"
-                    disabled={isAdding}
-                  />
+                  <div className="relative">
+                    <Textarea
+                      ref={textareaRef}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
+                      className="flex-1 min-h-[80px] resize-none font-mono text-sm"
+                      disabled={isAdding}
+                    />
+                    <TagSuggestion
+                      inputValue={inputValue}
+                      onTagSelect={setInputValue}
+                      inputRef={textareaRef}
+                      disabled={isAdding}
+                    />
+                  </div>
                   
                   {/* Todo模式下显示起始日期和截止日期输入框 */}
                   {inputMode === 'todo' && (
