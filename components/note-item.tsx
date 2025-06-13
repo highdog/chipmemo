@@ -398,6 +398,8 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             />
           </div>
         )}
+      {/* 分割线 */}
+      <div className="border-b border-border/50 my-3" />
     </div>
   )
 }
