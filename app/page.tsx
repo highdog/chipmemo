@@ -21,6 +21,7 @@ import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2
 import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
+import { SearchBar } from "@/components/search-bar"
 import ScheduleList from "@/components/schedule-list"
 import LargeCalendar from "@/components/large-calendar"
 import {
@@ -51,103 +52,7 @@ const extractTagsAndCleanContent = (content: string): { cleanContent: string; ta
   return { cleanContent, tags }
 }
 
-// SearchBar Component
-function SearchBar({
-  onSearch,
-  onClearSearch,
-  searchTerm,
-  placeholder = "搜索笔记内容或标签...",
-  popularTags = [],
-}: {
-  onSearch: (searchTerm: string) => void
-  onClearSearch: () => void
-  searchTerm: string
-  placeholder?: string
-  popularTags?: string[]
-}) {
-  const [inputValue, setInputValue] = useState("")
 
-  useEffect(() => {
-    setInputValue(searchTerm)
-  }, [searchTerm])
-
-  const handleSearch = () => {
-    onSearch(inputValue)
-  }
-
-  const handleClear = () => {
-    setInputValue("")
-    onSearch("")
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 不再拦截回车键，允许多行输入
-    // 只有当按下Ctrl+Enter或Command+Enter时才提交
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault()
-      onSearch(inputValue)
-    }
-  }
-
-  const handleTagClick = (tag: string) => {
-    const searchQuery = `#${tag}`
-    setInputValue(searchQuery)
-    onSearch(searchQuery)
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 max-w-md">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className="pl-10 pr-10"
-          />
-          {inputValue && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-        <Button onClick={handleSearch} size="sm">
-          搜索
-        </Button>
-        {searchTerm && (
-          <Button onClick={onClearSearch} variant="outline" size="sm">
-            <Home className="h-4 w-4 mr-1" />
-            显示全部
-          </Button>
-        )}
-      </div>
-      {popularTags.length > 0 && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground whitespace-nowrap"></span>
-          <div className="flex gap-1 flex-wrap">
-            {popularTags.slice(0, 5).map((tag) => (
-              <Badge
-                key={tag}
-                variant="outline"
-                className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
-                onClick={() => handleTagClick(tag)}
-              >
-                #{tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // NoteGroup Component
 function NoteGroup({
@@ -2385,7 +2290,7 @@ export default function NotePad() {
             }`}>
               {/* 输入区域 - 放在最上面 - 标签搜索时隐藏 */}
               {!searchTerm.startsWith('#') && (
-              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
+              <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 relative z-10">
                 <div className="mb-2 flex items-center justify-between">
                   {/* 模式切换按钮 */}
                   <div className="flex items-center gap-1 bg-muted rounded-md p-1">
