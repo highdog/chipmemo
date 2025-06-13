@@ -244,6 +244,10 @@ router.put('/:id', [
     .optional()
     .isISO8601()
     .withMessage('Due date must be in ISO format'),
+  body('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Start date must be in ISO format'),
   body('category')
     .optional()
     .isLength({ max: 50 })

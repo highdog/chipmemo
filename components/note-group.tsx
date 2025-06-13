@@ -22,9 +22,12 @@ export function NoteGroup({ date, notes, onDelete, searchTerm, onTagClick }: Not
       </div>
 
       {/* 该日期下的所有笔记 */}
-      <div className="space-y-3 ml-4">
-        {notes.map((note) => (
-          <NoteItem key={note.id} note={note} onDelete={onDelete} searchTerm={searchTerm} onTagClick={onTagClick} />
+      <div className="ml-4">
+        {notes.map((note, index) => (
+          <div key={note.id}>
+            <NoteItem note={note} onDelete={onDelete} searchTerm={searchTerm} onTagClick={onTagClick} />
+            <div className="border-b border-border/50 my-3" />
+          </div>
         ))}
       </div>
     </div>

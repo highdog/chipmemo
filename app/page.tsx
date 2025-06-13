@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
@@ -213,18 +213,25 @@ function TodoList({
     if (!editingTodo) return
     
     try {
-      // 调用父组件的更新函数
-      onUpdateTodo(editingTodo, {
+      // 调用父组件的更新函数并等待完成
+      await onUpdateTodo(editingTodo, {
         content: editContent,
         startDate: editStartDate,
         dueDate: editDueDate
       })
+      // 只有在更新成功后才清空编辑状态
       setEditingTodo(null)
       setEditContent('')
       setEditStartDate('')
       setEditDueDate('')
     } catch (error) {
       console.error('更新todo失败:', error)
+      // 可以在这里添加错误提示
+      toast({
+        title: "更新失败",
+        description: "保存Todo时发生错误，请重试",
+        variant: "destructive",
+      })
     }
   }
 
@@ -924,6 +931,11 @@ export default function NotePad() {
     startDate?: string;
     dueDate?: string;
   } | null>(null) // 选中的todo详情
+  
+  // 计时相关状态
+  const [isTimerRunning, setIsTimerRunning] = useState(false)
+  const [timerSeconds, setTimerSeconds] = useState(0)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // 加载所有日程数据
   const loadAllSchedules = useCallback(() => {
@@ -991,6 +1003,47 @@ export default function NotePad() {
 
     return sortedGroups
   }
+
+  // 计时器相关函数
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const startTimer = () => {
+    setIsTimerRunning(true)
+    timerRef.current = setInterval(() => {
+      setTimerSeconds(prev => prev + 1)
+    }, 1000)
+  }
+
+  const pauseTimer = () => {
+    setIsTimerRunning(false)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  const resetTimer = () => {
+    setIsTimerRunning(false)
+    setTimerSeconds(0)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  // 清理计时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
 
   // 滚动到指定日期的笔记
   const scrollToDate = (targetDate: Date) => {
@@ -1922,18 +1975,23 @@ export default function NotePad() {
           description: "Todo已更新",
         })
       } else {
+        // 抛出错误以便上层捕获
+        const errorMessage = result.error || "未知错误"
         toast({
           title: "更新失败",
-          description: result.error || "未知错误",
+          description: errorMessage,
           variant: "destructive",
         })
+        throw new Error(errorMessage)
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "更新Todo失败"
       toast({
         title: "错误",
-        description: "更新Todo失败",
+        description: errorMessage,
         variant: "destructive",
       })
+      throw error // 重新抛出错误以便上层捕获
     }
   }
 
@@ -2592,34 +2650,6 @@ export default function NotePad() {
             {/* 弹窗内容 */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="space-y-4">
-                {/* 完成状态 */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    {selectedTodoDetail.completed ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <span className={cn(
-                      "text-sm font-medium",
-                      selectedTodoDetail.completed ? "text-green-600" : "text-muted-foreground"
-                    )}>
-                      {selectedTodoDetail.completed ? "已完成" : "未完成"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Todo内容 */}
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">内容</h3>
-                  <div className={cn(
-                    "text-base p-3 bg-muted/30 rounded-md",
-                    selectedTodoDetail.completed ? "line-through text-muted-foreground" : "text-foreground"
-                  )}>
-                    {selectedTodoDetail.content}
-                  </div>
-                </div>
-
                 {/* 标签 */}
                 {selectedTodoDetail.tags.length > 0 && (
                   <div>
@@ -2636,6 +2666,52 @@ export default function NotePad() {
                     </div>
                   </div>
                 )}
+
+                {/* Todo内容 */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">内容</h3>
+                  <div className={cn(
+                    "text-base p-3 bg-muted/30 rounded-md",
+                    selectedTodoDetail.completed ? "line-through text-muted-foreground" : "text-foreground"
+                  )}>
+                    {selectedTodoDetail.content}
+                  </div>
+                </div>
+
+                {/* 正计时按钮 */}
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">计时</h3>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={() => {
+                        if (isTimerRunning) {
+                          pauseTimer()
+                        } else {
+                          startTimer()
+                        }
+                      }}
+                    >
+                      {isTimerRunning ? (
+                        <>
+                          <Pause className="h-4 w-4" />
+                          暂停计时
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="h-4 w-4" />
+                          开始计时
+                        </>
+                      )}
+                    </Button>
+                    {timerSeconds > 0 && (
+                      <div className="text-lg font-mono font-semibold text-foreground">
+                        {formatTime(timerSeconds)}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* 日期信息 */}
                 {(selectedTodoDetail.startDate || selectedTodoDetail.dueDate) && (
