@@ -345,7 +345,15 @@ function TodoList({
                     placeholder={`输入 #${newTodoTag} 标签的todo内容...`}
                     className="text-sm h-8 mb-2"
                     onKeyDown={async (e) => {
-                      if (e.key === 'Enter' && newTodoContent.trim()) {
+                      // 禁用回车键添加功能，只允许多行输入
+                      // 只有当按下Ctrl+Enter或Command+Enter时才提交
+                      if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey)) {
+                        // 允许普通回车键进行换行，不做任何处理
+                        return
+                      }
+                      
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && newTodoContent.trim()) {
+                        e.preventDefault()
                         try {
                           const todoResult = await apiClient.createTodo({
                              text: newTodoContent.trim(),
@@ -1957,8 +1965,13 @@ export default function NotePad() {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 不再拦截回车键，允许多行输入
+    // 禁用回车键添加功能，只允许多行输入
     // 只有当按下Ctrl+Enter或Command+Enter时才提交
+    if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
+      // 允许普通回车键进行换行，不做任何处理
+      return
+    }
+    
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault()
       handleAddNote()
