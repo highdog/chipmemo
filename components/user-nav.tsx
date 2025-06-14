@@ -10,6 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
@@ -24,7 +27,13 @@ interface UserNavProps {
   isImporting?: boolean
 }
 
-export function UserNav({ onLogout, onExport, onImport, isExporting = false, isImporting = false }: UserNavProps) {
+export function UserNav({ 
+  onLogout, 
+  onExport, 
+  onImport, 
+  isExporting = false, 
+  isImporting = false 
+}: UserNavProps) {
   const router = useRouter()
   const { user, loading: isLoading, logout } = useAuth()
 
@@ -92,7 +101,7 @@ export function UserNav({ onLogout, onExport, onImport, isExporting = false, isI
           ) : (
             <Download className="h-4 w-4 mr-2" />
           )}
-          {isExporting ? '导出中...' : '导出MD'}
+          {isExporting ? '导出中...' : '导出全部数据'}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onImport} disabled={isImporting}>
           {isImporting ? (
