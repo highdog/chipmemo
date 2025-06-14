@@ -1110,6 +1110,29 @@ export default function NotePad() {
     await loadNotes(false)
   }, [isLoadingMore, hasMoreNotes, loadNotes])
 
+  // 无限滚动监听
+  useEffect(() => {
+    const handleScroll = () => {
+      // 只在有更多数据且不在加载中时检查
+      if (!hasMoreNotes || isLoadingMore || isLoading) return
+      
+      const scrollableElement = document.querySelector('.flex-1.overflow-y-auto')
+      if (!scrollableElement) return
+      
+      const { scrollTop, scrollHeight, clientHeight } = scrollableElement
+      // 当滚动到距离底部100px时触发加载
+      if (scrollTop + clientHeight >= scrollHeight - 100) {
+        loadMoreNotes()
+      }
+    }
+
+    const scrollableElement = document.querySelector('.flex-1.overflow-y-auto')
+    if (scrollableElement) {
+      scrollableElement.addEventListener('scroll', handleScroll)
+      return () => scrollableElement.removeEventListener('scroll', handleScroll)
+    }
+  }, [hasMoreNotes, isLoadingMore, isLoading, loadMoreNotes])
+
   // 搜索笔记
   const handleSearch = async (term: string) => {
     setSearchTerm(term)
@@ -3390,24 +3413,21 @@ export default function NotePad() {
                             ))}
                             {hasMoreNotes && (
                               <div className="flex justify-center py-4">
-                                <Button
-                                  variant="outline"
-                                  onClick={loadMoreNotes}
-                                  disabled={isLoadingMore}
-                                  className="flex items-center gap-2"
-                                >
-                                  {isLoadingMore ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                      加载中...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Plus className="h-4 w-4" />
-                                      加载更多
-                                    </>
-                                  )}
-                                </Button>
+                                {isLoadingMore ? (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>正在加载更多...</span>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    onClick={loadMoreNotes}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    点击加载更多
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -3445,24 +3465,21 @@ export default function NotePad() {
                         ))}
                         {hasMoreNotes && (
                           <div className="flex justify-center py-4">
-                            <Button
-                              variant="outline"
-                              onClick={loadMoreNotes}
-                              disabled={isLoadingMore}
-                              className="flex items-center gap-2"
-                            >
-                              {isLoadingMore ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  加载中...
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="h-4 w-4" />
-                                  加载更多
-                                </>
-                              )}
-                            </Button>
+                            {isLoadingMore ? (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>正在加载更多...</span>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                onClick={loadMoreNotes}
+                                className="flex items-center gap-2 text-sm"
+                              >
+                                <Plus className="h-4 w-4" />
+                                点击加载更多
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
