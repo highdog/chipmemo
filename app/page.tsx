@@ -1264,8 +1264,25 @@ export default function NotePad() {
       const allTodos = Object.values(todosByDate).flat()
       const allSchedules = Object.values(schedulesByDate).flat()
       
+      // 获取所有标签的固定内容
+      const tagContentsResponse = await fetch('http://localhost:3001/api/tag-contents', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        }
+      })
+      let allTagContents: Array<{ tag: string; content: string; updatedAt: string }> = []
+      console.log('🔍 [导出调试] 标签固定内容API响应状态:', tagContentsResponse.status)
+      if (tagContentsResponse.ok) {
+        const tagContentsData = await tagContentsResponse.json()
+        console.log('🔍 [导出调试] 标签固定内容API响应数据:', tagContentsData)
+        allTagContents = tagContentsData.data || []
+        console.log('🔍 [导出调试] 处理后的标签固定内容数组:', allTagContents)
+      } else {
+        console.error('🔍 [导出调试] 标签固定内容API请求失败:', tagContentsResponse.status, tagContentsResponse.statusText)
+      }
+      
       // 检查是否有数据可导出
-      if (notesToExport.length === 0 && allTodos.length === 0 && allSchedules.length === 0) {
+      if (notesToExport.length === 0 && allTodos.length === 0 && allSchedules.length === 0 && allTagContents.length === 0) {
         toast({
           title: "导出失败",
           description: "没有可导出的数据",
@@ -1278,9 +1295,10 @@ export default function NotePad() {
       let markdownContent = `# 土豆笔记本完整导出\n\n`
       markdownContent += `导出时间: ${new Date().toLocaleString('zh-CN')}\n\n`
       markdownContent += `数据统计:\n`
-      markdownContent += `- 📝 笔记: ${notesToExport.length} 条\n`
-      markdownContent += `- ✅ Todo事项: ${allTodos.length} 条\n`
-      markdownContent += `- 📅 日程安排: ${allSchedules.length} 条\n\n`
+      markdownContent += `- 笔记: ${notesToExport.length} 条\n`
+      markdownContent += `- 待办事项: ${allTodos.length} 条\n`
+      markdownContent += `- 日程安排: ${allSchedules.length} 条\n`
+      markdownContent += `- 标签固定内容: ${allTagContents.length} 个\n\n`
       markdownContent += `---\n\n`
 
       // 收集所有日期并按日期组织数据
@@ -1437,14 +1455,32 @@ export default function NotePad() {
         // 按标签名排序
         const sortedTags = Array.from(tagMap.keys()).sort()
         
-        sortedTags.forEach(tag => {
-          const items = tagMap.get(tag)!
+        // 合并所有标签（包括有固定内容但没有关联笔记/待办的标签）
+        const allTagsSet = new Set([...sortedTags, ...allTagContents.map(tc => tc.tag)])
+        const allSortedTags = Array.from(allTagsSet).sort()
+        
+        allSortedTags.forEach(tag => {
           markdownContent += `## #${tag}\n\n`
-          markdownContent += `包含 ${items.length} 条内容\n\n`
           
-          items.forEach((item, index) => {
-            markdownContent += `${index + 1}. ${item.type === 'note' ? '📝' : '✅'} ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}\n`
-          })
+          // 添加标签的固定内容
+          const tagContent = allTagContents.find(tc => tc.tag === tag)
+          if (tagContent && tagContent.content.trim()) {
+            markdownContent += `**标签固定内容:**\n\n`
+            markdownContent += `${tagContent.content}\n\n`
+            markdownContent += `---\n\n`
+          }
+          
+          // 添加关联的笔记和待办
+          const items = tagMap.get(tag)
+          if (items && items.length > 0) {
+            markdownContent += `**关联内容:** 包含 ${items.length} 条\n\n`
+            
+            items.forEach((item, index) => {
+              markdownContent += `${index + 1}. ${item.type === 'note' ? '📝' : '✅'} ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}\n`
+            })
+          } else if (!tagContent || !tagContent.content.trim()) {
+            markdownContent += `暂无关联内容\n`
+          }
           
           markdownContent += `\n`
         })
@@ -1507,13 +1543,15 @@ export default function NotePad() {
         let importedNotes: any[] = []
         let importedTodos: any[] = []
         let importedSchedules: any[] = []
+        let importedTagContents: any[] = []
         
         if (isUnifiedFormat) {
           // 解析新的统一格式
-          const { notes, todos, schedules } = parseUnifiedMarkdownToData(text)
+          const { notes, todos, schedules, tagContents } = parseUnifiedMarkdownToData(text)
           importedNotes = notes
           importedTodos = todos
           importedSchedules = schedules
+          importedTagContents = tagContents || []
         } else {
           // 兼容旧格式
           const importType = detectImportType(text)
@@ -1544,7 +1582,8 @@ export default function NotePad() {
         console.log('🔍 [导入调试] 解析结果:', {
           notesCount: importedNotes.length,
           todosCount: importedTodos.length,
-          schedulesCount: importedSchedules.length
+          schedulesCount: importedSchedules.length,
+          tagContentsCount: importedTagContents.length
         })
         
         if (importedNotes.length > 0) {
@@ -1556,7 +1595,7 @@ export default function NotePad() {
           })))
         }
         
-        if (importedNotes.length === 0 && importedTodos.length === 0 && importedSchedules.length === 0) {
+        if (importedNotes.length === 0 && importedTodos.length === 0 && importedSchedules.length === 0 && importedTagContents.length === 0) {
           console.log('❌ [导入调试] 没有解析到任何数据')
           toast({
             title: "导入失败",
@@ -1569,109 +1608,274 @@ export default function NotePad() {
         let notesSuccessCount = 0
         let todosSuccessCount = 0
         let schedulesSuccessCount = 0
+        let tagContentsSuccessCount = 0
 
         // 批量添加笔记
-        console.log('🔍 [导入调试] 开始导入笔记，总数:', importedNotes.length)
-        for (let i = 0; i < importedNotes.length; i++) {
-          const noteData = importedNotes[i]
-          console.log(`🔍 [导入调试] 处理第 ${i + 1} 条笔记:`, {
-            originalContent: noteData.content.substring(0, 100) + '...',
-            tags: noteData.tags,
-            createdAt: noteData.createdAt
-          })
-          
+        console.log('🔍 [导入调试] 开始批量导入笔记，总数:', importedNotes.length)
+        if (importedNotes.length > 0) {
           try {
-            // 重新构建包含标签的内容
-            let contentWithTags = noteData.content
-            if (noteData.tags.length > 0) {
-              contentWithTags += '\n\n' + noteData.tags.map(tag => `#${tag}`).join(' ')
+            // 准备批量数据
+            const notesToCreate = importedNotes.map((noteData, i) => {
+              console.log(`🔍 [导入调试] 处理第 ${i + 1} 条笔记:`, {
+                originalContent: noteData.content ? noteData.content.substring(0, 100) + '...' : 'undefined',
+                tags: noteData.tags,
+                createdAt: noteData.createdAt
+              })
+              
+              // 重新构建包含标签的内容
+              let contentWithTags = noteData.content || ''
+              if (noteData.tags && noteData.tags.length > 0) {
+                contentWithTags += '\n\n' + noteData.tags.map(tag => `#${tag}`).join(' ')
+              }
+              
+              // 确保内容不为空且符合后端验证要求
+              if (!contentWithTags.trim()) {
+                contentWithTags = '导入的空笔记'
+              }
+              
+              // 使用完整的ISO时间字符串
+              const customDate = noteData.createdAt ? noteData.createdAt.toISOString() : new Date().toISOString()
+              
+              // 使用utils.ts中的extractTags函数，返回string[]格式
+              const tags = extractTags(contentWithTags) || []
+              // 确保title不为空且不超过200字符
+              const firstLine = contentWithTags.trim().split('\n')[0] || ''
+              const title = firstLine.length > 0 ? firstLine.substring(0, 200) : '导入的笔记'
+              
+              const noteToCreate = {
+                title: (title.trim() || '导入的笔记').substring(0, 200), // 确保不超过200字符
+                content: (contentWithTags.trim() || '导入的空笔记').substring(0, 100000), // 确保不超过100000字符
+                tags: Array.isArray(tags) ? tags : [],
+                color: 'default', // 添加默认颜色
+                customDate
+              }
+              
+              console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记准备的数据:`, {
+                title: noteToCreate.title.substring(0, 50),
+                contentLength: noteToCreate.content.length,
+                tagsCount: noteToCreate.tags.length,
+                color: noteToCreate.color,
+                customDate: noteToCreate.customDate
+              })
+              
+              return noteToCreate
+            }).filter(note => {
+              // 更严格的数据验证
+              const isValid = note.title && 
+                            note.title.trim().length > 0 && 
+                            note.title.length <= 200 &&
+                            note.content && 
+                            note.content.trim().length > 0 &&
+                            note.content.length <= 100000 &&
+                            Array.isArray(note.tags) &&
+                            note.customDate
+              
+              if (!isValid) {
+                console.warn(`⚠️ [导入调试] 过滤掉无效笔记:`, note)
+              }
+              
+              return isValid
+            })
+            
+            console.log(`🔍 [导入调试] 准备批量创建笔记:`, notesToCreate.length)
+            console.log(`🔍 [导入调试] 第一条笔记示例:`, notesToCreate[0])
+            
+            if (notesToCreate.length === 0) {
+              console.warn('⚠️ [导入调试] 没有有效的笔记数据可以创建')
+              return
             }
-            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记处理后的内容长度:`, contentWithTags.length)
             
-            // 使用完整的ISO时间字符串
-            const customDate = noteData.createdAt.toISOString()
-            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记的时间:`, customDate)
+            // 调用批量创建API
+            const requestBody = { notes: notesToCreate }
+            console.log(`🔍 [导入调试] 发送请求体:`, JSON.stringify(requestBody).substring(0, 500) + '...')
             
-            // 直接调用API而不是通过addNote函数，以便传递customDate
-            // 使用utils.ts中的extractTags函数，返回string[]格式
-            const tags = extractTags(contentWithTags)
-            // 确保title不为空且不超过200字符
-            const firstLine = contentWithTags.trim().split('\n')[0] || ''
-            const title = firstLine.length > 0 ? firstLine.substring(0, 200) : '导入的笔记'
-            
-            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记准备发送的数据:`, {
-              title: title.substring(0, 50) + '...',
-              contentLength: contentWithTags.length,
-              tags,
-              customDate
+            const response = await fetch('http://localhost:3001/api/notes/batch', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+              },
+              body: JSON.stringify(requestBody)
             })
             
-            const response = await notesApi.create({
-              title,
-              content: contentWithTags,
-              tags,
-              customDate
-            })
-            
-            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记API响应:`, response)
-            
-            if (response.success) {
-              notesSuccessCount++
-              console.log(`✅ [导入调试] 第 ${i + 1} 条笔记导入成功`)
+            if (response.ok) {
+              const result = await response.json()
+              console.log(`🔍 [导入调试] 批量创建笔记响应:`, result)
+              
+              if (result.success) {
+                notesSuccessCount = result.data.summary.created
+                console.log(`✅ [导入调试] 批量创建笔记成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                
+                if (result.data.failed.length > 0) {
+                  console.warn(`⚠️ [导入调试] 部分笔记创建失败:`, result.data.failed)
+                }
+              }
             } else {
-              console.error(`❌ [导入调试] 第 ${i + 1} 条笔记导入失败:`, response.error)
+              const errorText = await response.text()
+              console.error(`❌ [导入调试] 批量创建笔记失败:`, response.status, response.statusText)
+              console.error(`❌ [导入调试] 错误详情:`, errorText)
+              
+              try {
+                const errorJson = JSON.parse(errorText)
+                if (errorJson.errors) {
+                  console.error(`❌ [导入调试] 验证错误:`, errorJson.errors)
+                }
+              } catch (e) {
+                console.error(`❌ [导入调试] 无法解析错误响应:`, e)
+              }
             }
           } catch (error) {
-            console.error(`❌ [导入调试] 第 ${i + 1} 条笔记处理异常:`, error)
+            console.error(`❌ [导入调试] 批量创建笔记异常:`, error)
           }
         }
         console.log('🔍 [导入调试] 笔记导入完成，成功数量:', notesSuccessCount)
 
         // 批量添加Todo事项
-        for (const todoData of importedTodos) {
+        console.log('🔍 [导入调试] 开始批量导入待办事项，总数:', importedTodos.length)
+        if (importedTodos.length > 0) {
           try {
-            const dateKey = todoData.date
-            setTodosByDate(prev => ({
-              ...prev,
-              [dateKey]: [...(prev[dateKey] || []), todoData.todo]
+            // 准备批量数据
+            const todosToCreate = importedTodos.map(todoData => ({
+              text: todoData.todo.content,
+              tags: todoData.todo.tags || [],
+              dueDate: todoData.todo.dueDate,
+              startDate: todoData.todo.startDate,
+              completed: todoData.todo.completed || false
             }))
-            todosSuccessCount++
+            
+            console.log(`🔍 [导入调试] 准备批量创建待办事项:`, todosToCreate.length)
+            
+            // 调用批量创建API
+            const response = await fetch('http://localhost:3001/api/todos/batch', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+              },
+              body: JSON.stringify({ todos: todosToCreate })
+            })
+            
+            if (response.ok) {
+              const result = await response.json()
+              console.log(`🔍 [导入调试] 批量创建待办事项响应:`, result)
+              
+              if (result.success) {
+                todosSuccessCount = result.data.summary.created
+                console.log(`✅ [导入调试] 批量创建待办事项成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                
+                if (result.data.failed.length > 0) {
+                  console.warn(`⚠️ [导入调试] 部分待办事项创建失败:`, result.data.failed)
+                }
+              }
+            } else {
+              console.error(`❌ [导入调试] 批量创建待办事项失败:`, response.status, response.statusText)
+            }
           } catch (error) {
-            console.error('添加Todo失败:', error)
+            console.error(`❌ [导入调试] 批量创建待办事项异常:`, error)
           }
         }
 
         // 批量添加日程安排
-        for (const scheduleData of importedSchedules) {
+        console.log('🔍 [导入调试] 开始批量导入日程安排，总数:', importedSchedules.length)
+        if (importedSchedules.length > 0) {
           try {
-            const response = await schedulesApi.create({
+            // 准备批量数据
+            const schedulesToCreate = importedSchedules.map(scheduleData => ({
               title: scheduleData.schedule.title,
               time: scheduleData.schedule.time,
               date: scheduleData.date,
               description: scheduleData.schedule.description,
               type: scheduleData.schedule.type
+            }))
+            
+            console.log(`🔍 [导入调试] 准备批量创建日程安排:`, schedulesToCreate.length)
+            
+            // 调用批量创建API
+            const response = await fetch('http://localhost:3001/api/schedules/batch', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+              },
+              body: JSON.stringify({ schedules: schedulesToCreate })
             })
             
-            if (response.success) {
-              schedulesSuccessCount++
+            if (response.ok) {
+              const result = await response.json()
+              console.log(`🔍 [导入调试] 批量创建日程安排响应:`, result)
+              
+              if (result.success) {
+                schedulesSuccessCount = result.data.summary.created
+                console.log(`✅ [导入调试] 批量创建日程安排成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                
+                if (result.data.failed.length > 0) {
+                  console.warn(`⚠️ [导入调试] 部分日程安排创建失败:`, result.data.failed)
+                }
+              }
+            } else {
+              console.error(`❌ [导入调试] 批量创建日程安排失败:`, response.status, response.statusText)
             }
           } catch (error) {
-            console.error('添加日程失败:', error)
+            console.error(`❌ [导入调试] 批量创建日程安排异常:`, error)
+          }
+        }
+
+        // 批量添加标签固定内容
+        console.log('🔍 [导入调试] 开始批量导入标签内容，总数:', importedTagContents.length)
+        if (importedTagContents.length > 0) {
+          try {
+            // 准备批量数据
+            const tagContentsToCreate = importedTagContents.map(tagContentData => ({
+              tag: tagContentData.tag,
+              content: tagContentData.content
+            }))
+            
+            console.log(`🔍 [导入调试] 准备批量创建标签内容:`, tagContentsToCreate.length)
+            
+            // 调用批量创建API
+            const response = await fetch('http://localhost:3001/api/tag-contents/batch', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+              },
+              body: JSON.stringify({ tagContents: tagContentsToCreate })
+            })
+            
+            if (response.ok) {
+              const result = await response.json()
+              console.log(`🔍 [导入调试] 批量创建标签内容响应:`, result)
+              
+              if (result.success) {
+                tagContentsSuccessCount = result.data.summary.created
+                console.log(`✅ [导入调试] 批量创建标签内容成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                
+                if (result.data.failed.length > 0) {
+                  console.warn(`⚠️ [导入调试] 部分标签内容创建失败:`, result.data.failed)
+                }
+              }
+            } else {
+              console.error(`❌ [导入调试] 批量创建标签内容失败:`, response.status, response.statusText)
+            }
+          } catch (error) {
+            console.error(`❌ [导入调试] 批量创建标签内容异常:`, error)
           }
         }
 
         // 重新加载数据
         await loadNotes()
         await loadAllSchedules()
+        await loadTodosData()
         
         // 触发日程更新事件
         window.dispatchEvent(new CustomEvent('scheduleUpdated'))
         
-        const totalSuccess = notesSuccessCount + todosSuccessCount + schedulesSuccessCount
+        const totalSuccess = notesSuccessCount + todosSuccessCount + schedulesSuccessCount + tagContentsSuccessCount
         let description = `成功导入 ${totalSuccess} 条数据`
         if (notesSuccessCount > 0) description += `\n- 笔记: ${notesSuccessCount} 条`
         if (todosSuccessCount > 0) description += `\n- Todo: ${todosSuccessCount} 条`
         if (schedulesSuccessCount > 0) description += `\n- 日程: ${schedulesSuccessCount} 条`
+        if (tagContentsSuccessCount > 0) description += `\n- 标签固定内容: ${tagContentsSuccessCount} 条`
         
         toast({
           title: "导入成功",
@@ -2109,6 +2313,7 @@ export default function NotePad() {
     const notes: Array<{ content: string; tags: string[]; createdAt: Date }> = []
     const todos: Array<{ date: string; todo: any }> = []
     const schedules: Array<{ date: string; schedule: any }> = []
+    const tagContents: Array<{ tag: string; content: string }> = []
     const lines = text.split('\n')
     
     let currentDate: Date | null = null
@@ -2118,6 +2323,8 @@ export default function NotePad() {
     let currentContent = ''
     let currentTags: string[] = []
     let inContent = false
+    let currentTag: string = ''
+    let inTagSection = false
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
@@ -2127,9 +2334,40 @@ export default function NotePad() {
         continue
       }
       
+      // 检测标签汇总部分
+      if (line.includes('# 📋 标签汇总')) {
+        inTagSection = true
+        currentSection = 'tags'
+        continue
+      }
+      
+      // 处理标签固定内容
+      if (inTagSection) {
+        const tagMatch = line.match(/^## (.+)$/)
+        if (tagMatch) {
+          // 保存上一个标签的内容
+          if (currentTag && currentContent.trim()) {
+            tagContents.push({
+              tag: currentTag,
+              content: currentContent.trim()
+            })
+          }
+          currentTag = tagMatch[1]
+          currentContent = ''
+          continue
+        }
+        
+        // 收集标签内容
+        if (currentTag && line.trim() && !line.startsWith('#')) {
+          if (currentContent) currentContent += '\n'
+          currentContent += line
+        }
+        continue
+      }
+      
       // 匹配日期标题 (## 2024年1月1日 星期一)
-      const dateMatch = line.match(/^##\s*(.+)$/) && !line.match(/^###/) && !line.match(/^####/) && !line.includes('数据统计') && !line.includes('标签汇总')
-      if (dateMatch) {
+      const dateMatch = line.match(/^##\s*(.+)$/)
+      if (dateMatch && !line.match(/^###/) && !line.match(/^####/) && !line.includes('数据统计') && !line.includes('标签汇总')) {
         // 保存上一个内容
         if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
           const [hours, minutes] = currentTime.split(':')
@@ -2340,13 +2578,22 @@ export default function NotePad() {
       })
     }
     
+    // 保存最后一个标签的内容
+    if (currentTag && currentContent.trim() && inTagSection) {
+      tagContents.push({
+        tag: currentTag,
+        content: currentContent.trim()
+      })
+    }
+    
     console.log('🔍 [统一解析调试] 解析完成:', {
       notesCount: notes.length,
       todosCount: todos.length,
-      schedulesCount: schedules.length
+      schedulesCount: schedules.length,
+      tagContentsCount: tagContents.length
     })
     
-    return { notes, todos, schedules }
+    return { notes, todos, schedules, tagContents }
   }
 
   // 添加笔记

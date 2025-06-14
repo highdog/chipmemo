@@ -159,6 +159,102 @@ router.post('/', [
   }
 });
 
+// @route   POST /api/notes/batch
+// @desc    Create multiple notes
+// @access  Private
+router.post('/batch', [
+  body('notes')
+    .isArray()
+    .withMessage('Notes must be an array')
+    .custom((notes) => {
+      if (notes.length === 0) {
+        throw new Error('Notes array cannot be empty');
+      }
+      if (notes.length > 500) {
+        throw new Error('Cannot create more than 500 notes at once');
+      }
+      return true;
+    }),
+  body('notes.*.title')
+    .notEmpty()
+    .withMessage('Title is required')
+    .isLength({ max: 200 })
+    .withMessage('Title cannot exceed 200 characters'),
+  body('notes.*.content')
+    .notEmpty()
+    .withMessage('Content is required')
+    .isLength({ max: 100000 })
+    .withMessage('Content cannot exceed 100000 characters'),
+  body('notes.*.tags')
+    .optional()
+    .isArray()
+    .withMessage('Tags must be an array'),
+  body('notes.*.color')
+    .optional()
+    .isIn(['default', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'])
+    .withMessage('Invalid color'),
+  body('notes.*.customDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Custom date must be a valid ISO 8601 date')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { notes } = req.body;
+    const createdNotes = [];
+    const failedNotes = [];
+
+    // 批量创建笔记
+    for (let i = 0; i < notes.length; i++) {
+      try {
+        const { title, content, tags, color, customDate } = notes[i];
+
+        const note = new Note({
+          title,
+          content,
+          tags: tags || [],
+          color: color || 'default',
+          userId: req.user._id,
+          customDate: customDate ? new Date(customDate) : null
+        });
+
+        // 如果指定了自定义日期，也设置createdAt
+        if (customDate) {
+          note.createdAt = new Date(customDate);
+        }
+
+        await note.save();
+        createdNotes.push(note);
+      } catch (error) {
+        failedNotes.push({
+          index: i,
+          note: notes[i],
+          error: error.message
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        created: createdNotes,
+        failed: failedNotes,
+        summary: {
+          total: notes.length,
+          created: createdNotes.length,
+          failed: failedNotes.length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error while creating notes' });
+  }
+});
+
 // @route   PUT /api/notes/:id
 // @desc    Update note
 // @access  Private

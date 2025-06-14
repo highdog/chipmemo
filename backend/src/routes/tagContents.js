@@ -123,6 +123,66 @@ router.delete('/:tag', [
   }
 });
 
+// @route   POST /api/tag-contents/batch
+// @desc    Create or update multiple tag contents
+// @access  Private
+router.post('/batch', [
+  body('tagContents').isArray().withMessage('Tag contents must be an array'),
+  body('tagContents.*.tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Each tag must be between 1 and 50 characters'),
+  body('tagContents.*.content').isString().isLength({ min: 1, max: 100000 }).withMessage('Each content must be between 1 and 100000 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { tagContents } = req.body;
+    const results = {
+      created: [],
+      failed: []
+    };
+
+    for (const tagContentData of tagContents) {
+      try {
+        const tagContent = await TagContent.findOneAndUpdate(
+          { userId: req.user._id, tag: tagContentData.tag },
+          { content: tagContentData.content },
+          { new: true, upsert: true, runValidators: true }
+        );
+
+        results.created.push({
+          tag: tagContent.tag,
+          content: tagContent.content,
+          updatedAt: tagContent.updatedAt
+        });
+      } catch (error) {
+        console.error(`Error saving tag content for tag ${tagContentData.tag}:`, error);
+        results.failed.push({
+          tag: tagContentData.tag,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          total: tagContents.length,
+          created: results.created.length,
+          failed: results.failed.length
+        },
+        created: results.created,
+        failed: results.failed
+      }
+    });
+  } catch (error) {
+    console.error('Error in batch tag content creation:', error);
+    res.status(500).json({ error: 'Server error while creating tag contents' });
+  }
+});
+
 // @route   GET /api/tag-contents
 // @desc    Get all tag contents for user
 // @access  Private

@@ -224,6 +224,98 @@ router.post('/', [
   }
 });
 
+// @route   POST /api/todos/batch
+// @desc    Create multiple todos
+// @access  Private
+router.post('/batch', [
+  body('todos')
+    .isArray()
+    .withMessage('Todos must be an array')
+    .custom((todos) => {
+      if (todos.length === 0) {
+        throw new Error('Todos array cannot be empty');
+      }
+      if (todos.length > 100) {
+        throw new Error('Cannot create more than 100 todos at once');
+      }
+      return true;
+    }),
+  body('todos.*.text')
+    .notEmpty()
+    .withMessage('Todo text is required')
+    .isLength({ max: 500 })
+    .withMessage('Todo text cannot exceed 500 characters'),
+  body('todos.*.priority')
+    .optional()
+    .isIn(['low', 'medium', 'high'])
+    .withMessage('Invalid priority'),
+  body('todos.*.dueDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Due date must be in ISO format'),
+  body('todos.*.category')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('Category cannot exceed 50 characters'),
+  body('todos.*.noteId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid note ID')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { todos } = req.body;
+    const createdTodos = [];
+    const failedTodos = [];
+
+    // 批量创建Todo
+    for (let i = 0; i < todos.length; i++) {
+      try {
+        const { text, priority, dueDate, category, noteId, tags } = todos[i];
+
+        const todo = new Todo({
+          text,
+          priority: priority || 'medium',
+          dueDate: dueDate || null,
+          category: category || 'general',
+          noteId: noteId || null,
+          tags: tags || [],
+          userId: req.user._id
+        });
+
+        await todo.save();
+        await todo.populate('noteId', 'title');
+        createdTodos.push(todo);
+      } catch (error) {
+        failedTodos.push({
+          index: i,
+          todo: todos[i],
+          error: error.message
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        created: createdTodos,
+        failed: failedTodos,
+        summary: {
+          total: todos.length,
+          created: createdTodos.length,
+          failed: failedTodos.length
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error while creating todos' });
+  }
+});
+
 // @route   PUT /api/todos/:id
 // @desc    Update todo
 // @access  Private

@@ -122,6 +122,104 @@ router.post('/', [
   }
 });
 
+// @route   POST /api/schedules/batch
+// @desc    Create multiple schedules
+// @access  Private
+router.post('/batch', [
+  body('schedules')
+    .isArray()
+    .withMessage('Schedules must be an array')
+    .custom((schedules) => {
+      if (schedules.length === 0) {
+        throw new Error('Schedules array cannot be empty');
+      }
+      if (schedules.length > 100) {
+        throw new Error('Cannot create more than 100 schedules at once');
+      }
+      return true;
+    }),
+  body('schedules.*.title')
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Title must be between 1 and 200 characters'),
+  body('schedules.*.time')
+    .trim()
+    .notEmpty()
+    .withMessage('Time is required'),
+  body('schedules.*.date')
+    .trim()
+    .notEmpty()
+    .withMessage('Date is required'),
+  body('schedules.*.description')
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage('Description cannot exceed 1000 characters'),
+  body('schedules.*.type')
+    .optional()
+    .isIn(['event', 'meeting', 'reminder', 'task'])
+    .withMessage('Type must be one of: event, meeting, reminder, task')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { schedules } = req.body;
+    const createdSchedules = [];
+    const failedSchedules = [];
+
+    // 批量创建日程
+    for (let i = 0; i < schedules.length; i++) {
+      try {
+        const { title, time, date, description, type } = schedules[i];
+
+        const schedule = new Schedule({
+          title,
+          time,
+          date,
+          description,
+          type: type || 'event',
+          userId: req.user._id
+        });
+
+        await schedule.save();
+        createdSchedules.push({
+          id: schedule._id.toString(),
+          title: schedule.title,
+          time: schedule.time,
+          date: schedule.date,
+          description: schedule.description,
+          type: schedule.type
+        });
+      } catch (error) {
+        failedSchedules.push({
+          index: i,
+          schedule: schedules[i],
+          error: error.message
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: {
+        created: createdSchedules,
+        failed: failedSchedules,
+        summary: {
+          total: schedules.length,
+          created: createdSchedules.length,
+          failed: failedSchedules.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error creating schedules:', error);
+    res.status(500).json({ error: 'Server error while creating schedules' });
+  }
+});
+
 // @route   PUT /api/schedules/:id
 // @desc    Update a schedule
 // @access  Private
