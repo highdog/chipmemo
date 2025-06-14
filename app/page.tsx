@@ -1076,7 +1076,12 @@ export default function NotePad() {
       if (reset) {
         setNotes(result.notes)
       } else {
-        setNotes(prev => [...prev, ...result.notes])
+        // 合并新笔记时，去重以避免重复的笔记ID
+        setNotes(prev => {
+          const existingIds = new Set(prev.map(note => note.id))
+          const newNotes = result.notes.filter(note => !existingIds.has(note.id))
+          return [...prev, ...newNotes]
+        })
       }
       
       // 检查是否还有更多数据
