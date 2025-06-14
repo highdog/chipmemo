@@ -36,7 +36,7 @@ import {
 import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn, extractTags } from "@/lib/utils"
 import { format } from 'date-fns'
 import { toast } from "@/hooks/use-toast"
-import { apiClient, notesApi } from "@/lib/api"
+import { apiClient, notesApi, schedulesApi } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
 
 // 提取标签和清理内容的函数
@@ -895,6 +895,9 @@ export default function NotePad() {
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMoreNotes, setHasMoreNotes] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [inputValue, setInputValue] = useState("")
   const [date, setDate] = useState<Date>(new Date())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -938,46 +941,29 @@ export default function NotePad() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // 加载所有日程数据
-  const loadAllSchedules = useCallback(() => {
-    const schedules: Record<string, any[]> = {}
-    // 遍历localStorage中的所有键，找到日程数据
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('schedules_')) {
-        const dateKey = key.replace('schedules_', '')
-        try {
-          const data = localStorage.getItem(key)
-          if (data) {
-            schedules[dateKey] = JSON.parse(data)
-          }
-        } catch (error) {
-          // 解析日程数据失败
-        }
+  const loadAllSchedules = useCallback(async () => {
+    try {
+      const response = await schedulesApi.getAll()
+      if (response.success) {
+        setSchedulesByDate(response.data)
       }
+    } catch (error) {
+      console.error('加载日程失败:', error)
     }
-    setSchedulesByDate(schedules)
   }, [])
 
-  // 监听localStorage变化和自定义事件，实时更新日程数据
+  // 监听自定义事件，实时更新日程数据
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key && e.key.startsWith('schedules_')) {
-        loadAllSchedules()
-      }
-    }
-
     const handleScheduleUpdate = () => {
       loadAllSchedules()
     }
 
-    window.addEventListener('storage', handleStorageChange)
     window.addEventListener('scheduleUpdated', handleScheduleUpdate)
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('scheduleUpdated', handleScheduleUpdate)
     }
-  }, [])
+  }, [loadAllSchedules])
 
   // 按日期分组笔记
   const groupNotesByDate = (notes: Note[]) => {
@@ -1078,10 +1064,27 @@ export default function NotePad() {
   }
 
   // 加载笔记
-  const loadNotes = useCallback(async () => {
+  const loadNotes = useCallback(async (reset: boolean = true) => {
     try {
-      const fetchedNotes = await getNotes()
-      setNotes(fetchedNotes)
+      if (reset) {
+        setCurrentPage(1)
+        setHasMoreNotes(true)
+      }
+      
+      const result = await getNotes(reset ? 1 : currentPage, 100)
+      
+      if (reset) {
+        setNotes(result.notes)
+      } else {
+        setNotes(prev => [...prev, ...result.notes])
+      }
+      
+      // 检查是否还有更多数据
+      setHasMoreNotes(result.pagination && result.pagination.current < result.pagination.pages)
+      
+      if (!reset) {
+        setCurrentPage(prev => prev + 1)
+      }
     } catch (error) {
       toast({
         title: "加载失败",
@@ -1090,13 +1093,24 @@ export default function NotePad() {
       })
     } finally {
       setIsLoading(false)
+      setIsLoadingMore(false)
     }
-  }, [])
+  }, [currentPage])
+
+  // 加载更多笔记
+  const loadMoreNotes = useCallback(async () => {
+    if (isLoadingMore || !hasMoreNotes) return
+    
+    setIsLoadingMore(true)
+    await loadNotes(false)
+  }, [isLoadingMore, hasMoreNotes, loadNotes])
 
   // 搜索笔记
   const handleSearch = async (term: string) => {
     setSearchTerm(term)
     setIsSearching(true)
+    setCurrentPage(1)
+    setHasMoreNotes(true)
 
     // 更新搜索历史记录
     if (term.trim()) {
@@ -1106,19 +1120,20 @@ export default function NotePad() {
     }
 
     try {
-      let searchResults: Note[]
+      let searchResult: { notes: Note[]; pagination: any }
       
       // 检查是否是标签搜索（以#开头）
       if (term.startsWith('#')) {
         const tag = term.substring(1) // 移除#前缀
         setCurrentTag(tag) // 设置当前标签
-        searchResults = await searchNotesByTag(tag)
+        searchResult = await searchNotesByTag(tag, 1, 100)
       } else {
         setCurrentTag("") // 清除当前标签
-        searchResults = await searchNotes(term)
+        searchResult = await searchNotes(term, 1, 100)
       }
       
-      setNotes(searchResults)
+      setNotes(searchResult.notes)
+      setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
     } catch (error) {
       toast({
         title: "搜索失败",
@@ -1135,13 +1150,16 @@ export default function NotePad() {
     setSearchTerm("")
     setCurrentTag("") // 清除当前标签
     setIsSearching(true)
+    setCurrentPage(1)
+    setHasMoreNotes(true)
 
     try {
-      const allNotes = await getNotes()
-      setNotes(allNotes)
+      const result = await getNotes(1, 100)
+      setNotes(result.notes)
+      setHasMoreNotes(result.pagination && result.pagination.current < result.pagination.pages)
       toast({
         title: "已显示全部笔记",
-        description: `共 ${allNotes.length} 条笔记`,
+        description: `共显示 ${result.notes.length} 条笔记`,
       })
     } catch (error) {
       toast({
@@ -1484,18 +1502,17 @@ export default function NotePad() {
         // 批量添加日程安排
         for (const scheduleData of importedSchedules) {
           try {
-            const dateKey = scheduleData.date
-            const currentSchedules = localStorage.getItem(`schedules_${dateKey}`)
-            const schedules = currentSchedules ? JSON.parse(currentSchedules) : []
-            schedules.push(scheduleData.schedule)
-            localStorage.setItem(`schedules_${dateKey}`, JSON.stringify(schedules))
+            const response = await schedulesApi.create({
+              title: scheduleData.schedule.title,
+              time: scheduleData.schedule.time,
+              date: scheduleData.date,
+              description: scheduleData.schedule.description,
+              type: scheduleData.schedule.type
+            })
             
-            // 触发日程更新事件
-            window.dispatchEvent(new CustomEvent('scheduleUpdated', { 
-              detail: { dateKey, schedules } 
-            }))
-            
-            schedulesSuccessCount++
+            if (response.success) {
+              schedulesSuccessCount++
+            }
           } catch (error) {
             console.error('添加日程失败:', error)
           }
@@ -1503,7 +1520,10 @@ export default function NotePad() {
 
         // 重新加载数据
         await loadNotes()
-        loadAllSchedules()
+        await loadAllSchedules()
+        
+        // 触发日程更新事件
+        window.dispatchEvent(new CustomEvent('scheduleUpdated'))
         
         const totalSuccess = notesSuccessCount + todosSuccessCount + schedulesSuccessCount
         let description = `成功导入 ${totalSuccess} 条数据`
@@ -2555,6 +2575,28 @@ export default function NotePad() {
                                 onUpdate={handleUpdateNote}
                               />
                             ))}
+                            {hasMoreNotes && (
+                              <div className="flex justify-center py-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={loadMoreNotes}
+                                  disabled={isLoadingMore}
+                                  className="flex items-center gap-2"
+                                >
+                                  {isLoadingMore ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      加载中...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-4 w-4" />
+                                      加载更多
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="h-full flex items-center justify-center text-muted-foreground">
@@ -2588,6 +2630,28 @@ export default function NotePad() {
                             onUpdate={handleUpdateNote}
                           />
                         ))}
+                        {hasMoreNotes && (
+                          <div className="flex justify-center py-4">
+                            <Button
+                              variant="outline"
+                              onClick={loadMoreNotes}
+                              disabled={isLoadingMore}
+                              className="flex items-center gap-2"
+                            >
+                              {isLoadingMore ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  加载中...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-4 w-4" />
+                                  加载更多
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="h-full flex items-center justify-center text-muted-foreground">

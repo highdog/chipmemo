@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, X, Edit2, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import { schedulesApi } from '@/lib/api'
 
 interface ScheduleItem {
   id: string
@@ -31,83 +32,78 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
     type: 'event' as ScheduleItem['type']
   })
 
-  // 从localStorage加载日程数据
+  // 从API加载日程数据
   useEffect(() => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd')
-    const savedSchedules = localStorage.getItem(`schedules_${dateKey}`)
-    
-    if (savedSchedules) {
+    const loadSchedules = async () => {
       try {
-        const parsedSchedules = JSON.parse(savedSchedules)
-        setSchedules(parsedSchedules)
+        const dateKey = format(selectedDate, 'yyyy-MM-dd')
+        const response = await schedulesApi.getAll({ date: dateKey })
+        
+        if (response.success) {
+          const daySchedules = response.data[dateKey] || []
+          setSchedules(daySchedules)
+        } else {
+          setSchedules([])
+        }
       } catch (error) {
-        console.error('解析日程数据失败:', error)
-        setSchedules([])
-      }
-    } else {
-      // 如果是今天且没有保存的数据，显示默认示例数据
-      const today = new Date()
-      if (selectedDate.toDateString() === today.toDateString()) {
-        const mockSchedules: ScheduleItem[] = [
-          {
-            id: '1',
-            title: '团队会议',
-            time: '09:00',
-            description: '讨论项目进度',
-            type: 'meeting'
-          },
-          {
-            id: '2',
-            title: '客户拜访',
-            time: '14:30',
-            description: '产品演示',
-            type: 'appointment'
-          }
-        ]
-        setSchedules(mockSchedules)
-        // 保存示例数据到localStorage
-        localStorage.setItem(`schedules_${dateKey}`, JSON.stringify(mockSchedules))
-      } else {
+        console.error('加载日程数据失败:', error)
         setSchedules([])
       }
     }
+
+    loadSchedules()
   }, [selectedDate])
 
-  const handleAddSchedule = () => {
+  const handleAddSchedule = async () => {
     if (!newSchedule.title.trim() || !newSchedule.time.trim()) return
 
-    const schedule: ScheduleItem = {
-      id: Date.now().toString(),
-      title: newSchedule.title.trim(),
-      time: newSchedule.time,
-      description: newSchedule.description.trim() || undefined,
-      type: newSchedule.type
-    }
+    try {
+      const dateKey = format(selectedDate, 'yyyy-MM-dd')
+      const response = await schedulesApi.create({
+        title: newSchedule.title.trim(),
+        time: newSchedule.time,
+        date: dateKey,
+        description: newSchedule.description.trim() || undefined,
+        type: newSchedule.type
+      })
 
-    const updatedSchedules = [...schedules, schedule].sort((a, b) => a.time.localeCompare(b.time))
-    setSchedules(updatedSchedules)
-    
-    // 保存到localStorage
-    const dateKey = format(selectedDate, 'yyyy-MM-dd')
-    localStorage.setItem(`schedules_${dateKey}`, JSON.stringify(updatedSchedules))
-    
-    // 触发自定义事件通知其他组件
-    window.dispatchEvent(new CustomEvent('scheduleUpdated', { detail: { dateKey, schedules: updatedSchedules } }))
-    
-    setNewSchedule({ title: '', time: '', description: '', type: 'event' })
-    setIsAdding(false)
+      if (response.success) {
+        const newScheduleItem: ScheduleItem = {
+          id: response.data.id,
+          title: response.data.title,
+          time: response.data.time,
+          description: response.data.description,
+          type: response.data.type as ScheduleItem['type']
+        }
+        
+        const updatedSchedules = [...schedules, newScheduleItem].sort((a, b) => a.time.localeCompare(b.time))
+        setSchedules(updatedSchedules)
+        
+        // 触发自定义事件通知其他组件
+        window.dispatchEvent(new CustomEvent('scheduleUpdated'))
+        
+        setNewSchedule({ title: '', time: '', description: '', type: 'event' })
+        setIsAdding(false)
+      }
+    } catch (error) {
+      console.error('添加日程失败:', error)
+    }
   }
 
-  const handleDeleteSchedule = (id: string) => {
-    const updatedSchedules = schedules.filter(s => s.id !== id)
-    setSchedules(updatedSchedules)
-    
-    // 保存到localStorage
-    const dateKey = format(selectedDate, 'yyyy-MM-dd')
-    localStorage.setItem(`schedules_${dateKey}`, JSON.stringify(updatedSchedules))
-    
-    // 触发自定义事件通知其他组件
-    window.dispatchEvent(new CustomEvent('scheduleUpdated', { detail: { dateKey, schedules: updatedSchedules } }))
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      const response = await schedulesApi.delete(id)
+      
+      if (response.success) {
+        const updatedSchedules = schedules.filter(s => s.id !== id)
+        setSchedules(updatedSchedules)
+        
+        // 触发自定义事件通知其他组件
+        window.dispatchEvent(new CustomEvent('scheduleUpdated'))
+      }
+    } catch (error) {
+      console.error('删除日程失败:', error)
+    }
   }
 
 

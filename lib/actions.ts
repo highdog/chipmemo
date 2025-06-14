@@ -91,19 +91,22 @@ function parseTodos(content: string): TodoItem[] {
 }
 
 // 获取所有笔记
-export async function getNotes(): Promise<Note[]> {
+export async function getNotes(page: number = 1, limit: number = 100): Promise<{ notes: Note[]; pagination: any }> {
   try {
-    const response = await notesApi.getAll({ limit: 100 });
+    const response = await notesApi.getAll({ page, limit });
     
     if (response.success && response.data) {
-      return response.data.notes.map(convertApiNoteToNote);
+      return {
+        notes: response.data.notes.map(convertApiNoteToNote),
+        pagination: response.data.pagination
+      };
     } else {
       console.error('Failed to fetch notes:', response.error);
-      return [];
+      return { notes: [], pagination: null };
     }
   } catch (error) {
     console.error('Error fetching notes:', error);
-    return [];
+    return { notes: [], pagination: null };
   }
 }
 
@@ -266,40 +269,47 @@ export async function getTodosByDate(
 }
 
 // 搜索笔记
-export async function searchNotes(searchTerm: string): Promise<Note[]> {
+export async function searchNotes(searchTerm: string, page: number = 1, limit: number = 100): Promise<{ notes: Note[]; pagination: any }> {
   try {
     if (!searchTerm.trim()) {
-      return getNotes();
+      const result = await getNotes();
+      return result;
     }
 
-    const response = await notesApi.getAll({ search: searchTerm, limit: 100 });
+    const response = await notesApi.getAll({ search: searchTerm, page, limit });
     
     if (response.success && response.data) {
-      return response.data.notes.map(convertApiNoteToNote);
+      return {
+        notes: response.data.notes.map(convertApiNoteToNote),
+        pagination: response.data.pagination
+      };
     } else {
       console.error('Failed to search notes:', response.error);
-      return [];
+      return { notes: [], pagination: null };
     }
   } catch (error) {
     console.error('Error searching notes:', error);
-    return [];
+    return { notes: [], pagination: null };
   }
 }
 
 // 按标签搜索笔记
-export async function searchNotesByTag(tag: string): Promise<Note[]> {
+export async function searchNotesByTag(tag: string, page: number = 1, limit: number = 100): Promise<{ notes: Note[]; pagination: any }> {
   try {
-    const response = await notesApi.getAll({ tags: tag, limit: 100 });
+    const response = await notesApi.getAll({ tags: tag, page, limit });
     
     if (response.success && response.data) {
-      return response.data.notes.map(convertApiNoteToNote);
+      return {
+        notes: response.data.notes.map(convertApiNoteToNote),
+        pagination: response.data.pagination
+      };
     } else {
       console.error('Failed to search notes by tag:', response.error);
-      return [];
+      return { notes: [], pagination: null };
     }
   } catch (error) {
     console.error('Error searching notes by tag:', error);
-    return [];
+    return { notes: [], pagination: null };
   }
 }
 

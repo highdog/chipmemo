@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth');
 const noteRoutes = require('./routes/notes');
 const todoRoutes = require('./routes/todos');
 const tagContentRoutes = require('./routes/tagContents');
+const scheduleRoutes = require('./routes/schedules');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/todos', todoRoutes);
 app.use('/api/tag-contents', tagContentRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

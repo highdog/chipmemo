@@ -275,6 +275,50 @@ class ApiClient {
     return this.get<Array<{ tag: string; content: string; updatedAt: string }>>('/tag-contents');
   }
 
+  // 日程相关API
+  async getSchedules(params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<{ [date: string]: Array<{ id: string; title: string; time: string; description?: string; type?: string }> }>> {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          searchParams.append(key, value.toString());
+        }
+      });
+    }
+    const query = searchParams.toString();
+    return this.get<{ [date: string]: Array<{ id: string; title: string; time: string; description?: string; type?: string }> }>(
+      `/schedules${query ? `?${query}` : ''}`
+    );
+  }
+
+  async createSchedule(data: {
+    title: string;
+    time: string;
+    date: string;
+    description?: string;
+    type?: string;
+  }): Promise<ApiResponse<{ id: string; title: string; time: string; date: string; description?: string; type?: string }>> {
+    return this.post<{ id: string; title: string; time: string; date: string; description?: string; type?: string }>('/schedules', data);
+  }
+
+  async updateSchedule(id: string, data: {
+    title?: string;
+    time?: string;
+    date?: string;
+    description?: string;
+    type?: string;
+  }): Promise<ApiResponse<{ id: string; title: string; time: string; date: string; description?: string; type?: string }>> {
+    return this.put<{ id: string; title: string; time: string; date: string; description?: string; type?: string }>(`/schedules/${id}`, data);
+  }
+
+  async deleteSchedule(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(`/schedules/${id}`);
+  }
+
   // 待办事项相关API
   async getTodos(params?: {
     date?: string;
@@ -385,6 +429,14 @@ export const tagContentsApi = {
   save: (tag: string, content: string) => apiClient.saveTagContent(tag, content),
   delete: (tag: string) => apiClient.deleteTagContent(tag),
   getAll: () => apiClient.getAllTagContents(),
+};
+
+export const schedulesApi = {
+  getAll: (params?: Parameters<typeof apiClient.getSchedules>[0]) => apiClient.getSchedules(params),
+  create: (data: Parameters<typeof apiClient.createSchedule>[0]) => apiClient.createSchedule(data),
+  update: (id: string, data: Parameters<typeof apiClient.updateSchedule>[1]) =>
+    apiClient.updateSchedule(id, data),
+  delete: (id: string) => apiClient.deleteSchedule(id),
 };
 
 export default apiClient;
