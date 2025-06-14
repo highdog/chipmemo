@@ -1434,9 +1434,28 @@ export default function NotePad() {
       setIsImporting(true)
       try {
         const text = await file.text()
+        console.log('🔍 [导入调试] 文件内容长度:', text.length)
+        console.log('🔍 [导入调试] 文件内容预览:', text.substring(0, 500) + '...')
+        
         const { notes: importedNotes, todos: importedTodos, schedules: importedSchedules } = parseMarkdownToData(text)
         
+        console.log('🔍 [导入调试] 解析结果:', {
+          notesCount: importedNotes.length,
+          todosCount: importedTodos.length,
+          schedulesCount: importedSchedules.length
+        })
+        
+        if (importedNotes.length > 0) {
+          console.log('🔍 [导入调试] 解析到的笔记样例:', importedNotes.slice(0, 2).map((note, index) => ({
+            index,
+            contentPreview: note.content.substring(0, 100) + '...',
+            tags: note.tags,
+            createdAt: note.createdAt
+          })))
+        }
+        
         if (importedNotes.length === 0 && importedTodos.length === 0 && importedSchedules.length === 0) {
+          console.log('❌ [导入调试] 没有解析到任何数据')
           toast({
             title: "导入失败",
             description: "文件中没有找到有效的数据",
@@ -1450,16 +1469,26 @@ export default function NotePad() {
         let schedulesSuccessCount = 0
 
         // 批量添加笔记
-        for (const noteData of importedNotes) {
+        console.log('🔍 [导入调试] 开始导入笔记，总数:', importedNotes.length)
+        for (let i = 0; i < importedNotes.length; i++) {
+          const noteData = importedNotes[i]
+          console.log(`🔍 [导入调试] 处理第 ${i + 1} 条笔记:`, {
+            originalContent: noteData.content.substring(0, 100) + '...',
+            tags: noteData.tags,
+            createdAt: noteData.createdAt
+          })
+          
           try {
             // 重新构建包含标签的内容
             let contentWithTags = noteData.content
             if (noteData.tags.length > 0) {
               contentWithTags += '\n\n' + noteData.tags.map(tag => `#${tag}`).join(' ')
             }
+            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记处理后的内容长度:`, contentWithTags.length)
             
             // 使用完整的ISO时间字符串
             const customDate = noteData.createdAt.toISOString()
+            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记的时间:`, customDate)
             
             // 直接调用API而不是通过addNote函数，以便传递customDate
             // 使用utils.ts中的extractTags函数，返回string[]格式
@@ -1468,6 +1497,13 @@ export default function NotePad() {
             const firstLine = contentWithTags.trim().split('\n')[0] || ''
             const title = firstLine.length > 0 ? firstLine.substring(0, 200) : '导入的笔记'
             
+            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记准备发送的数据:`, {
+              title: title.substring(0, 50) + '...',
+              contentLength: contentWithTags.length,
+              tags,
+              customDate
+            })
+            
             const response = await notesApi.create({
               title,
               content: contentWithTags,
@@ -1475,15 +1511,19 @@ export default function NotePad() {
               customDate
             })
             
+            console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记API响应:`, response)
+            
             if (response.success) {
               notesSuccessCount++
+              console.log(`✅ [导入调试] 第 ${i + 1} 条笔记导入成功`)
             } else {
-              console.error('添加笔记失败:', response.error)
+              console.error(`❌ [导入调试] 第 ${i + 1} 条笔记导入失败:`, response.error)
             }
           } catch (error) {
-            console.error('添加笔记失败:', error)
+            console.error(`❌ [导入调试] 第 ${i + 1} 条笔记处理异常:`, error)
           }
         }
+        console.log('🔍 [导入调试] 笔记导入完成，成功数量:', notesSuccessCount)
 
         // 批量添加Todo事项
         for (const todoData of importedTodos) {
@@ -1551,10 +1591,12 @@ export default function NotePad() {
 
   // 解析Markdown文本为笔记、Todo和日程数据
   const parseMarkdownToData = (text: string) => {
+    console.log('🔍 [解析调试] 开始解析Markdown文本')
     const notes: Array<{ content: string; tags: string[]; createdAt: Date }> = []
     const todos: Array<{ date: string; todo: any }> = []
     const schedules: Array<{ date: string; schedule: any }> = []
     const lines = text.split('\n')
+    console.log('🔍 [解析调试] 总行数:', lines.length)
     
     let currentDate: Date | null = null
     let currentDateKey: string = ''
@@ -1565,18 +1607,26 @@ export default function NotePad() {
     let currentSection: 'notes' | 'todos' | 'schedules' | null = null
     
     // 开始解析文件
+    console.log('🔍 [解析调试] 开始逐行解析...')
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
       
       // 匹配日期标题 (## 2024年1月1日 星期一 或 ## 2024年1月1日星期一)
-      const dateMatch = line.match(/^##\s*(.+)$/) && !line.match(/^###\s*[📝✅📅]/)
+      // 确保不匹配章节标题 (### 📝 笔记) 和笔记时间标题 (#### 14:30)
+      const dateMatch = line.match(/^##\s*(.+)$/) && !line.match(/^###/) && !line.match(/^####/)
       if (dateMatch) {
+        console.log(`🔍 [解析调试] 第${i+1}行 - 发现日期行:`, line)
         const actualDateMatch = line.match(/^##\s*(.+)$/)
         // 找到日期行
         
         // 保存上一个笔记
         if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
+          console.log('🔍 [解析调试] 保存上一个笔记:', {
+            content: currentContent.trim().substring(0, 50) + '...',
+            tags: currentTags,
+            time: currentTime
+          })
           const [hours, minutes] = currentTime.split(':')
           const noteDate = new Date(currentDate)
           noteDate.setHours(parseInt(hours), parseInt(minutes))
@@ -1593,7 +1643,7 @@ export default function NotePad() {
         currentTags = []
         currentTime = null
         inNoteContent = false
-        currentSection = null
+        // 不重置 currentSection，让它在同一日期内保持有效
         
         // 尝试解析日期 - 支持多种格式
         try {
@@ -1624,20 +1674,54 @@ export default function NotePad() {
       // 匹配章节标题
       const sectionMatch = line.match(/^###\s*([📝✅📅])\s*(.+)$/)
       if (sectionMatch) {
+        console.log(`🔍 [解析调试] 第${i+1}行 - 发现章节:`, line)
+        console.log(`🔍 [解析调试] 章节匹配结果:`, sectionMatch)
         const emoji = sectionMatch[1]
-        if (emoji === '📝') {
+        
+        // 保存上一个笔记（如果有的话）
+        if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
+          const [hours, minutes] = currentTime.split(':')
+          const noteDate = new Date(currentDate)
+          noteDate.setHours(parseInt(hours), parseInt(minutes))
+          
+          notes.push({
+            content: currentContent.trim(),
+            tags: [...currentTags],
+            createdAt: noteDate
+          })
+        }
+        
+        // 重置笔记相关状态
+        currentContent = ''
+        currentTags = []
+        currentTime = null
+        inNoteContent = false
+        
+        // 设置新的章节 - 修复emoji匹配问题
+        console.log('🔍 [解析调试] emoji值:', emoji, 'emoji长度:', emoji.length, 'emoji编码:', emoji.charCodeAt(0))
+        if (line.includes('📝')) {
           currentSection = 'notes'
-        } else if (emoji === '✅') {
+          console.log('🔍 [解析调试] 进入笔记章节，设置 currentSection =', currentSection)
+        } else if (line.includes('✅')) {
           currentSection = 'todos'
-        } else if (emoji === '📅') {
+          console.log('🔍 [解析调试] 进入Todo章节，设置 currentSection =', currentSection)
+        } else if (line.includes('📅')) {
           currentSection = 'schedules'
+          console.log('🔍 [解析调试] 进入日程章节，设置 currentSection =', currentSection)
         }
         continue
       }
       
-      // 匹配笔记时间标题 (#### 14:30 - 笔记 1)
-      const noteTimeMatch = line.match(/^####\s*(\d{1,2}:\d{2})\s*-\s*笔记\s*\d+$/)
+      // 匹配笔记时间标题 (#### 14:30 - 笔记 1) - 使用更宽松的匹配
+      if (line.startsWith('####')) {
+        console.log(`🔍 [解析调试] 第${i+1}行 - 发现####行:`, line, '当前章节:', currentSection)
+      }
+      const noteTimeMatch = line.match(/^####\s*(\d{1,2}:\d{2})\s*-\s*笔记/)
+      if (line.startsWith('####') && currentSection === 'notes') {
+        console.log(`🔍 [解析调试] 第${i+1}行 - 检查笔记时间行:`, line, '匹配结果:', noteTimeMatch)
+      }
       if (noteTimeMatch && currentSection === 'notes') {
+        console.log(`🔍 [解析调试] 第${i+1}行 - 发现笔记时间:`, line, '时间:', noteTimeMatch[1])
         // 保存上一个笔记
         if (currentContent.trim() && currentDate && currentTime) {
           const [hours, minutes] = currentTime.split(':')
@@ -1762,17 +1846,24 @@ export default function NotePad() {
       if (currentSection === 'notes' && currentTime && line !== '') {
         if (!inNoteContent && !line.startsWith('**')) {
           inNoteContent = true
+          console.log(`🔍 [解析调试] 第${i+1}行 - 开始收集笔记内容`)
         }
         
         if (inNoteContent && !line.startsWith('**')) {
           if (currentContent) currentContent += '\n'
           currentContent += lines[i] // 使用原始行，保持格式
+          console.log(`🔍 [解析调试] 第${i+1}行 - 添加内容:`, lines[i].substring(0, 50) + '...')
         }
       }
     }
     
     // 保存最后一个笔记
     if (currentContent.trim() && currentDate && currentTime && currentSection === 'notes') {
+      console.log('🔍 [解析调试] 保存最后一个笔记:', {
+        content: currentContent.trim().substring(0, 50) + '...',
+        tags: currentTags,
+        time: currentTime
+      })
       const [hours, minutes] = currentTime.split(':')
       const noteDate = new Date(currentDate)
       noteDate.setHours(parseInt(hours), parseInt(minutes))
@@ -1785,6 +1876,11 @@ export default function NotePad() {
     }
     
     // 解析完成，返回所有数据
+    console.log('🔍 [解析调试] 解析完成，最终结果:', {
+      notesCount: notes.length,
+      todosCount: todos.length,
+      schedulesCount: schedules.length
+    })
     return { notes, todos, schedules }
   }
 

@@ -113,7 +113,23 @@ class ApiClient {
         },
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // Handle non-JSON responses (like HTML error pages)
+        const textResponse = await response.text();
+        if (response.status === 429) {
+          return {
+            success: false,
+            error: '请求过于频繁，请稍后再试',
+          };
+        }
+        return {
+          success: false,
+          error: `服务器错误 (${response.status}): ${textResponse.substring(0, 100)}`,
+        };
+      }
 
       if (!response.ok) {
         // 如果是401错误，清除token
