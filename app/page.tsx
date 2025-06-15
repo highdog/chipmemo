@@ -3169,6 +3169,7 @@ export default function NotePad() {
                  onSearch={handleSearch} 
                  onClearSearch={handleClearSearch} 
                  searchTerm={searchTerm}
+                 showClearButton={!!(searchTerm || currentTag)}
                />
              </div>
              
@@ -3193,19 +3194,15 @@ export default function NotePad() {
           </div>
           
           {/* 搜索状态提示 */}
-          {searchTerm && (
-            <div className="mt-2 flex items-center justify-between">
+          {(searchTerm || currentTag) && (
+            <div className="mt-2">
               <div className="text-sm text-muted-foreground">
-                搜索结果: "{searchTerm}" ({notes.length} 条笔记)
+                {currentTag ? (
+                  <>标签搜索: "#{currentTag}" ({notes.length} 条笔记)</>
+                ) : (
+                  <>搜索结果: "{searchTerm}" ({notes.length} 条笔记)</>
+                )}
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleClearSearch}
-                className="h-6 px-2 text-xs"
-              >
-                显示全部
-              </Button>
             </div>
           )}
         </div>

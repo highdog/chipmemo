@@ -15,13 +15,15 @@ interface SearchBarProps {
   onClearSearch: () => void
   searchTerm: string
   placeholder?: string
+  showClearButton?: boolean
 }
 
 export function SearchBar({ 
   onSearch, 
   onClearSearch, 
   searchTerm, 
-  placeholder = "搜索笔记内容或标签..." 
+  placeholder = "搜索笔记内容或标签...",
+  showClearButton = false
 }: SearchBarProps) {
   console.log('=== SearchBar component initialized ===') // 新增调试信息
   const [inputValue, setInputValue] = useState("")
@@ -278,6 +280,12 @@ export function SearchBar({
         <Button onClick={handleSearch} size="sm">
           搜索
         </Button>
+        
+        {showClearButton && (
+          <Button onClick={onClearSearch} size="sm" variant="outline">
+            显示全部
+          </Button>
+        )}
       </div>
     </div>
   )
