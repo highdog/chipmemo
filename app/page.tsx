@@ -3176,16 +3176,13 @@ export default function NotePad() {
                />
              </div>
              
-             {/* 右侧：深浅色切换按钮和用户图标 */}
-             <div className="flex items-center gap-2">
-               <Button variant="outline" size="sm" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                 {theme === 'dark' ? (
-                   <Sun className="h-4 w-4 mr-2" />
-                 ) : (
-                   <Moon className="h-4 w-4 mr-2" />
-                 )}
-                 {theme === 'dark' ? '浅色' : '深色'}
-               </Button>
+             {/* 右侧：用户名和用户图标 */}
+             <div className="flex items-center gap-3">
+               {user && (
+                 <span className="text-sm font-medium text-muted-foreground">
+                   {user.username}
+                 </span>
+               )}
                <UserNav 
                  onLogout={handleLogout}
                  onExport={handleExportAll}

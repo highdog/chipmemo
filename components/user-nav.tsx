@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
-import { Download, Upload, Loader2 } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Download, Upload, Loader2, Sun, Moon } from "lucide-react"
 
 interface UserNavProps {
   onLogout?: () => void
@@ -36,6 +37,7 @@ export function UserNav({
 }: UserNavProps) {
   const router = useRouter()
   const { user, loading: isLoading, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
 
   const handleLogout = () => {
     logout()
@@ -112,6 +114,14 @@ export function UserNav({
           {isImporting ? '导入中...' : '导入MD'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          {theme === 'dark' ? (
+            <Sun className="h-4 w-4 mr-2" />
+          ) : (
+            <Moon className="h-4 w-4 mr-2" />
+          )}
+          {theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+        </DropdownMenuItem>
         <DropdownMenuItem>
           个人资料
         </DropdownMenuItem>
