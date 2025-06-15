@@ -287,7 +287,7 @@ export async function searchNotes(searchTerm: string, page: number = 1, limit: n
 }
 
 // 按标签搜索笔记
-export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promise<{ notes: Note[]; pagination?: any }> {
+export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promise<{ notes: Note[]; pagination: any }> {
   try {
     // 确保参数类型正确
     const pageNum = Number(page);
@@ -323,7 +323,7 @@ export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promi
     if (response.errors && Array.isArray(response.errors)) {
       console.log('🚨 [DEBUG] Validation errors:');
       response.errors.forEach((err, index) => {
-        console.log(`  ${index + 1}. ${err.msg || err.message || err} (param: ${err.param || 'unknown'})`);
+        console.log(`  ${index + 1}. ${err.msg || err} (param: ${err.param || 'unknown'})`);
       });
     }
     
@@ -342,8 +342,8 @@ export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promi
     console.error('💥 [DEBUG] Exception caught in searchNotesByTag:', error);
     console.error('💥 [DEBUG] Error type:', typeof error);
     console.error('💥 [DEBUG] Error constructor:', error?.constructor?.name);
-    console.error('💥 [DEBUG] Error message:', error?.message);
-    console.error('💥 [DEBUG] Error stack:', error?.stack);
+    console.error('💥 [DEBUG] Error message:', error instanceof Error ? error.message : String(error));
+    console.error('💥 [DEBUG] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     if (error instanceof Error) {
       throw error;

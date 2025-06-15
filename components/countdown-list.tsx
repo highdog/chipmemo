@@ -29,7 +29,7 @@ const CountdownList: React.FC = () => {
         setLoading(true)
         const response = await schedulesApi.getAll({})
         
-        if (response.success) {
+        if (response.success && response.data) {
           const today = startOfDay(new Date())
           const allSchedules: CountdownItem[] = []
           

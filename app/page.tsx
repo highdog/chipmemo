@@ -957,7 +957,7 @@ export default function NotePad() {
   const loadAllSchedules = useCallback(async () => {
     try {
       const response = await schedulesApi.getAll()
-      if (response.success) {
+      if (response.success && response.data) {
         setSchedulesByDate(response.data)
       }
     } catch (error) {
@@ -1182,7 +1182,7 @@ export default function NotePad() {
       }
       
       setNotes(searchResult.notes)
-      setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
+      setHasMoreNotes(searchResult.pagination ? searchResult.pagination.current < searchResult.pagination.pages : false)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "搜索时出现错误";
       toast({
@@ -1419,7 +1419,7 @@ export default function NotePad() {
             
             // 添加标签
             if (note.tags && note.tags.length > 0) {
-              markdownContent += `**标签:** ${note.tags.map(tag => `#${tag}`).join(' ')}\n\n`
+              markdownContent += `**标签:** ${note.tags.map((tag: string) => `#${tag}`).join(' ')}\n\n`
             }
             
             // 添加笔记内容
@@ -1687,7 +1687,7 @@ export default function NotePad() {
               // 重新构建包含标签的内容
               let contentWithTags = noteData.content || ''
               if (noteData.tags && noteData.tags.length > 0) {
-                contentWithTags += '\n\n' + noteData.tags.map(tag => `#${tag}`).join(' ')
+                contentWithTags += '\n\n' + noteData.tags.map((tag: string) => `#${tag}`).join(' ')
               }
               
               // 确保内容不为空且符合后端验证要求
@@ -2250,7 +2250,7 @@ export default function NotePad() {
           const nextLine = lines[nextLineIndex].trim()
           if (nextLine.startsWith('**标签:**')) {
             const tagStr = nextLine.replace('**标签:**', '').trim()
-            todo.tags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+            todo.tags = tagStr.split(/\s+/).filter((tag: string) => tag.startsWith('#')).map((tag: string) => tag.slice(1))
             i = nextLineIndex
           } else if (nextLine.startsWith('**截止日期:**')) {
             todo.dueDate = nextLine.replace('**截止日期:**', '').trim()
@@ -2314,7 +2314,7 @@ export default function NotePad() {
       const tagMatch = line.match(/^\*\*标签:\*\*\s*(.+)$/)
       if (tagMatch && currentSection === 'notes') {
         const tagStr = tagMatch[1]
-        currentTags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+        currentTags = tagStr.split(/\s+/).filter((tag: string) => tag.startsWith('#')).map((tag: string) => tag.slice(1))
         inNoteContent = true
         continue
       }
@@ -2540,7 +2540,7 @@ export default function NotePad() {
           const nextLine = lines[nextLineIndex].trim()
           if (nextLine.startsWith('**标签:**')) {
             const tagStr = nextLine.replace('**标签:**', '').trim()
-            todo.tags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+            todo.tags = tagStr.split(/\s+/).filter((tag: string) => tag.startsWith('#')).map((tag: string) => tag.slice(1))
             i = nextLineIndex
           } else if (nextLine.startsWith('**截止日期:**')) {
             todo.dueDate = nextLine.replace('**截止日期:**', '').trim()
@@ -2602,7 +2602,7 @@ export default function NotePad() {
       const tagMatch = line.match(/^\*\*标签:\*\*\s*(.+)$/)
       if (tagMatch && currentSection === 'notes') {
         const tagStr = tagMatch[1]
-        currentTags = tagStr.split(/\s+/).filter(tag => tag.startsWith('#')).map(tag => tag.slice(1))
+        currentTags = tagStr.split(/\s+/).filter((tag: string) => tag.startsWith('#')).map((tag: string) => tag.slice(1))
         inContent = true
         continue
       }
@@ -2672,8 +2672,7 @@ export default function NotePad() {
         const todoResult = await apiClient.createTodo({
           text: cleanContent,
           tags,
-          dueDate: todoDueDate || undefined,
-          startDate: todoStartDate || undefined
+          dueDate: todoDueDate || undefined
         })
         
         if (!todoResult.error) {

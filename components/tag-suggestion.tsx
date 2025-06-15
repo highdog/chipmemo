@@ -8,7 +8,7 @@ import { getAllTags } from '@/lib/actions'
 interface TagSuggestionProps {
   inputValue: string
   onTagSelect: (tag: string) => void
-  inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
+  inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>
   disabled?: boolean
 }
 
