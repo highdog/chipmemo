@@ -45,15 +45,21 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
     }
   }
 
-  // 处理标签建议
+  // 处理标签建议 - 添加防抖以提高输入性能
   useEffect(() => {
     if (disabled) {
       setShowSuggestions(false)
       return
     }
 
-    // 检查是否输入了 # 字符
-    if (inputValue.includes('#')) {
+    // 如果不包含#字符，直接隐藏建议，避免不必要的处理
+    if (!inputValue.includes('#')) {
+      setShowSuggestions(false)
+      return
+    }
+
+    // 使用防抖延迟处理，避免频繁触发
+    const debounceTimer = setTimeout(() => {
       const lastHashIndex = inputValue.lastIndexOf('#')
       const tagPart = inputValue.substring(lastHashIndex + 1)
       
@@ -82,9 +88,10 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
       } else {
         setShowSuggestions(false)
       }
-    } else {
-      setShowSuggestions(false)
-    }
+    }, 300) // 增加防抖延迟到300ms
+
+    // 清理定时器
+    return () => clearTimeout(debounceTimer)
   }, [inputValue, allTags, disabled])
 
   // 处理建议点击

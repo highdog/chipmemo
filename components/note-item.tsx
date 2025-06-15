@@ -161,9 +161,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
       ),
     };
 
-    // 调试：打印笔记内容
-    console.log('Note content in renderNoteContent:', JSON.stringify(note.content));
-    console.log('Note content raw:', note.content);
+
     
     return (
       <div className="markdown-content">

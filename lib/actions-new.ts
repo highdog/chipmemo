@@ -247,7 +247,7 @@ export async function searchNotes(searchTerm: string): Promise<Note[]> {
       return getNotes();
     }
 
-    const response = await notesApi.getAll({ search: searchTerm, limit: 100 });
+    const response = await notesApi.getAll({ search: searchTerm, limit: 1000 });
     
     if (response.success && response.data) {
       return response.data.notes.map(convertApiNoteToNote);
@@ -264,7 +264,7 @@ export async function searchNotes(searchTerm: string): Promise<Note[]> {
 // 按标签搜索笔记
 export async function searchNotesByTag(tag: string): Promise<Note[]> {
   try {
-    const response = await notesApi.getAll({ tags: tag, limit: 100 });
+    const response = await notesApi.getAll({ tags: tag, limit: 1000 });
     
     if (response.success && response.data) {
       return response.data.notes.map(convertApiNoteToNote);

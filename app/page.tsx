@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
@@ -926,6 +926,18 @@ export default function NotePad() {
   const [isExporting, setIsExporting] = useState(false) // 导出状态
   const [isImporting, setIsImporting] = useState(false) // 导入状态
   const [searchHistory, setSearchHistory] = useState<string[]>([]) // 搜索历史记录
+  
+  // Memoized button disabled states to optimize performance
+  const isMainButtonDisabled = useMemo(() => {
+    const isInputEmpty = !inputValue.trim()
+    return isAdding || (isInputEmpty && (inputMode === 'note' && !selectedImage))
+  }, [inputValue, isAdding, inputMode, selectedImage])
+  
+  const isSearchButtonDisabled = useMemo(() => {
+    const isInputEmpty = !inputValue.trim()
+    return isAdding || isInputEmpty
+  }, [inputValue, isAdding])
+  
   const [selectedTodoDetail, setSelectedTodoDetail] = useState<{
     id: string;
     content: string;
@@ -1154,10 +1166,10 @@ export default function NotePad() {
       if (term.startsWith('#')) {
         const tag = term.substring(1) // 移除#前缀
         setCurrentTag(tag) // 设置当前标签
-        searchResult = await searchNotesByTag(tag, 1, 100)
+        searchResult = await searchNotesByTag(tag, 1, 5000) // 增加搜索限制到1000条
       } else {
         setCurrentTag("") // 清除当前标签
-        searchResult = await searchNotes(term, 1, 100)
+        searchResult = await searchNotes(term, 1, 5000) // 增加搜索限制到1000条
       }
       
       setNotes(searchResult.notes)
@@ -3241,7 +3253,7 @@ export default function NotePad() {
                     </Button>
                   </div>
                   {/* 添加按钮移到这里 */}
-                  <Button onClick={handleAddNote} disabled={isAdding || (!inputValue.trim() && (inputMode === 'note' && !selectedImage))} size="sm" className="h-7 px-3 text-xs">
+                  <Button onClick={handleAddNote} disabled={isMainButtonDisabled} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (
                       <>
                         <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -3374,7 +3386,7 @@ export default function NotePad() {
                           />
                           <Button 
                             onClick={handleAddNote} 
-                            disabled={isAdding || !inputValue.trim()} 
+                            disabled={isSearchButtonDisabled} 
                             size="sm" 
                             className="h-[60px] px-4"
                           >
