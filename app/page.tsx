@@ -1118,9 +1118,14 @@ export default function NotePad() {
   const loadMoreNotes = useCallback(async () => {
     if (isLoadingMore || !hasMoreNotes) return
     
+    // 如果在搜索状态下，不加载更多笔记
+    if (searchTerm || currentTag) {
+      return
+    }
+    
     setIsLoadingMore(true)
     await loadNotes(false)
-  }, [isLoadingMore, hasMoreNotes, loadNotes])
+  }, [isLoadingMore, hasMoreNotes, loadNotes, searchTerm, currentTag])
 
   // 无限滚动监听
   useEffect(() => {
@@ -1164,7 +1169,10 @@ export default function NotePad() {
       
       // 检查是否是标签搜索（以#开头）
       if (term.startsWith('#')) {
-        const tag = term.substring(1) // 移除#前缀
+        const tag = term.substring(1).trim() // 移除#前缀并去除空格
+        if (!tag) {
+          throw new Error('标签名称不能为空');
+        }
         setCurrentTag(tag) // 设置当前标签
         searchResult = await searchNotesByTag(tag, 1, 5000) // 增加搜索限制到1000条
       } else {
@@ -1175,9 +1183,10 @@ export default function NotePad() {
       setNotes(searchResult.notes)
       setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "搜索时出现错误";
       toast({
         title: "搜索失败",
-        description: "搜索时出现错误",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -1214,21 +1223,33 @@ export default function NotePad() {
 
   // 标签点击搜索
   const handleTagClick = async (tag: string) => {
-    setSearchTerm(`#${tag}`)
-    setCurrentTag(tag) // 设置当前标签
+    const trimmedTag = tag.trim();
+    if (!trimmedTag) {
+      toast({
+        title: "搜索失败",
+        description: "标签名称不能为空",
+        variant: "destructive",
+      })
+      return;
+    }
+    
+    setSearchTerm(`#${trimmedTag}`)
+    setCurrentTag(trimmedTag) // 设置当前标签
     setIsSearching(true)
 
     try {
-      const searchResults = await searchNotesByTag(tag)
-      setNotes(searchResults)
+      const searchResult = await searchNotesByTag(trimmedTag, 1, 5000)
+      setNotes(searchResult.notes)
+      setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
       toast({
-        title: "标签搜索",
-        description: `找到 ${searchResults.length} 条包含 #${tag} 标签的笔记`,
-      })
+          title: "标签搜索",
+          description: `找到 ${searchResult.notes.length} 条包含 #${trimmedTag} 标签的笔记`,
+        })
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "标签搜索时出现错误";
       toast({
         title: "搜索失败",
-        description: "标签搜索时出现错误",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -2905,10 +2926,14 @@ export default function NotePad() {
   }
 
   const handleNoteDelete = () => {
-    // 如果有搜索词，重新搜索；否则重新加载
-    if (searchTerm) {
+    // 如果有标签搜索，重新执行标签搜索
+    if (currentTag) {
+      handleTagClick(currentTag)
+    } else if (searchTerm) {
+      // 如果有文本搜索，重新执行文本搜索
       handleSearch(searchTerm)
     } else {
+      // 否则重新加载全部笔记
       loadNotes()
     }
   }
@@ -2923,7 +2948,9 @@ export default function NotePad() {
       
       if (result.success) {
         // 刷新笔记列表
-        if (searchTerm) {
+        if (currentTag) {
+          handleTagClick(currentTag)
+        } else if (searchTerm) {
           handleSearch(searchTerm)
         } else {
           loadNotes()
@@ -2963,7 +2990,9 @@ export default function NotePad() {
         const deleteResult = await deleteNote(note.id)
         if (deleteResult.success) {
           // 刷新笔记列表
-          if (searchTerm) {
+          if (currentTag) {
+            handleTagClick(currentTag)
+          } else if (searchTerm) {
             handleSearch(searchTerm)
           } else {
             loadNotes()
@@ -3031,7 +3060,9 @@ export default function NotePad() {
         setSearchHistory(JSON.parse(savedSearchHistory))
       }
       
-      loadNotes().then(() => {
+      // 只有在没有搜索状态时才加载全部笔记
+      if (!searchTerm && !currentTag) {
+        loadNotes().then(() => {
         // 页面加载完成后自动滚动到最新笔记
         setTimeout(() => {
           if (notes.length > 0) {
@@ -3055,7 +3086,8 @@ export default function NotePad() {
             }
           }
         }, 300)
-      })
+        })
+      }
       loadTodosData()
       loadAllSchedules() // 加载日程数据
     }
@@ -3162,8 +3194,18 @@ export default function NotePad() {
           
           {/* 搜索状态提示 */}
           {searchTerm && (
-            <div className="mt-2 text-sm text-muted-foreground">
-              搜索结果: "{searchTerm}" ({notes.length} 条笔记)
+            <div className="mt-2 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                搜索结果: "{searchTerm}" ({notes.length} 条笔记)
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleClearSearch}
+                className="h-6 px-2 text-xs"
+              >
+                显示全部
+              </Button>
             </div>
           )}
         </div>

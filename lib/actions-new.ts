@@ -270,11 +270,14 @@ export async function searchNotesByTag(tag: string): Promise<Note[]> {
       return response.data.notes.map(convertApiNoteToNote);
     } else {
       console.error('Failed to search notes by tag:', response.error);
-      return [];
+      throw new Error(response.error || 'Failed to search notes by tag');
     }
   } catch (error) {
     console.error('Error searching notes by tag:', error);
-    return [];
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error while searching notes by tag');
   }
 }
 

@@ -37,8 +37,10 @@ router.get('/', [
     }
 
     if (tags) {
-      const tagArray = tags.split(',').map(tag => tag.trim());
-      query.tags = { $in: tagArray };
+      const tagArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+      if (tagArray.length > 0) {
+        query.tags = { $in: tagArray };
+      }
     }
 
     let notes;

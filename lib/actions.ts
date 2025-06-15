@@ -287,22 +287,68 @@ export async function searchNotes(searchTerm: string, page: number = 1, limit: n
 }
 
 // 按标签搜索笔记
-export async function searchNotesByTag(tag: string, page: number = 1, limit: number = 100): Promise<{ notes: Note[]; pagination: any }> {
+export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promise<{ notes: Note[]; pagination?: any }> {
   try {
-    const response = await notesApi.getAll({ tags: tag, page, limit });
+    // 确保参数类型正确
+    const pageNum = Number(page);
+    // 限制limit的最大值为1000（后端验证要求）
+    const limitNum = Math.min(Number(limit), 1000);
+    
+    // 调试信息：打印请求参数
+    console.log('🔍 [DEBUG] searchNotesByTag called with:', { tag, page: pageNum, limit: limitNum });
+    
+    // 调试信息：检查认证状态
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    console.log('🔑 [DEBUG] Auth token exists:', !!token);
+    if (token) {
+      console.log('🔑 [DEBUG] Token length:', token.length);
+      console.log('🔑 [DEBUG] Token preview:', token.substring(0, 20) + '...');
+    }
+    
+    // 调试信息：API调用前
+    console.log('📡 [DEBUG] Calling notesApi.getAll with params:', { tags: tag, page: pageNum, limit: limitNum });
+    
+    const response = await notesApi.getAll({ tags: tag, page: pageNum, limit: limitNum });
+    
+    // 调试信息：API响应
+    console.log('📡 [DEBUG] API response:', {
+      success: response.success,
+      hasData: !!response.data,
+      error: response.error,
+      errors: response.errors,
+      fullResponse: response
+    });
+    
+    // 如果有errors数组，详细打印每个错误
+    if (response.errors && Array.isArray(response.errors)) {
+      console.log('🚨 [DEBUG] Validation errors:');
+      response.errors.forEach((err, index) => {
+        console.log(`  ${index + 1}. ${err.msg || err.message || err} (param: ${err.param || 'unknown'})`);
+      });
+    }
     
     if (response.success && response.data) {
+      console.log('✅ [DEBUG] Search successful, notes count:', response.data.notes?.length || 0);
       return {
         notes: response.data.notes.map(convertApiNoteToNote),
         pagination: response.data.pagination
       };
     } else {
-      console.error('Failed to search notes by tag:', response.error);
-      return { notes: [], pagination: null };
+      console.error('❌ [DEBUG] API returned error:', response.error);
+      console.error('❌ [DEBUG] Full error response:', response);
+      throw new Error(response.error || 'Failed to search notes by tag');
     }
   } catch (error) {
-    console.error('Error searching notes by tag:', error);
-    return { notes: [], pagination: null };
+    console.error('💥 [DEBUG] Exception caught in searchNotesByTag:', error);
+    console.error('💥 [DEBUG] Error type:', typeof error);
+    console.error('💥 [DEBUG] Error constructor:', error?.constructor?.name);
+    console.error('💥 [DEBUG] Error message:', error?.message);
+    console.error('💥 [DEBUG] Error stack:', error?.stack);
+    
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error while searching notes by tag');
   }
 }
 
