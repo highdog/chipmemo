@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
@@ -22,7 +20,7 @@ import { TagContent } from "@/components/tag-content"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
-import { TagSuggestion } from "@/components/tag-suggestion"
+
 import ScheduleList from "@/components/schedule-list"
 import CountdownList from "@/components/countdown-list"
 import LargeCalendar from "@/components/large-calendar"
@@ -57,7 +55,7 @@ const extractTagsAndCleanContent = (content: string): { cleanContent: string; ta
 
 
 // NoteGroup Component
-function NoteGroup({
+const NoteGroup = React.memo(function NoteGroup({
   date,
   notes,
   onDelete,
@@ -98,10 +96,10 @@ function NoteGroup({
       </div>
     </div>
   )
-}
+})
 
 // TodoList Component
-function TodoList({ 
+const TodoList = React.memo(function TodoList({ 
   selectedDate, 
   todosByDate, 
   onToggleTodo,
@@ -171,12 +169,12 @@ function TodoList({
     })
 
   // 获取所有标签
-  const allTags = Array.from(new Set(allTodos.flatMap(todo => todo.tags)))
+  const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap(todo => todo.tags))), [allTodos])
 
   // 根据选中的标签筛选todos
-  const displayTodos = selectedTag === 'all' 
+  const displayTodos = useMemo(() => selectedTag === 'all' 
     ? allTodos 
-    : allTodos.filter(todo => todo.tags.includes(selectedTag))
+    : allTodos.filter(todo => todo.tags.includes(selectedTag)), [selectedTag, allTodos])
 
   const loadTodos = async () => {
     setIsLoading(true)
@@ -277,8 +275,8 @@ function TodoList({
     }
   }, [menuOpenTodo])
 
-  const completedCount = displayTodos.filter(todo => todo.completed).length
-  const totalCount = displayTodos.length
+  const completedCount = useMemo(() => displayTodos.filter(todo => todo.completed).length, [displayTodos])
+  const totalCount = useMemo(() => displayTodos.length, [displayTodos])
 
   return (
     <div className="flex flex-col h-full">
@@ -889,7 +887,7 @@ function TodoList({
       )}
     </div>
   )
-}
+})
 
 // Main Component
 export default function NotePad() {
@@ -1152,7 +1150,7 @@ export default function NotePad() {
   }, [hasMoreNotes, isLoadingMore, isLoading, loadMoreNotes])
 
   // 搜索笔记
-  const handleSearch = async (term: string) => {
+  const handleSearch = useCallback(async (term: string) => {
     setSearchTerm(term)
     setIsSearching(true)
     setCurrentPage(1)
@@ -1193,10 +1191,10 @@ export default function NotePad() {
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [searchHistory, toast])
 
   // 清除搜索，显示全部笔记
-  const handleClearSearch = async () => {
+  const handleClearSearch = useCallback(async () => {
     setSearchTerm("")
     setCurrentTag("") // 清除当前标签
     setIsSearching(true)
@@ -1220,7 +1218,7 @@ export default function NotePad() {
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [toast])
 
   // 标签点击搜索
   const handleTagClick = async (tag: string) => {
@@ -2911,7 +2909,12 @@ export default function NotePad() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // 优化输入处理函数，使用useCallback避免重新创建
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value)
+  }, [])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // 禁用回车键添加功能，只允许多行输入
     // 只有当按下Ctrl+Enter或Command+Enter时才提交
     if (e.key === "Enter" && !(e.ctrlKey || e.metaKey)) {
@@ -2923,7 +2926,7 @@ export default function NotePad() {
       e.preventDefault()
       handleAddNote()
     }
-  }
+  }, [handleAddNote])
 
   const handleNoteDelete = () => {
     // 如果有标签搜索，重新执行标签搜索
@@ -3131,7 +3134,7 @@ export default function NotePad() {
   }, [])
 
 
-  const groupedNotes = groupNotesByDate(notes)
+  const groupedNotes = useMemo(() => groupNotesByDate(notes), [notes])
 
   // 如果正在检查认证状态，显示加载界面
   if (isCheckingAuth) {
@@ -3288,18 +3291,13 @@ export default function NotePad() {
                     <Textarea
                       ref={textareaRef}
                       value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyDown={handleKeyDown}
                       placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
                       className="flex-1 min-h-[80px] resize-none font-mono text-sm"
                       disabled={isAdding}
                     />
-                    <TagSuggestion
-                      inputValue={inputValue}
-                      onTagSelect={setInputValue}
-                      inputRef={textareaRef}
-                      disabled={isAdding}
-                    />
+
                   </div>
                   
                   {/* Todo模式下显示起始日期和截止日期输入框 */}
@@ -3397,7 +3395,7 @@ export default function NotePad() {
                         <div className="flex items-center space-x-2">
                           <Textarea
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
                             placeholder={`输入新笔记... ( ${searchTerm})`}
                             className="flex-1 min-h-[60px] resize-none font-mono text-sm"

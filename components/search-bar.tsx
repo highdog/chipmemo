@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
@@ -18,14 +18,13 @@ interface SearchBarProps {
   showClearButton?: boolean
 }
 
-export function SearchBar({ 
+export const SearchBar = React.memo(function SearchBar({ 
   onSearch, 
   onClearSearch, 
   searchTerm, 
   placeholder = "搜索笔记内容或标签...",
   showClearButton = false
 }: SearchBarProps) {
-  console.log('=== SearchBar component initialized ===') // 新增调试信息
   const [inputValue, setInputValue] = useState("")
   const [allTags, setAllTags] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -289,4 +288,4 @@ export function SearchBar({
       </div>
     </div>
   )
-}
+})

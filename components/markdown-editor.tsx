@@ -14,7 +14,7 @@ interface MarkdownEditorProps {
   className?: string
 }
 
-export function MarkdownEditor({
+export const MarkdownEditor = React.memo(function MarkdownEditor({
   value,
   onChange,
   placeholder = "输入Markdown内容...",
@@ -53,4 +53,4 @@ export function MarkdownEditor({
       />
     </div>
   )
-}
+})
