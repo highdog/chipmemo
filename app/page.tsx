@@ -24,6 +24,7 @@ import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
 import { TagSuggestion } from "@/components/tag-suggestion"
 import ScheduleList from "@/components/schedule-list"
+import CountdownList from "@/components/countdown-list"
 import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
@@ -3237,30 +3238,10 @@ export default function NotePad() {
                 <ScheduleList selectedDate={date} />
               </div>
               
-              {/* 常用标签区域 - 标签搜索时隐藏 */}
-              {!searchTerm.startsWith('#') && searchHistory.filter(item => item.startsWith('#')).length > 0 && (
-                <div className="p-4 border-b">
-                  <div className="mb-2">
-                    <span className="text-sm text-muted-foreground">常用标签</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {searchHistory.filter(item => item.startsWith('#')).map(item => item.substring(1)).slice(0, 8).map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
-                        onClick={() => {
-                          const tagSearch = `#${tag}`
-                          setSearchTerm(tagSearch)
-                          handleSearch(tagSearch)
-                        }}
-                      >
-                        #{tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* 倒计日区域 */}
+              <div className="p-4 border-b">
+                <CountdownList />
+              </div>
             </div>
             )}
 
