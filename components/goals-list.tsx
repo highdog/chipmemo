@@ -1,161 +1,195 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Target, TrendingUp } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { tagContentsApi } from '@/lib/api'
 
-interface Goal {
+interface TagContent {
   tag: string
-  targetCount: number
-  currentCount: number
-  isActive: boolean
+  content: string
+  updatedAt: string
+  isGoalEnabled?: boolean
+  targetCount?: number
+  currentCount?: number
 }
 
 interface GoalsListProps {
-  className?: string
   onTagSelect?: (tag: string) => void
 }
 
-const GoalsList: React.FC<GoalsListProps> = ({ className, onTagSelect }) => {
-  const [goals, setGoals] = useState<Goal[]>([])
+const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
+  const [goals, setGoals] = useState<TagContent[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // 加载目标数据
-  const loadGoals = async () => {
-     try {
-       setLoading(true)
-       // 从标签内容中获取目标数据
-       const response = await tagContentsApi.getAll()
-       if (response.success && response.data) {
-         // 过滤出启用了目标设置的标签内容
-          const goalData = response.data
-            .filter((tagContent: any) => tagContent.isGoalEnabled)
-            .map((tagContent: any) => ({
-              tag: tagContent.tag,
-              targetCount: tagContent.targetCount || 0,
-              currentCount: tagContent.currentCount || 0,
-              isActive: true
-            }))
-         setGoals(goalData)
-       } else {
-         setGoals([])
-       }
-     } catch (error) {
-       console.error('加载目标数据失败:', error)
-       setGoals([])
-     } finally {
-       setLoading(false)
-     }
-   }
-
-  useEffect(() => {
-    loadGoals()
-  }, [])
-
-  // 监听标签更新事件，实时刷新目标列表
-  useEffect(() => {
-    const handleTagUpdate = () => {
-      loadGoals()
+  const fetchGoals = async () => {
+    try {
+      console.log('🔍 [GoalsList] 开始获取所有标签内容...')
+      const response = await tagContentsApi.getAll()
+      console.log('📥 [GoalsList] 获取到的原始数据:', response)
+      console.log('📊 [GoalsList] 数据类型:', typeof response)
+      console.log('📊 [GoalsList] 数据结构:', Object.keys(response))
+      
+      if (response && response.data) {
+        console.log('📋 [GoalsList] response.data:', response.data)
+        console.log('📋 [GoalsList] response.data 类型:', typeof response.data)
+        console.log('📋 [GoalsList] response.data 是否为数组:', Array.isArray(response.data))
+        
+        const goalData = response.data
+        console.log('🎯 [GoalsList] goalData:', goalData)
+        console.log('🎯 [GoalsList] goalData 长度:', goalData.length)
+        
+        // 打印每个标签的详细信息
+        goalData.forEach((item: TagContent, index: number) => {
+          console.log(`📝 [GoalsList] 标签 ${index + 1}:`, {
+            tag: item.tag,
+            isGoalEnabled: item.isGoalEnabled,
+            targetCount: item.targetCount,
+            currentCount: item.currentCount,
+            hasGoalFields: 'isGoalEnabled' in item,
+            goalFieldType: typeof item.isGoalEnabled
+          })
+        })
+        
+        // 过滤启用目标的标签
+        console.log('🔍 [GoalsList] 开始过滤启用目标的标签...')
+        const filteredGoals = goalData.filter((tagContent: TagContent) => {
+          const isEnabled = tagContent.isGoalEnabled === true
+          console.log(`🎯 [GoalsList] 标签 "${tagContent.tag}" 目标启用状态:`, {
+            isGoalEnabled: tagContent.isGoalEnabled,
+            isEnabled: isEnabled,
+            comparison: `${tagContent.isGoalEnabled} === true`
+          })
+          return isEnabled
+        })
+        
+        console.log('✅ [GoalsList] 过滤后的目标标签:', filteredGoals)
+        console.log('📊 [GoalsList] 过滤后的数量:', filteredGoals.length)
+        
+        setGoals(filteredGoals)
+      } else {
+        console.warn('⚠️ [GoalsList] 响应数据格式异常:', response)
+        setGoals([])
+      }
+    } catch (err) {
+      console.error('❌ [GoalsList] 获取目标数据失败:', err)
+      setError('获取目标数据失败')
+    } finally {
+      setLoading(false)
+      console.log('🏁 [GoalsList] 数据获取流程结束')
     }
-
-    // 监听所有标签的更新事件
-    const handleGlobalTagUpdate = (event: CustomEvent) => {
-      loadGoals()
-    }
-
-    // 添加全局标签更新监听器
-    window.addEventListener('goals-list-refresh', handleGlobalTagUpdate as EventListener)
-    
-    return () => {
-      window.removeEventListener('goals-list-refresh', handleGlobalTagUpdate as EventListener)
-    }
-  }, [])
-
-  const calculateProgress = (current: number, target: number) => {
-    return Math.min((current / target) * 100, 100)
   }
 
-  const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-green-500'
-    if (progress >= 75) return 'bg-blue-500'
-    if (progress >= 50) return 'bg-yellow-500'
-    return 'bg-gray-400'
+  useEffect(() => {
+    fetchGoals()
+
+    // 监听目标列表刷新事件
+    const handleGoalsRefresh = () => {
+      console.log('🔄 [GoalsList] 收到目标列表刷新事件，重新获取数据...')
+      setLoading(true)
+      fetchGoals()
+    }
+
+    window.addEventListener('goals-list-refresh', handleGoalsRefresh)
+    console.log('👂 [GoalsList] 已添加目标列表刷新事件监听器')
+
+    // 清理事件监听器
+    return () => {
+      window.removeEventListener('goals-list-refresh', handleGoalsRefresh)
+      console.log('🧹 [GoalsList] 已移除目标列表刷新事件监听器')
+    }
+  }, [])
+
+  console.log('🎨 [GoalsList] 渲染组件，当前状态:', {
+    loading,
+    error,
+    goalsCount: goals.length,
+    goals: goals.map(g => ({ tag: g.tag, isGoalEnabled: g.isGoalEnabled }))
+  })
+
+  const handleGoalClick = (tag: string) => {
+    console.log('🎯 [GoalsList] 点击目标标签:', tag)
+    // 触发标签搜索，类似主页中的标签点击效果
+    if (typeof window !== 'undefined') {
+      // 触发全局搜索事件
+      window.dispatchEvent(new CustomEvent('tag-search', { detail: { tag } }))
+    }
+    // 如果有回调函数，也调用它
+    if (onTagSelect) {
+      onTagSelect(tag)
+    }
   }
 
   if (loading) {
+    console.log('⏳ [GoalsList] 显示加载状态')
     return (
-      <div className="mt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Target className="h-4 w-4 text-muted-foreground" />
-          <h3 className="font-medium text-sm">目标进度</h3>
-        </div>
-        <div className="text-center py-4 text-sm text-muted-foreground">
-          加载中...
-        </div>
+      <div>
+        <h3 className="font-medium text-sm mb-3">目标进度</h3>
+        <p>加载中...</p>
       </div>
     )
   }
 
+  if (error) {
+    console.log('❌ [GoalsList] 显示错误状态:', error)
+    return (
+      <div>
+         <h3 className="font-medium text-sm mb-3">目标进度</h3>
+         <p className="text-red-500">{error}</p>
+       </div>
+    )
+  }
+
+  if (goals.length === 0) {
+    console.log('📭 [GoalsList] 显示无目标状态')
+    return (
+      <div>
+         <h3 className="font-medium text-sm mb-3">目标进度</h3>
+         <p className="text-gray-500">暂无设置目标的标签</p>
+       </div>
+    )
+  }
+
+  console.log('🎯 [GoalsList] 显示目标列表，共', goals.length, '个目标')
+  
   return (
-    <div className="mt-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Target className="h-4 w-4 text-muted-foreground" />
-        <h3 className="font-medium text-sm">目标进度</h3>
-      </div>
-      
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {goals.length === 0 ? (
-          <div className="text-center py-4 text-sm text-muted-foreground">
-            暂无设置目标
-          </div>
-        ) : (
-          goals.filter(goal => goal.isActive).map((goal) => {
-            const progress = calculateProgress(goal.currentCount, goal.targetCount)
-            return (
-              <div
-                key={goal.tag}
-                className="p-3 rounded-md border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => onTagSelect?.(goal.tag)}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">#{goal.tag}</span>
-                    <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {goal.currentCount}/{goal.targetCount}
+    <div>
+       <h3 className="font-medium text-sm mb-3">目标进度</h3>
+      <div className="space-y-4">
+        {goals.map((goal, index) => {
+          const progress = goal.targetCount && goal.targetCount > 0 
+            ? (goal.currentCount || 0) / goal.targetCount * 100 
+            : 0
+          
+          console.log(`🎯 [GoalsList] 渲染目标 "${goal.tag}":`, {
+            targetCount: goal.targetCount,
+            currentCount: goal.currentCount,
+            progress: progress
+          })
+          
+          return (
+            <div 
+              key={goal.tag} 
+              className="space-y-2 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors"
+              onClick={() => handleGoalClick(goal.tag)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline">{goal.tag}</Badge>
+                  <span className="text-sm text-gray-600">
+                    {goal.currentCount || 0} / {goal.targetCount || 0}
                   </span>
                 </div>
-                
-                <div className="space-y-1">
-                  <Progress 
-                    value={progress} 
-                    className="h-2"
-                  />
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">
-                      进度: {progress.toFixed(0)}%
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      progress >= 100 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                        : progress >= 75
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : progress >= 50
-                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
-                    }`}>
-                      {progress >= 100 ? '已完成' : 
-                       progress >= 75 ? '接近完成' :
-                       progress >= 50 ? '进行中' : '刚开始'}
-                    </span>
-                  </div>
-                </div>
+                <span className="text-sm font-medium">
+                  {Math.round(progress)}%
+                </span>
               </div>
-            )
-          })
-        )}
+              <Progress value={progress} className="h-2" />
+            </div>
+          )
+        })}
       </div>
     </div>
   )

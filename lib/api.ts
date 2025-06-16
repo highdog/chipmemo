@@ -114,11 +114,23 @@ class ApiClient {
       });
 
       let data;
+      let textResponse;
+      
+      // 首先尝试获取文本响应
       try {
-        data = await response.json();
+        textResponse = await response.text();
+      } catch (textError) {
+        return {
+          success: false,
+          error: `无法读取响应: ${textError instanceof Error ? textError.message : '未知错误'}`,
+        };
+      }
+      
+      // 然后尝试解析为 JSON
+      try {
+        data = JSON.parse(textResponse);
       } catch (jsonError) {
         // Handle non-JSON responses (like HTML error pages)
-        const textResponse = await response.text();
         if (response.status === 429) {
           return {
             success: false,
@@ -275,15 +287,69 @@ class ApiClient {
   }
 
   // 标签内容相关API
-  async getTagContent(tag: string): Promise<ApiResponse<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string }>> {
-    return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
+  async getTagContent(tag: string): Promise<ApiResponse<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>> {
+    return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>(`/tag-contents/${encodeURIComponent(tag)}`);
   }
 
-  async saveTagContent(tag: string, content: string, goalSettings?: { isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>> {
-    const data = { content, ...goalSettings };
-    return this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, data);
+  async saveTagContent(tag: string, content: string, goalSettings?: {
+    isGoalEnabled?: boolean
+    targetCount?: number
+    currentCount?: number
+  }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>> {
+    console.log('🌐 [API] saveTagContent 调用开始')
+    console.log('📤 [API] 请求参数:', {
+      tag: tag,
+      content: content,
+      goalSettings: goalSettings
+    })
+    
+    const requestBody = {
+      content,
+      ...goalSettings
+    }
+    
+    console.log('📦 [API] 请求体:', requestBody)
+    console.log('🔗 [API] 请求URL:', `/tag-contents/${encodeURIComponent(tag)}`)
+    
+    try {
+      const response = await this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, requestBody)
+      
+      console.log('📥 [API] saveTagContent 响应:', response)
+      console.log('✅ [API] saveTagContent 成功')
+      
+      return response
+    } catch (error) {
+      console.error('❌ [API] saveTagContent 失败:', error)
+      throw error
+    }
   }
 
+  async getAll(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>>> {
+    console.log('🌐 [API] getAll 调用开始')
+    console.log('🔗 [API] 请求URL: /tag-contents')
+    
+    try {
+      const response = await this.get<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>>('/tag-contents')
+      console.log('📥 [API] getAll 响应:', response)
+      console.log('📊 [API] getAll 数据类型:', typeof response)
+      console.log('📋 [API] getAll 数据结构:', response ? Object.keys(response) : 'null')
+      
+      if (response && response.data) {
+        console.log('📄 [API] getAll 数据详情:', {
+          dataType: typeof response.data,
+          isArray: Array.isArray(response.data),
+          length: response.data.length,
+          firstItem: response.data[0]
+        })
+      }
+      
+      console.log('✅ [API] getAll 成功')
+      return response
+    } catch (error) {
+      console.error('❌ [API] getAll 失败:', error)
+      throw error
+    }
+  }
   async deleteTagContent(tag: string): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
   }

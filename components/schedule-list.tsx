@@ -39,8 +39,11 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd')
         const response = await schedulesApi.getAll({ date: dateKey })
         
-        if (response.success) {
-          const daySchedules = response.data[dateKey] || []
+        if (response.success && response.data) {
+          const daySchedules = (response.data[dateKey] || []).map(schedule => ({
+            ...schedule,
+            type: schedule.type as ScheduleItem['type']
+          }))
           setSchedules(daySchedules)
         } else {
           setSchedules([])
@@ -67,7 +70,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
         type: newSchedule.type
       })
 
-      if (response.success) {
+      if (response.success && response.data) {
         const newScheduleItem: ScheduleItem = {
           id: response.data.id,
           title: response.data.title,

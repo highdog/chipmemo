@@ -147,7 +147,7 @@ const NoteGroup = React.memo(function NoteGroup({
       </div>
 
       {/* 该日期下的所有笔记 */}
-      <div className="space-y-3 ml-4">
+      <div className="space-y-2 ml-4">
         {notes.map((note) => (
           <NoteItem 
             key={note.id} 
@@ -182,12 +182,13 @@ const TodoList = React.memo(function TodoList({
     tags: string[];
     dueDate?: string;
     startDate?: string;
+    priority: 'low' | 'medium' | 'high';
   }>>;
   onToggleTodo: (todoId: string) => void;
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
-  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string }) => void;
+  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority: 'low' | 'medium' | 'high' }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -266,8 +267,8 @@ const TodoList = React.memo(function TodoList({
       
       // 然后按优先级排序：高 > 中 > 低
       const priorityOrder = { high: 3, medium: 2, low: 1 }
-      const aPriority = a.priority ? priorityOrder[a.priority as keyof typeof priorityOrder] || 2 : 2 // 默认为中优先级
-      const bPriority = b.priority ? priorityOrder[b.priority as keyof typeof priorityOrder] || 2 : 2 // 默认为中优先级
+      const aPriority = a.priority ? priorityOrder[a.priority] || 2 : 2 // 默认为中优先级
+      const bPriority = b.priority ? priorityOrder[b.priority] || 2 : 2 // 默认为中优先级
       return bPriority - aPriority
     })
   }, [selectedTag, allTodos])
@@ -646,7 +647,8 @@ const TodoList = React.memo(function TodoList({
                             completed: todo.completed,
                             tags: todo.tags,
                             startDate: todo.startDate,
-                            dueDate: todo.dueDate
+                            dueDate: todo.dueDate,
+                            priority: todo.priority
                           })}
                         >
                           {todo.content}
@@ -1050,7 +1052,7 @@ export default function NotePad() {
     tags: string[];
     dueDate?: string;
     startDate?: string;
-    priority?: 'low' | 'medium' | 'high';
+    priority: 'low' | 'medium' | 'high';
   }>>>({})
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -1117,6 +1119,21 @@ export default function NotePad() {
       window.removeEventListener('scheduleUpdated', handleScheduleUpdate)
     }
   }, [loadAllSchedules])
+
+  // 监听目标点击事件
+  useEffect(() => {
+    const handleTagSearch = (event: CustomEvent) => {
+      const { tag } = event.detail
+      console.log('🎯 [HomePage] 收到目标标签搜索事件:', tag)
+      handleTagClick(tag)
+    }
+
+    window.addEventListener('tag-search', handleTagSearch as EventListener)
+    
+    return () => {
+      window.removeEventListener('tag-search', handleTagSearch as EventListener)
+    }
+  }, [])
 
   // 按日期分组笔记
   const groupNotesByDate = (notes: Note[]) => {
@@ -3321,7 +3338,7 @@ export default function NotePad() {
           tags: string[];
           dueDate?: string;
           startDate?: string;
-          priority?: 'low' | 'medium' | 'high';
+          priority: 'low' | 'medium' | 'high';
         }>> = {}
         
         response.data.todos.forEach((todo: any) => {
@@ -3336,7 +3353,7 @@ export default function NotePad() {
             tags: todo.tags || [],
             dueDate: todo.dueDate,
             startDate: todo.startDate,
-            priority: todo.priority
+            priority: todo.priority || 'medium'
           })
         })
         

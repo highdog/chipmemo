@@ -82,30 +82,55 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   }, [tag])
   
   const handleSave = async () => {
-    setIsSaving(true)
+    if (!tag) return
+    
+    console.log('💾 [TagContent] 开始保存标签内容和目标设置...')
+    console.log('📝 [TagContent] 保存参数:', {
+      tag: tag,
+      content: content,
+      isGoalEnabled: isGoalEnabled,
+      targetCount: targetCount,
+      currentCount: currentCount
+    })
     
     try {
-      // 保存标签内容和目标设置
-      const response = await tagContentsApi.save(tag, content, {
-        isGoalEnabled,
-        targetCount,
-        currentCount
-      })
+      setIsSaving(true)
       
-      if (response.success) {
-        toast.success('内容和目标设置已保存')
+      const goalSettings = {
+        isGoalEnabled,
+        targetCount: isGoalEnabled ? targetCount : 0,
+        currentCount: isGoalEnabled ? currentCount : 0
+      }
+      
+      console.log('🎯 [TagContent] 目标设置数据:', goalSettings)
+      
+      const result = await tagContentsApi.save(tag, content, goalSettings)
+      console.log('✅ [TagContent] 保存结果:', result)
+      
+      if (result.success) {
+        console.log('🎉 [TagContent] 保存成功！')
         setIsEditing(false)
+        
+        // 触发目标列表刷新
+        console.log('🔄 [TagContent] 触发目标列表刷新事件')
+        window.dispatchEvent(new CustomEvent('goals-list-refresh'))
+        
+        // 显示成功提示
+        toast.success('内容和目标设置已保存')
+        
         if (onSave) {
           onSave(tag, content)
         }
       } else {
-        toast.error('保存失败')
+        console.error('❌ [TagContent] 保存失败:', result.error)
+        toast.error(result.error || '保存失败')
       }
     } catch (error) {
-      console.error('Error saving content:', error)
-      toast.error('保存失败')
+      console.error('💥 [TagContent] 保存异常:', error)
+      toast.error('网络错误或服务器异常')
     } finally {
       setIsSaving(false)
+      console.log('🏁 [TagContent] 保存流程结束')
     }
   }
 
