@@ -19,6 +19,10 @@ export interface TodoItem {
   id: string;
   content: string;
   completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  tags?: string[];
+  dueDate?: string;
+  startDate?: string;
 }
 
 // 将后端API的Note转换为前端Note格式

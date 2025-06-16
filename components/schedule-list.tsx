@@ -122,7 +122,7 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
         </Button>
       </div>
       
-      <div className="space-y-2 max-h-48 overflow-y-auto">
+      <div className="space-y-1 max-h-48 overflow-y-auto">
         {/* 添加新日程表单 */}
         {isAdding && (
           <div className="space-y-2 p-2 border rounded-md bg-muted/50">

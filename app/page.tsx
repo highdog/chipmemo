@@ -17,12 +17,14 @@ import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2
 // 由于组件已在本文件中定义,移除重复导入
 // 由于TodoList组件已在本文件中定义,移除此导入
 import { TagContent } from "@/components/tag-content"
+import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
 
 import ScheduleList from "@/components/schedule-list"
 import CountdownList from "@/components/countdown-list"
+import GoalsList from "@/components/goals-list"
 import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
@@ -50,6 +52,70 @@ const extractTagsAndCleanContent = (content: string): { cleanContent: string; ta
   
   const cleanContent = content.replace(tagRegex, '').trim()
   return { cleanContent, tags }
+}
+
+// TagProgressInputField组件
+function TagProgressInputField({ currentTag, progressInput, setProgressInput, isAdding }: {
+  currentTag: string
+  progressInput: number
+  setProgressInput: (value: number) => void
+  isAdding: boolean
+}) {
+  const [tagData, setTagData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const loadTagData = async () => {
+    if (!currentTag) return
+    
+    setIsLoading(true)
+    try {
+      const response = await tagContentsApi.get(currentTag)
+      setTagData(response.data)
+    } catch (error) {
+      console.error('Error loading tag data:', error)
+      setTagData(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTagData()
+  }, [currentTag])
+
+  // 监听标签更新事件
+  useEffect(() => {
+    if (!currentTag) return
+    
+    const handleTagUpdate = () => {
+      loadTagData()
+    }
+
+    window.addEventListener(`tag-updated-${currentTag}`, handleTagUpdate)
+    
+    return () => {
+      window.removeEventListener(`tag-updated-${currentTag}`, handleTagUpdate)
+    }
+  }, [currentTag])
+
+  if (isLoading || !tagData?.isGoalEnabled) {
+    return null
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        type="number"
+        min="0"
+        max={tagData.targetCount}
+        value={progressInput}
+        onChange={(e) => setProgressInput(parseInt(e.target.value) || 0)}
+        className="h-[60px] w-16 text-sm"
+        placeholder="+进度"
+        disabled={isAdding}
+      />
+    </div>
+  )
 }
 
 
@@ -118,7 +184,7 @@ const TodoList = React.memo(function TodoList({
     startDate?: string;
   }>>;
   onToggleTodo: (todoId: string) => void;
-  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => void;
+  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
   onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string }) => void;
@@ -171,10 +237,40 @@ const TodoList = React.memo(function TodoList({
   // 获取所有标签
   const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap(todo => todo.tags))), [allTodos])
 
-  // 根据选中的标签筛选todos
-  const displayTodos = useMemo(() => selectedTag === 'all' 
-    ? allTodos 
-    : allTodos.filter(todo => todo.tags.includes(selectedTag)), [selectedTag, allTodos])
+  // 根据优先级获取文字颜色
+  const getPriorityTextColor = (priority?: string) => {
+    switch (priority) {
+      case 'high':
+        return 'text-gray-900 dark:text-gray-100 font-medium' // 高优先级：黑色，加粗
+      case 'medium':
+        return 'text-gray-600 dark:text-gray-400' // 中优先级：灰色
+      case 'low':
+        return 'text-gray-400 dark:text-gray-600' // 低优先级：浅灰色
+      default:
+        return 'text-gray-600 dark:text-gray-400' // 默认为中优先级
+    }
+  }
+
+  // 根据选中的标签筛选todos，并按优先级排序
+  const displayTodos = useMemo(() => {
+    const filtered = selectedTag === 'all' 
+      ? allTodos 
+      : allTodos.filter(todo => todo.tags.includes(selectedTag))
+    
+    // 按优先级排序：高 > 中 > 低，然后按完成状态排序
+    return filtered.sort((a, b) => {
+      // 首先按完成状态排序，未完成的在前
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1
+      }
+      
+      // 然后按优先级排序：高 > 中 > 低
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      const aPriority = a.priority ? priorityOrder[a.priority as keyof typeof priorityOrder] || 2 : 2 // 默认为中优先级
+      const bPriority = b.priority ? priorityOrder[b.priority as keyof typeof priorityOrder] || 2 : 2 // 默认为中优先级
+      return bPriority - aPriority
+    })
+  }, [selectedTag, allTodos])
 
   const loadTodos = async () => {
     setIsLoading(true)
@@ -466,7 +562,12 @@ const TodoList = React.memo(function TodoList({
               {displayTodos.map((todo) => (
                 <div
                   key={todo.id}
-                  className="p-2 rounded border bg-card hover:bg-accent/50 transition-colors"
+                  className={cn(
+                    "p-2 rounded border bg-card hover:bg-accent/50 transition-colors",
+                    todo.priority === 'high' && "border-l-4 border-l-red-500",
+                    todo.priority === 'medium' && "border-l-4 border-l-yellow-500",
+                    todo.priority === 'low' && "border-l-4 border-l-gray-400"
+                  )}
                 >
                   {editingTodo === todo.id ? (
                     // 编辑模式
@@ -537,7 +638,7 @@ const TodoList = React.memo(function TodoList({
                         <label
                           className={cn(
                              "text-sm block cursor-pointer hover:bg-accent/50 p-1 rounded transition-colors",
-                             todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                             todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority)
                            )}
                           onClick={() => onShowTodoDetail({
                             id: todo.id,
@@ -591,7 +692,7 @@ const TodoList = React.memo(function TodoList({
                           <MoreVertical className="h-3 w-3" />
                         </Button>
                         {menuOpenTodo === todo.id && (
-                          <div className="todo-menu absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[80px]">
+                          <div className="todo-menu absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[120px]">
                             <Button
                               size="sm"
                               variant="ghost"
@@ -605,6 +706,42 @@ const TodoList = React.memo(function TodoList({
                               <Edit className="h-3 w-3 mr-1" />
                               编辑
                             </Button>
+                            <div className="border-t my-1"></div>
+                            <div className="px-2 py-1 text-xs text-muted-foreground">优先级</div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                onUpdateTodo(todo.id, { priority: 'high' })
+                                setMenuOpenTodo(null)
+                              }}
+                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'high' ? 'bg-accent' : ''}`}
+                            >
+                              高优先级
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                onUpdateTodo(todo.id, { priority: 'medium' })
+                                setMenuOpenTodo(null)
+                              }}
+                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'medium' || !todo.priority ? 'bg-accent' : ''}`}
+                            >
+                              中优先级
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                onUpdateTodo(todo.id, { priority: 'low' })
+                                setMenuOpenTodo(null)
+                              }}
+                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'low' ? 'bg-accent' : ''}`}
+                            >
+                              低优先级
+                            </Button>
+                            <div className="border-t my-1"></div>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -906,18 +1043,20 @@ export default function NotePad() {
   const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
   const [todoDueDate, setTodoDueDate] = useState('')
   const [todoStartDate, setTodoStartDate] = useState('')
-  const [todosByDate, setTodosByDate] = useState<Record<string, Array<{ 
+  const [todosByDate, setTodosByDate] = useState<Record<string, Array<{
     id: string; 
     content: string; 
     completed: boolean;
     tags: string[];
     dueDate?: string;
     startDate?: string;
+    priority?: 'low' | 'medium' | 'high';
   }>>>({})
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [currentTag, setCurrentTag] = useState<string>("") // 当前搜索的标签
+  const [selectedTag, setSelectedTag] = useState<string>('all') // 目标列表选中的标签
   const [selectedImage, setSelectedImage] = useState<string | null>(null) // 选择的图片
   const [isLoggedIn, setIsLoggedIn] = useState(false) // 用户登录状态
   const [isLargeCalendarOpen, setIsLargeCalendarOpen] = useState(false) // 大日历弹窗状态
@@ -925,6 +1064,9 @@ export default function NotePad() {
   const [isExporting, setIsExporting] = useState(false) // 导出状态
   const [isImporting, setIsImporting] = useState(false) // 导入状态
   const [searchHistory, setSearchHistory] = useState<string[]>([]) // 搜索历史记录
+  const [tagNoteInput, setTagNoteInput] = useState('') // 标签页面的笔记输入
+  const [tagProgressInput, setTagProgressInput] = useState(0) // 标签页面的进度输入
+  const [isTagNoteAdding, setIsTagNoteAdding] = useState(false) // 标签页面添加笔记状态
   
   // Memoized button disabled states to optimize performance
   const isMainButtonDisabled = useMemo(() => {
@@ -2765,6 +2907,75 @@ export default function NotePad() {
   }
   
   // extractTagsAndCleanContent函数已移到组件外部
+  
+  // 标签页面添加笔记函数
+  const handleTagAddNote = async () => {
+    if (!tagNoteInput.trim() && tagProgressInput === 0) return
+
+    setIsTagNoteAdding(true)
+    try {
+      let noteContent = tagNoteInput.trim()
+      
+      // 获取当前标签的目标设置
+      const tagResponse = await tagContentsApi.get(currentTag)
+      const tagData = tagResponse.data
+      
+      // 如果有进度输入且标签启用了目标功能，添加进度文字并更新进度
+      if (tagProgressInput > 0 && tagData?.isGoalEnabled) {
+        const progressText = `增加进度${tagProgressInput}`
+        noteContent = noteContent ? `${noteContent} ${progressText}` : progressText
+        
+        // 更新当前进度
+        const newCurrentCount = (tagData.currentCount || 0) + tagProgressInput
+        
+        // 保存更新的进度到标签内容
+        await tagContentsApi.save(currentTag, tagData.content || '', {
+          isGoalEnabled: tagData.isGoalEnabled,
+          targetCount: tagData.targetCount || 1,
+          currentCount: newCurrentCount
+        })
+        
+        // 触发标签内容更新事件，让TagContent组件立即刷新
+        window.dispatchEvent(new CustomEvent(`tag-updated-${currentTag}`))
+        
+        // 触发目标列表刷新事件
+        window.dispatchEvent(new CustomEvent('goals-list-refresh'))
+      }
+      
+      // 添加标签到笔记内容
+      if (!noteContent.includes(`#${currentTag}`)) {
+        noteContent = `${noteContent} #${currentTag}`
+      }
+      
+      // 调用添加笔记的API
+      const result = await addNote(noteContent, new Date().toISOString())
+      
+      if (result.success) {
+        // 清空输入
+        setTagNoteInput('')
+        setTagProgressInput(0)
+        
+        // 重新加载笔记
+        await handleSearch(`#${currentTag}`)
+        
+        toast({
+          title: "添加成功",
+          description: "笔记已保存到服务器",
+        })
+      } else {
+        throw new Error(result.error || '添加笔记失败')
+      }
+    } catch (error) {
+      console.error('Error adding tag note:', error)
+      toast({
+        title: "添加失败",
+        description: "添加笔记失败，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTagNoteAdding(false)
+    }
+  }
    
    const handleToggleTodo = async (todoId: string) => {
     try {
@@ -2845,13 +3056,14 @@ export default function NotePad() {
     }
   }
 
-  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string }) => {
+  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => {
     try {
       // 调用后端API更新todo
       const updateData: any = {}
       if (updates.content !== undefined) updateData.text = updates.content
       if (updates.startDate !== undefined) updateData.startDate = updates.startDate
       if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate
+      if (updates.priority !== undefined) updateData.priority = updates.priority
       
       const result = await apiClient.updateTodo(todoId, updateData)
       if (result.success) {
@@ -3109,6 +3321,7 @@ export default function NotePad() {
           tags: string[];
           dueDate?: string;
           startDate?: string;
+          priority?: 'low' | 'medium' | 'high';
         }>> = {}
         
         response.data.todos.forEach((todo: any) => {
@@ -3122,7 +3335,8 @@ export default function NotePad() {
             completed: todo.completed || false,
             tags: todo.tags || [],
             dueDate: todo.dueDate,
-            startDate: todo.startDate
+            startDate: todo.startDate,
+            priority: todo.priority
           })
         })
         
@@ -3240,6 +3454,11 @@ export default function NotePad() {
               {/* 倒计日区域 */}
               <div className="p-4 border-b">
                 <CountdownList />
+              </div>
+              
+              {/* 目标区域 */}
+              <div className="p-4 border-b">
+                <GoalsList onTagSelect={setSelectedTag} />
               </div>
             </div>
             )}
@@ -3386,36 +3605,40 @@ export default function NotePad() {
                   
                   {/* 右侧：可滚动的有日期笔记区域 */}
                   <div className="flex-1 flex flex-col">
-                    {/* 标签搜索时的简化笔记输入区域 - 只在右侧显示 */}
-                    {searchTerm.startsWith('#') && (
-                      <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
-                        <div className="flex items-center space-x-2">
-                          <Textarea
-                            value={inputValue}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            placeholder={`输入新笔记... ( ${searchTerm})`}
-                            className="flex-1 min-h-[60px] resize-none font-mono text-sm"
-                            disabled={isAdding}
-                          />
-                          <Button 
-                            onClick={handleAddNote} 
-                            disabled={isSearchButtonDisabled} 
-                            size="sm" 
-                            className="h-[60px] px-4"
-                          >
-                            {isAdding ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                                <span>保存中</span>
-                              </>
-                            ) : (
-                              <span>添加笔记</span>
-                            )}
-                          </Button>
-                        </div>
+                    {/* 标签页面的笔记输入区域 - 在右侧笔记列表顶部 */}
+                    <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
+                      <div className="flex items-center space-x-2">
+                        <Textarea
+                          value={tagNoteInput}
+                          onChange={(e) => setTagNoteInput(e.target.value)}
+                          placeholder={`输入新笔记... (#${currentTag})`}
+                          className="flex-1 min-h-[60px] resize-none font-mono text-sm"
+                          disabled={isTagNoteAdding}
+                        />
+                        {/* 进度输入框 - 需要动态检查当前标签是否启用目标功能 */}
+                         <TagProgressInputField 
+                           currentTag={currentTag}
+                           progressInput={tagProgressInput}
+                           setProgressInput={setTagProgressInput}
+                           isAdding={isTagNoteAdding}
+                         />
+                        <Button 
+                          onClick={handleTagAddNote} 
+                          disabled={isTagNoteAdding || (!tagNoteInput.trim() && tagProgressInput === 0)} 
+                          size="sm" 
+                          className="h-[60px] px-4"
+                        >
+                          {isTagNoteAdding ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                              <span>保存中</span>
+                            </>
+                          ) : (
+                            <span>添加笔记</span>
+                          )}
+                        </Button>
                       </div>
-                    )}
+                    </div>
                     <div className="flex-1 overflow-y-auto">
                       <div className="p-4">
                         {isLoading || isSearching ? (

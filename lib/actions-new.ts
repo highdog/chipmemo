@@ -19,6 +19,10 @@ export interface TodoItem {
   id: string;
   content: string;
   completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  tags?: string[];
+  dueDate?: string;
+  startDate?: string;
 }
 
 // 将后端API的Note转换为前端Note格式
@@ -65,6 +69,7 @@ function parseTodos(content: string): TodoItem[] {
         id: `todo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: todoContent,
         completed: false,
+        priority: 'medium', // 默认中等优先级
       });
     }
   }

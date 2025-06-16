@@ -16,6 +16,21 @@ const tagContentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  // 目标设置相关字段
+  isGoalEnabled: {
+    type: Boolean,
+    default: false
+  },
+  targetCount: {
+    type: Number,
+    default: 0,
+    min: [0, 'Target count cannot be negative']
+  },
+  currentCount: {
+    type: Number,
+    default: 0,
+    min: [0, 'Current count cannot be negative']
   }
 }, {
   timestamps: true

@@ -279,8 +279,9 @@ class ApiClient {
     return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
   }
 
-  async saveTagContent(tag: string, content: string): Promise<ApiResponse<{ tag: string; content: string; updatedAt: string }>> {
-    return this.put<{ tag: string; content: string; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, { content });
+  async saveTagContent(tag: string, content: string, goalSettings?: { isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>> {
+    const data = { content, ...goalSettings };
+    return this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, data);
   }
 
   async deleteTagContent(tag: string): Promise<ApiResponse<{ message: string }>> {
@@ -442,7 +443,7 @@ export const todosApi = {
 
 export const tagContentsApi = {
   get: (tag: string) => apiClient.getTagContent(tag),
-  save: (tag: string, content: string) => apiClient.saveTagContent(tag, content),
+  save: (tag: string, content: string, goalSettings?: { isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }) => apiClient.saveTagContent(tag, content, goalSettings),
   delete: (tag: string) => apiClient.deleteTagContent(tag),
   getAll: () => apiClient.getAllTagContents(),
 };

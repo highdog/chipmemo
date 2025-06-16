@@ -35,10 +35,10 @@ const CountdownList: React.FC = () => {
           
           // 遍历所有日期的日程
           Object.entries(response.data).forEach(([dateKey, schedules]) => {
-            const scheduleDate = new Date(dateKey)
+            const scheduleDate = startOfDay(new Date(dateKey))
             
-            // 只处理今天及未来的日程
-            if (isToday(scheduleDate) || isAfter(scheduleDate, today)) {
+            // 只处理未来的日程（不包括今天）
+            if (isAfter(scheduleDate, today)) {
               const daySchedules = schedules as ScheduleItem[]
               
               daySchedules.forEach(schedule => {
@@ -120,7 +120,7 @@ const CountdownList: React.FC = () => {
         <h3 className="font-medium text-sm">倒计日</h3>
       </div>
       
-      <div className="space-y-2 max-h-48 overflow-y-auto">
+      <div className="space-y-1 max-h-48 overflow-y-auto">
         {upcomingSchedules.length === 0 ? (
           <div className="text-center py-4 text-sm text-muted-foreground">
             暂无未来日程安排

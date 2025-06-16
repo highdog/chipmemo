@@ -32,7 +32,10 @@ router.get('/:tag', [
         data: {
           tag: tag,
           content: `这是关于 #${tag} 标签的基本内容。点击编辑按钮来自定义这个内容。`,
-          isDefault: true
+          isDefault: true,
+          isGoalEnabled: false,
+          targetCount: 0,
+          currentCount: 0
         }
       });
     }
@@ -43,6 +46,9 @@ router.get('/:tag', [
         tag: tagContent.tag,
         content: tagContent.content,
         isDefault: false,
+        isGoalEnabled: tagContent.isGoalEnabled || false,
+        targetCount: tagContent.targetCount || 0,
+        currentCount: tagContent.currentCount || 0,
         updatedAt: tagContent.updatedAt
       }
     });
@@ -57,7 +63,10 @@ router.get('/:tag', [
 // @access  Private
 router.put('/:tag', [
   param('tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Tag must be between 1 and 50 characters'),
-  body('content').isString().isLength({ min: 1, max: 100000 }).withMessage('Content must be between 1 and 100000 characters')
+  body('content').isString().isLength({ min: 1, max: 100000 }).withMessage('Content must be between 1 and 100000 characters'),
+  body('isGoalEnabled').optional().isBoolean().withMessage('isGoalEnabled must be a boolean'),
+  body('targetCount').optional().isInt({ min: 0 }).withMessage('targetCount must be a non-negative integer'),
+  body('currentCount').optional().isInt({ min: 0 }).withMessage('currentCount must be a non-negative integer')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -66,11 +75,17 @@ router.put('/:tag', [
     }
 
     const { tag } = req.params;
-    const { content } = req.body;
+    const { content, isGoalEnabled, targetCount, currentCount } = req.body;
+
+    // 构建更新对象
+    const updateData = { content };
+    if (isGoalEnabled !== undefined) updateData.isGoalEnabled = isGoalEnabled;
+    if (targetCount !== undefined) updateData.targetCount = targetCount;
+    if (currentCount !== undefined) updateData.currentCount = currentCount;
 
     const tagContent = await TagContent.findOneAndUpdate(
       { userId: req.user._id, tag: tag },
-      { content: content },
+      updateData,
       { new: true, upsert: true, runValidators: true }
     );
 
@@ -79,6 +94,9 @@ router.put('/:tag', [
       data: {
         tag: tagContent.tag,
         content: tagContent.content,
+        isGoalEnabled: tagContent.isGoalEnabled || false,
+        targetCount: tagContent.targetCount || 0,
+        currentCount: tagContent.currentCount || 0,
         updatedAt: tagContent.updatedAt
       }
     });
@@ -196,7 +214,10 @@ router.get('/', async (req, res) => {
       data: tagContents.map(tc => ({
         tag: tc.tag,
         content: tc.content,
-        updatedAt: tc.updatedAt
+        updatedAt: tc.updatedAt,
+        isGoalEnabled: tc.isGoalEnabled || false,
+        targetCount: tc.targetCount || 0,
+        currentCount: tc.currentCount || 0
       }))
     });
   } catch (error) {
