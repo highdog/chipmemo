@@ -254,9 +254,32 @@ const TodoList = React.memo(function TodoList({
 
   // 根据选中的标签筛选todos，并按优先级排序
   const displayTodos = useMemo(() => {
-    const filtered = selectedTag === 'all' 
-      ? allTodos 
-      : allTodos.filter(todo => todo.tags.includes(selectedTag))
+    let filtered
+    
+    if (selectedTag === 'focus') {
+      // 专注模式：只显示一个优先级最高的未完成todo
+      const incompleteTodos = allTodos.filter(todo => !todo.completed)
+      
+      if (incompleteTodos.length === 0) {
+        return []
+      }
+      
+      // 按优先级排序：高 > 中 > 低
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      const sortedTodos = incompleteTodos.sort((a, b) => {
+        const aPriority = a.priority ? priorityOrder[a.priority] || 2 : 2
+        const bPriority = b.priority ? priorityOrder[b.priority] || 2 : 2
+        return bPriority - aPriority
+      })
+      
+      // 只返回第一个（优先级最高的）
+      return [sortedTodos[0]]
+    } else {
+      // 其他模式：正常筛选
+      filtered = selectedTag === 'all' 
+        ? allTodos 
+        : allTodos.filter(todo => todo.tags.includes(selectedTag))
+    }
     
     // 按优先级排序：高 > 中 > 低，然后按完成状态排序
     return filtered.sort((a, b) => {
@@ -406,6 +429,17 @@ const TodoList = React.memo(function TodoList({
             >
               All
             </button>
+            <button
+              onClick={() => setSelectedTag('focus')}
+              className={cn(
+                "px-2 py-1 text-xs rounded border transition-colors",
+                selectedTag === 'focus' 
+                  ? "bg-orange-500 text-white border-orange-500" 
+                  : "bg-background text-muted-foreground border-border hover:bg-accent"
+              )}
+            >
+              专注
+            </button>
             {allTags.map((tag) => (
               <button
                 key={tag}
@@ -427,8 +461,8 @@ const TodoList = React.memo(function TodoList({
       {/* 可滚动的Todo列表区域 */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
-          {/* 添加新Todo按钮 - 仅在选择了特定标签时显示 */}
-          {selectedTag !== 'all' && (
+          {/* 添加新Todo按钮 - 仅在选择了特定标签时显示，但不包括专注模式 */}
+          {selectedTag !== 'all' && selectedTag !== 'focus' && (
             <div className="mb-3">
               <Button
                 onClick={() => setNewTodoTag(selectedTag)}
@@ -560,6 +594,18 @@ const TodoList = React.memo(function TodoList({
             </div>
           ) : displayTodos.length > 0 ? (
             <div className="space-y-2">
+              {/* 专注模式提示 */}
+              {selectedTag === 'focus' && (
+                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">专注模式：当前最重要的任务</span>
+                  </div>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    完成这个任务后，系统会自动显示下一个优先级最高的任务
+                  </p>
+                </div>
+              )}
               {displayTodos.map((todo) => (
                 <div
                   key={todo.id}
@@ -567,7 +613,8 @@ const TodoList = React.memo(function TodoList({
                     "p-2 rounded border bg-card hover:bg-accent/50 transition-colors",
                     todo.priority === 'high' && "border-l-4 border-l-red-500",
                     todo.priority === 'medium' && "border-l-4 border-l-yellow-500",
-                    todo.priority === 'low' && "border-l-4 border-l-gray-400"
+                    todo.priority === 'low' && "border-l-4 border-l-gray-400",
+                    selectedTag === 'focus' && "ring-2 ring-orange-200 dark:ring-orange-800 bg-orange-50/50 dark:bg-orange-950/10"
                   )}
                 >
                   {editingTodo === todo.id ? (
@@ -767,7 +814,20 @@ const TodoList = React.memo(function TodoList({
             </div>
           ) : (
             <div className="text-center py-4 text-sm text-muted-foreground">
-              暂无Todo事项
+              {selectedTag === 'focus' ? (
+                <div className="space-y-2">
+                  <div className="text-green-600 dark:text-green-400 font-medium">
+                    🎉 太棒了！
+                  </div>
+                  <div>
+                    所有任务都已完成，可以休息一下了
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  暂无Todo事项
+                </div>
+              )}
             </div>
           )}
         </div>
