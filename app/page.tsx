@@ -200,6 +200,7 @@ const TodoList = React.memo(function TodoList({
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
   const [newTodoTag, setNewTodoTag] = useState<string | null>(null)
   const [newTodoContent, setNewTodoContent] = useState('')
+  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium')
 
   const selectedDateObj = new Date(selectedDate)
   
@@ -494,13 +495,15 @@ const TodoList = React.memo(function TodoList({
                         try {
                           const todoResult = await apiClient.createTodo({
                              text: newTodoContent.trim(),
-                             tags: [newTodoTag]
+                             tags: [newTodoTag],
+                             priority: newTodoPriority
                            })
                           
                           if (!todoResult.error) {
                             await onLoadTodos()
                             setNewTodoContent('')
                             setNewTodoTag(null)
+                            setNewTodoPriority('medium')
                             toast({
                               title: "成功",
                               description: "Todo已添加",
@@ -523,10 +526,50 @@ const TodoList = React.memo(function TodoList({
                       } else if (e.key === 'Escape') {
                         setNewTodoTag(null)
                         setNewTodoContent('')
+                        setNewTodoPriority('medium')
                       }
                     }}
                     autoFocus
                   />
+                  {/* 优先级选择器 */}
+                  <div className="mb-2">
+                    <label className="text-xs text-muted-foreground mb-1 block">优先级:</label>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setNewTodoPriority('high')}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded border transition-colors",
+                          newTodoPriority === 'high'
+                            ? "bg-red-500 text-white border-red-500"
+                            : "bg-background text-muted-foreground border-border hover:bg-accent"
+                        )}
+                      >
+                        高
+                      </button>
+                      <button
+                        onClick={() => setNewTodoPriority('medium')}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded border transition-colors",
+                          newTodoPriority === 'medium'
+                            ? "bg-yellow-500 text-white border-yellow-500"
+                            : "bg-background text-muted-foreground border-border hover:bg-accent"
+                        )}
+                      >
+                        中
+                      </button>
+                      <button
+                        onClick={() => setNewTodoPriority('low')}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded border transition-colors",
+                          newTodoPriority === 'low'
+                            ? "bg-gray-500 text-white border-gray-500"
+                            : "bg-background text-muted-foreground border-border hover:bg-accent"
+                        )}
+                      >
+                        低
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex gap-1">
                     <Button
                       size="sm"
@@ -537,13 +580,15 @@ const TodoList = React.memo(function TodoList({
                           try {
                             const todoResult = await apiClient.createTodo({
                                text: newTodoContent.trim(),
-                               tags: [newTodoTag]
+                               tags: [newTodoTag],
+                               priority: newTodoPriority
                              })
                             
                             if (!todoResult.error) {
                               await onLoadTodos()
                               setNewTodoContent('')
                               setNewTodoTag(null)
+                              setNewTodoPriority('medium')
                               toast({
                                 title: "成功",
                                 description: "Todo已添加",
@@ -576,6 +621,7 @@ const TodoList = React.memo(function TodoList({
                       onClick={() => {
                         setNewTodoTag(null)
                         setNewTodoContent('')
+                        setNewTodoPriority('medium')
                       }}
                     >
                       <XCircle className="h-3 w-3 mr-1" />
@@ -1103,6 +1149,7 @@ export default function NotePad() {
   const [isAdding, setIsAdding] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
+  const [inputPriority, setInputPriority] = useState<'low' | 'medium' | 'high'>('medium') // 共用输入框的优先级
   const [todoDueDate, setTodoDueDate] = useState('')
   const [todoStartDate, setTodoStartDate] = useState('')
   const [todosByDate, setTodosByDate] = useState<Record<string, Array<{
@@ -2889,7 +2936,8 @@ export default function NotePad() {
         const todoResult = await apiClient.createTodo({
           text: cleanContent,
           tags,
-          dueDate: todoDueDate || undefined
+          dueDate: todoDueDate || undefined,
+          priority: inputPriority
         })
         
         if (!todoResult.error) {
@@ -2899,6 +2947,7 @@ export default function NotePad() {
           setInputValue('')
           setTodoDueDate('')
           setTodoStartDate('')
+          setInputPriority('medium')
           
           toast({
             title: "成功",
@@ -3553,7 +3602,10 @@ export default function NotePad() {
                     <Button
                       variant={inputMode === 'note' ? 'default' : 'ghost'}
                       size="sm"
-                      onClick={() => setInputMode('note')}
+                      onClick={() => {
+                        setInputMode('note')
+                        setInputPriority('medium')
+                      }}
                       className="h-6 px-2 text-xs"
                     >
                       笔记
@@ -3567,6 +3619,47 @@ export default function NotePad() {
                       Todo
                     </Button>
                   </div>
+                  {/* Todo模式下的优先级选择器 */}
+                  {inputMode === 'todo' && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">优先级:</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setInputPriority('high')}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded border transition-colors",
+                            inputPriority === 'high'
+                              ? "bg-red-500 text-white border-red-500"
+                              : "bg-background text-muted-foreground border-border hover:bg-accent"
+                          )}
+                        >
+                          高
+                        </button>
+                        <button
+                          onClick={() => setInputPriority('medium')}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded border transition-colors",
+                            inputPriority === 'medium'
+                              ? "bg-yellow-500 text-white border-yellow-500"
+                              : "bg-background text-muted-foreground border-border hover:bg-accent"
+                          )}
+                        >
+                          中
+                        </button>
+                        <button
+                          onClick={() => setInputPriority('low')}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded border transition-colors",
+                            inputPriority === 'low'
+                              ? "bg-gray-500 text-white border-gray-500"
+                              : "bg-background text-muted-foreground border-border hover:bg-accent"
+                          )}
+                        >
+                          低
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {/* 添加按钮移到这里 */}
                   <Button onClick={handleAddNote} disabled={isMainButtonDisabled} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (
