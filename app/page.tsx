@@ -1149,7 +1149,6 @@ export default function NotePad() {
   const [isAdding, setIsAdding] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
-  const [inputPriority, setInputPriority] = useState<'low' | 'medium' | 'high'>('medium') // 共用输入框的优先级
   const [todoDueDate, setTodoDueDate] = useState('')
   const [todoStartDate, setTodoStartDate] = useState('')
   const [todosByDate, setTodosByDate] = useState<Record<string, Array<{
@@ -2936,8 +2935,7 @@ export default function NotePad() {
         const todoResult = await apiClient.createTodo({
           text: cleanContent,
           tags,
-          dueDate: todoDueDate || undefined,
-          priority: inputPriority
+          dueDate: todoDueDate || undefined
         })
         
         if (!todoResult.error) {
@@ -2947,7 +2945,6 @@ export default function NotePad() {
           setInputValue('')
           setTodoDueDate('')
           setTodoStartDate('')
-          setInputPriority('medium')
           
           toast({
             title: "成功",
@@ -3602,10 +3599,7 @@ export default function NotePad() {
                     <Button
                       variant={inputMode === 'note' ? 'default' : 'ghost'}
                       size="sm"
-                      onClick={() => {
-                        setInputMode('note')
-                        setInputPriority('medium')
-                      }}
+                      onClick={() => setInputMode('note')}
                       className="h-6 px-2 text-xs"
                     >
                       笔记
@@ -3619,47 +3613,6 @@ export default function NotePad() {
                       Todo
                     </Button>
                   </div>
-                  {/* Todo模式下的优先级选择器 */}
-                  {inputMode === 'todo' && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-muted-foreground">优先级:</span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => setInputPriority('high')}
-                          className={cn(
-                            "px-2 py-1 text-xs rounded border transition-colors",
-                            inputPriority === 'high'
-                              ? "bg-red-500 text-white border-red-500"
-                              : "bg-background text-muted-foreground border-border hover:bg-accent"
-                          )}
-                        >
-                          高
-                        </button>
-                        <button
-                          onClick={() => setInputPriority('medium')}
-                          className={cn(
-                            "px-2 py-1 text-xs rounded border transition-colors",
-                            inputPriority === 'medium'
-                              ? "bg-yellow-500 text-white border-yellow-500"
-                              : "bg-background text-muted-foreground border-border hover:bg-accent"
-                          )}
-                        >
-                          中
-                        </button>
-                        <button
-                          onClick={() => setInputPriority('low')}
-                          className={cn(
-                            "px-2 py-1 text-xs rounded border transition-colors",
-                            inputPriority === 'low'
-                              ? "bg-gray-500 text-white border-gray-500"
-                              : "bg-background text-muted-foreground border-border hover:bg-accent"
-                          )}
-                        >
-                          低
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   {/* 添加按钮移到这里 */}
                   <Button onClick={handleAddNote} disabled={isMainButtonDisabled} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (

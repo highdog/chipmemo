@@ -242,81 +242,26 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
           </div>
         ) : (
           schedules.map((schedule) => (
-            <div key={schedule.id}>
-              {editingId === schedule.id ? (
-                /* 编辑表单 */
-                <div className="space-y-2 p-2 border rounded-md bg-muted/50">
-                  <Input
-                    placeholder="日程标题"
-                    value={editSchedule.title}
-                    onChange={(e) => setEditSchedule(prev => ({ ...prev, title: e.target.value }))}
-                    className="text-xs h-7"
-                  />
-                  <Input
-                    type="time"
-                    step="600"
-                    value={editSchedule.time}
-                    onChange={(e) => setEditSchedule(prev => ({ ...prev, time: e.target.value }))}
-                    className="text-xs h-7"
-                  />
-                  <Input
-                    type="date"
-                    value={editSchedule.date}
-                    onChange={(e) => setEditSchedule(prev => ({ ...prev, date: e.target.value }))}
-                    className="text-xs h-7"
-                  />
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      onClick={handleUpdateSchedule}
-                      className="h-6 px-2 text-xs"
-                      disabled={!editSchedule.title.trim() || !editSchedule.time.trim()}
-                    >
-                      <Check className="h-3 w-3 mr-1" />
-                      保存
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCancelEdit}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      取消
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                /* 日程显示 */
-                <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors group">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium text-primary">
-                      {schedule.time}
-                    </span>
-                    <span className="text-sm text-foreground">
-                      {schedule.title}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditSchedule(schedule)}
-                      className="h-6 w-6 p-0 hover:text-blue-600 flex-shrink-0"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteSchedule(schedule.id)}
-                      className="h-6 w-6 p-0 hover:text-destructive flex-shrink-0"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+            <div
+              key={schedule.id}
+              className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors group"
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-sm font-medium text-primary">
+                  {schedule.time}
+                </span>
+                <span className="text-sm text-foreground">
+                  {schedule.title}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteSchedule(schedule.id)}
+                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:text-destructive flex-shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           ))
         )}
