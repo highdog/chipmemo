@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Pencil, Save, X, Target, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { tagContentsApi } from "@/lib/api"
+import { tagContentsApi, apiClient } from "@/lib/api"
 
 
 interface TagContentProps {
@@ -30,6 +30,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   const [isGoalEnabled, setIsGoalEnabled] = useState(false)
   const [targetCount, setTargetCount] = useState(10)
   const [currentCount, setCurrentCount] = useState(0)
+  const [checkedBoxes, setCheckedBoxes] = useState<boolean[]>([])
   
 
 
@@ -44,12 +45,19 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         setIsGoalEnabled(response.data.isGoalEnabled || false)
         setTargetCount(response.data.targetCount || 0)
         setCurrentCount(response.data.currentCount || 0)
+        // 初始化勾选框状态
+        const boxes = new Array(response.data.targetCount || 0).fill(false)
+        for (let i = 0; i < (response.data.currentCount || 0); i++) {
+          boxes[i] = true
+        }
+        setCheckedBoxes(boxes)
       } else {
         // 如果没有找到内容，设置默认内容
         setContent(`这是关于 #${tag} 标签的基本内容。点击编辑按钮来自定义这个内容。`)
         setIsGoalEnabled(false)
         setTargetCount(0)
         setCurrentCount(0)
+        setCheckedBoxes([])
       }
     } catch (error) {
       console.error('Error loading tag content:', error)
@@ -57,6 +65,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       setIsGoalEnabled(false)
       setTargetCount(0)
       setCurrentCount(0)
+      setCheckedBoxes([])
       toast.error('加载标签内容失败')
     } finally {
       setIsLoading(false)
@@ -151,6 +160,74 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     loadOriginalContent()
     setIsEditing(false)
   }
+
+  // 处理勾选框点击
+  const handleCheckboxClick = async (index: number) => {
+    if (!isGoalEnabled) return
+    
+    const newCheckedBoxes = [...checkedBoxes]
+    const wasChecked = newCheckedBoxes[index]
+    
+    // 切换勾选状态
+    newCheckedBoxes[index] = !wasChecked
+    setCheckedBoxes(newCheckedBoxes)
+    
+    // 计算新的进度
+    const newCurrentCount = newCheckedBoxes.filter(Boolean).length
+    setCurrentCount(newCurrentCount)
+    
+    try {
+      // 保存进度到后端
+      const goalSettings = {
+        isGoalEnabled,
+        targetCount,
+        currentCount: newCurrentCount
+      }
+      
+      await tagContentsApi.save(tag, content, goalSettings)
+      
+      // 如果是勾选（进度+1），自动创建笔记
+      if (!wasChecked) {
+        const noteTitle = `${tag} 目标进度 +1`
+        const noteContent = `完成了 #${tag} 标签的一个目标项目，当前进度：${newCurrentCount}/${targetCount}`
+        
+        await apiClient.createNote({
+          title: noteTitle,
+          content: noteContent,
+          tags: [tag],
+          color: '#3b82f6'
+        })
+        
+        toast.success(`进度 +1，已自动创建笔记`)
+      } else {
+        toast.success(`进度已更新：${newCurrentCount}/${targetCount}`)
+      }
+      
+      // 触发目标列表刷新
+      window.dispatchEvent(new CustomEvent('goals-list-refresh'))
+      
+    } catch (error) {
+      console.error('更新进度失败:', error)
+      // 回滚状态
+      newCheckedBoxes[index] = wasChecked
+      setCheckedBoxes(newCheckedBoxes)
+      setCurrentCount(checkedBoxes.filter(Boolean).length)
+      toast.error('更新进度失败')
+    }
+  }
+
+  // 当目标数量改变时，更新勾选框数组
+  useEffect(() => {
+    if (isGoalEnabled) {
+      const newBoxes = new Array(targetCount).fill(false)
+      for (let i = 0; i < Math.min(currentCount, targetCount); i++) {
+        newBoxes[i] = true
+      }
+      setCheckedBoxes(newBoxes)
+    } else {
+      setCheckedBoxes([])
+    }
+  }, [targetCount, isGoalEnabled])
 
 
 
@@ -270,11 +347,38 @@ export function TagContent({ tag, onSave }: TagContentProps) {
             />
           </div>
         ) : (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col gap-4">
             <div 
               className="prose prose-sm max-w-none flex-1 overflow-y-auto" 
               dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} 
             />
+            
+            {/* 目标进度勾选框区域 */}
+            {isGoalEnabled && targetCount > 0 && (
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">目标进度</span>
+                  <span className="text-xs text-gray-500">({currentCount}/{targetCount})</span>
+                </div>
+                <div className="grid grid-cols-10 gap-2">
+                  {Array.from({ length: targetCount }, (_, index) => (
+                    <div key={index} className="flex flex-col items-center">
+                      <Checkbox
+                        id={`goal-checkbox-${tag}-${index}`}
+                        checked={checkedBoxes[index] || false}
+                        onCheckedChange={() => handleCheckboxClick(index)}
+                        className="h-5 w-5"
+                      />
+                      <span className="text-xs text-gray-400 mt-1">{index + 1}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  点击勾选框来更新进度，每次勾选会自动创建一条进度笔记
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
