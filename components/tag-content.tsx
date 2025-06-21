@@ -163,10 +163,23 @@ export function TagContent({ tag, onSave }: TagContentProps) {
 
   // 处理勾选框点击
   const handleCheckboxClick = async (index: number) => {
-    if (!isGoalEnabled) return
+    console.log('🎯 [勾选框] 点击勾选框，索引:', index)
+    
+    if (!isGoalEnabled) {
+      console.log('❌ [勾选框] 目标功能未启用')
+      return
+    }
     
     const newCheckedBoxes = [...checkedBoxes]
     const wasChecked = newCheckedBoxes[index]
+    
+    console.log('📊 [勾选框] 当前状态:', {
+      index,
+      wasChecked,
+      tag,
+      targetCount,
+      currentCount
+    })
     
     // 切换勾选状态
     newCheckedBoxes[index] = !wasChecked
@@ -176,6 +189,11 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     const newCurrentCount = newCheckedBoxes.filter(Boolean).length
     setCurrentCount(newCurrentCount)
     
+    console.log('🔄 [勾选框] 更新后状态:', {
+      newCurrentCount,
+      willCreateNote: !wasChecked
+    })
+    
     try {
       // 保存进度到后端
       const goalSettings = {
@@ -184,39 +202,58 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         currentCount: newCurrentCount
       }
       
-      await tagContentsApi.save(tag, content, goalSettings)
+      console.log('💾 [勾选框] 保存进度设置:', goalSettings)
+      const saveResult = await tagContentsApi.save(tag, content, goalSettings)
+      console.log('✅ [勾选框] 进度保存成功:', saveResult)
       
       // 如果是勾选（进度+1），自动创建笔记
       if (!wasChecked) {
         const noteTitle = `${tag} 目标进度 +1`
         const noteContent = `完成了 #${tag} 标签的一个目标项目，当前进度：${newCurrentCount}/${targetCount}`
         
-        await apiClient.createNote({
+        const noteData = {
           title: noteTitle,
           content: noteContent,
           tags: [tag],
-          color: '#3b82f6'
-        })
+          color: 'blue'
+        }
+        
+        console.log('📝 [勾选框] 准备创建笔记:', noteData)
+        
+        const createResult = await apiClient.createNote(noteData)
+        console.log('✅ [勾选框] 笔记创建成功:', createResult)
         
         toast.success(`进度 +1，已自动创建笔记`)
+        
+        // 触发笔记列表刷新，传递当前标签信息
+        window.dispatchEvent(new CustomEvent('notes-refresh', {
+          detail: { currentTag: tag }
+        }))
       } else {
+        console.log('📝 [勾选框] 取消勾选，不创建笔记')
         toast.success(`进度已更新：${newCurrentCount}/${targetCount}`)
       }
       
       // 触发目标列表刷新
       window.dispatchEvent(new CustomEvent('goals-list-refresh'))
       
-    } catch (error) {
-      console.error('更新进度失败:', error)
+    } catch (error: any) {
+      console.error('❌ [勾选框] 操作失败:', error)
+      console.error('❌ [勾选框] 错误详情:', {
+        message: error?.message,
+        stack: error?.stack,
+        response: error?.response
+      })
+      
       // 回滚状态
       newCheckedBoxes[index] = wasChecked
       setCheckedBoxes(newCheckedBoxes)
       setCurrentCount(checkedBoxes.filter(Boolean).length)
-      toast.error('更新进度失败')
+      toast.error('更新进度失败: ' + (error?.message || '未知错误'))
     }
   }
 
-  // 当目标数量改变时，更新勾选框数组
+  // 当目标数量或当前进度改变时，更新勾选框数组
   useEffect(() => {
     if (isGoalEnabled) {
       const newBoxes = new Array(targetCount).fill(false)
@@ -227,7 +264,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     } else {
       setCheckedBoxes([])
     }
-  }, [targetCount, isGoalEnabled])
+  }, [targetCount, currentCount, isGoalEnabled])
 
 
 

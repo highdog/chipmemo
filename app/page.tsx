@@ -1241,6 +1241,47 @@ export default function NotePad() {
     }
   }, [])
 
+  // 监听笔记刷新事件
+  useEffect(() => {
+    const handleNotesRefresh = async (event: any) => {
+      console.log('📝 [HomePage] 收到笔记刷新事件，重新加载笔记列表')
+      
+      // 从事件中获取标签信息，如果没有则使用当前页面的标签状态
+      const eventTag = event.detail?.currentTag
+      const targetTag = eventTag || currentTag
+      
+      console.log('📝 [HomePage] 事件标签:', eventTag, '当前标签:', currentTag, '目标标签:', targetTag)
+      
+      // 如果有标签信息，则重新执行标签搜索
+      if (targetTag) {
+        console.log('📝 [HomePage] 重新加载标签笔记:', targetTag)
+        try {
+          const searchResult = await searchNotesByTag(targetTag, 1, 5000)
+          setNotes(searchResult.notes)
+          setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
+          // 如果事件传递了标签但当前页面标签状态不一致，更新当前标签状态
+          if (eventTag && eventTag !== currentTag) {
+            setCurrentTag(eventTag)
+          }
+        } catch (error) {
+          console.error('📝 [HomePage] 标签笔记刷新失败:', error)
+          // 如果标签搜索失败，回退到加载全部笔记
+          loadNotes()
+        }
+      } else {
+        // 没有标签筛选，加载全部笔记
+        console.log('📝 [HomePage] 加载全部笔记')
+        loadNotes()
+      }
+    }
+
+    window.addEventListener('notes-refresh', handleNotesRefresh)
+    
+    return () => {
+      window.removeEventListener('notes-refresh', handleNotesRefresh)
+    }
+  }, []) // 空依赖数组，直接调用 loadNotes 避免依赖问题
+
   // 按日期分组笔记
   const groupNotesByDate = (notes: Note[]) => {
     const groups: { [key: string]: Note[] } = {}
