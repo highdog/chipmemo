@@ -398,16 +398,16 @@ export function TagContent({ tag, onSave }: TagContentProps) {
                   <span className="text-sm font-medium text-gray-700">目标进度</span>
                   <span className="text-xs text-gray-500">({currentCount}/{targetCount})</span>
                 </div>
-                <div className="grid grid-cols-10 gap-2">
+                <div className="grid grid-cols-12 gap-1">
                   {Array.from({ length: targetCount }, (_, index) => (
                     <div key={index} className="flex flex-col items-center">
                       <Checkbox
                         id={`goal-checkbox-${tag}-${index}`}
                         checked={checkedBoxes[index] || false}
                         onCheckedChange={() => handleCheckboxClick(index)}
-                        className="h-5 w-5"
+                        className="h-4 w-4"
                       />
-                      <span className="text-xs text-gray-400 mt-1">{index + 1}</span>
+                      <span className="text-xs text-gray-400 mt-0.5">{index + 1}</span>
                     </div>
                   ))}
                 </div>
