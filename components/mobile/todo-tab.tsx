@@ -8,8 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TabsContent } from "@/components/ui/tabs"
-import { Plus, Tag } from "lucide-react"
-import { todosApi } from "@/lib/api"
+import { Plus, Tag, Trash2 } from "lucide-react"
+import { todosApi, notesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Todo, TagContent, TodoTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
@@ -23,6 +23,8 @@ export function TodoTab({ user }: TodoTabProps) {
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [selectedTag, setSelectedTag] = useState("All")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null)
+  const [isDeletingTodo, setIsDeletingTodo] = useState(false)
 
   // 加载待办数据
   const loadTodos = useCallback(async () => {
@@ -95,14 +97,22 @@ export function TodoTab({ user }: TodoTabProps) {
     return contents
   }, [todos])
 
-  // 过滤待办
+  // 过滤和排序待办
   const filteredTodos = useMemo(() => {
-    if (selectedTag === "All") {
-      return todos
+    let filtered = todos
+    if (selectedTag !== "All") {
+      filtered = todos.filter(todo => 
+        todo.tags && Array.isArray(todo.tags) && todo.tags.includes(selectedTag)
+      )
     }
-    return todos.filter(todo => 
-      todo.tags && Array.isArray(todo.tags) && todo.tags.includes(selectedTag)
-    )
+    
+    // 根据优先级排序：high > medium > low
+    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 }
+    return filtered.sort((a, b) => {
+      const aPriority = priorityOrder[a.priority] || 0
+      const bPriority = priorityOrder[b.priority] || 0
+      return bPriority - aPriority
+    })
   }, [todos, selectedTag])
 
   // 添加待办
@@ -135,24 +145,78 @@ export function TodoTab({ user }: TodoTabProps) {
       const todo = todos.find(t => t._id === todoId)
       if (!todo) return
       
-      await todosApi.update(todoId, {
-        ...todo,
-        completed: !todo.completed
-      })
-      await loadTodos()
+      // 如果todo从未完成变为完成，则删除todo并创建笔记
+      if (!todo.completed) {
+        // 创建笔记内容，包含原todo的内容和标签
+        const noteContent = todo.text + (todo.tags && todo.tags.length > 0 ? ' ' + todo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
+        
+        // 调用notesApi创建新笔记
+         const result = await notesApi.create({
+           title: todo.text.length > 50 ? todo.text.substring(0, 50) + '...' : todo.text,
+           content: noteContent,
+           tags: todo.tags || []
+         })
+        
+        if (result.success) {
+          // 创建笔记成功后，删除待办
+          const deleteResult = await todosApi.delete(todoId)
+          if (deleteResult.success) {
+            // 重新加载todos数据
+            await loadTodos()
+            toast({ title: "待办已完成并转换为笔记" })
+          } else {
+            toast({ title: "笔记已创建，但删除待办失败", variant: "destructive" })
+          }
+        } else {
+          toast({ title: "创建笔记失败", variant: "destructive" })
+        }
+      } else {
+        // 如果是从完成变为未完成，调用API切换状态
+        await todosApi.update(todoId, {
+          ...todo,
+          completed: !todo.completed
+        })
+        await loadTodos()
+        toast({ title: "待办状态已更新" })
+      }
     } catch (error) {
       console.error('Error toggling todo:', error)
       toast({ title: "更新待办失败", variant: "destructive" })
     }
   }
 
-  // 获取优先级颜色
-  const getPriorityColor = (priority: string) => {
+  // 删除待办
+  const deleteTodo = async (todoId: string) => {
+    setIsDeletingTodo(true)
+    try {
+      await todosApi.delete(todoId)
+      await loadTodos()
+      setSelectedTodoId(null)
+      toast({ title: "待办删除成功" })
+    } catch (error) {
+      console.error('Error deleting todo:', error)
+      toast({ title: "删除待办失败", variant: "destructive" })
+    } finally {
+      setIsDeletingTodo(false)
+    }
+  }
+
+  // 处理待办事项点击
+  const handleTodoClick = (todoId: string) => {
+    if (selectedTodoId === todoId) {
+      setSelectedTodoId(null)
+    } else {
+      setSelectedTodoId(todoId)
+    }
+  }
+
+  // 获取优先级勾选框颜色
+  const getPriorityCheckboxColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'border-l-red-500'
-      case 'medium': return 'border-l-yellow-500'
-      case 'low': return 'border-l-green-500'
-      default: return 'border-l-gray-300'
+      case 'high': return 'border-red-500 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500'
+      case 'medium': return 'border-yellow-500 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500'
+      case 'low': return 'border-green-500 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
+      default: return 'border-gray-300 data-[state=checked]:bg-gray-500 data-[state=checked]:border-gray-500'
     }
   }
 
@@ -227,17 +291,16 @@ export function TodoTab({ user }: TodoTabProps) {
         </div>
 
         {/* 标签筛选 */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           {tagContents.map((tag) => (
             <Button
               key={tag.name}
               variant={selectedTag === tag.name ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedTag(tag.name)}
-              className="text-xs"
+              className="text-xs px-2 py-1"
             >
-              <Tag className="h-3 w-3 mr-1" />
-              {tag.name} ({tag.count})
+              {tag.name}
             </Button>
           ))}
         </div>
@@ -253,18 +316,25 @@ export function TodoTab({ user }: TodoTabProps) {
           <div className="space-y-4">
             {filteredTodos.map((todo) => (
               <div key={todo._id}>
-                <div className="flex items-start gap-3 p-3">
+                <div 
+                  className="flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-lg"
+                  onClick={() => handleTodoClick(todo._id)}
+                >
                   <Checkbox
                     checked={todo.completed}
                     onCheckedChange={() => toggleTodo(todo._id)}
-                    className="mt-1"
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                      "mt-1 border-2",
+                      getPriorityCheckboxColor(todo.priority)
+                    )}
                   />
+                  
                   <div className="flex flex-1">
                     {/* 待办内容 */}
                     <div className="flex-1">
                       <div className={cn(
-                        "text-sm border-l-4 pl-3",
-                        getPriorityColor(todo.priority),
+                        "text-sm",
                         todo.completed && "line-through text-muted-foreground opacity-60"
                       )}>
                         {todo.text}
@@ -273,19 +343,22 @@ export function TodoTab({ user }: TodoTabProps) {
                     
                     {/* 标签 - 放在右侧 */}
                     {todo.tags && todo.tags.length > 0 && (
-                      <div className="flex flex-col items-end gap-1 ml-2 min-w-[80px]">
+                      <div className="flex flex-col items-end gap-0.5 ml-2 min-w-[80px]">
                         {todo.tags.slice(0, 3).map((tag, index) => (
                           <Badge 
                             key={index} 
                             variant="outline" 
-                            className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 transition-colors"
-                            onClick={() => setSelectedTag(tag)}
+                            className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 transition-colors px-1.5 py-0.5"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedTag(tag)
+                            }}
                           >
                             #{tag}
                           </Badge>
                         ))}
                         {todo.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs px-1.5 py-0.5">
                             +{todo.tags.length - 3}
                           </Badge>
                         )}
@@ -293,6 +366,22 @@ export function TodoTab({ user }: TodoTabProps) {
                     )}
                   </div>
                 </div>
+                
+                {/* 删除按钮 - 只在选中时显示 */}
+                {selectedTodoId === todo._id && (
+                  <div className="px-3 pb-3">
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => deleteTodo(todo._id)}
+                      disabled={isDeletingTodo}
+                      className="w-full flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {isDeletingTodo ? "删除中..." : "删除待办"}
+                    </Button>
+                  </div>
+                )}
                 
                 {/* 分割线 */}
                 <div className="border-b border-border/50 my-3" />
