@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,7 +25,9 @@ import {
   Trash2,
   Check,
   X,
-  Clock
+  Clock,
+  Sun,
+  Moon
 } from "lucide-react"
 import { 
   addNote,
@@ -86,8 +89,15 @@ interface TagContent {
 
 export default function MobilePage() {
   const { user, logout, loading } = useAuth()
+  const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("notes")
+  
+  // 控制输入区域显示状态
+  const [showNoteInput, setShowNoteInput] = useState(false)
+  const [showScheduleInput, setShowScheduleInput] = useState(false)
+  const [showTodoInput, setShowTodoInput] = useState(false)
+  const [showGoalInput, setShowGoalInput] = useState(false)
   
   // 笔记相关状态
   const [notes, setNotes] = useState<Note[]>([])
@@ -110,6 +120,9 @@ export default function MobilePage() {
   const [goals, setGoals] = useState<TagContent[]>([])
   const [newGoal, setNewGoal] = useState({ tag: "", content: "", targetCount: 0 })
   const [isAddingGoal, setIsAddingGoal] = useState(false)
+  
+  // 待办事项标签筛选
+  const [selectedTodoTag, setSelectedTodoTag] = useState<string>('All')
 
   // 加载数据 - 所有 useCallback 必须在条件返回之前
   const loadNotes = useCallback(async () => {
@@ -193,6 +206,31 @@ export default function MobilePage() {
     }
   }, [user, loadNotes, loadSchedules, loadTodos, loadGoals])
 
+  // 按日期分组笔记的函数
+  const groupNotesByDate = (notes: Note[]) => {
+    const groups: { [key: string]: Note[] } = {}
+    
+    notes.forEach(note => {
+      const dateKey = getDateKey(new Date(note.createdAt))
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(note)
+    })
+    
+    // 转换为数组并按日期排序（最新的在前）
+    const groupedNotes = Object.entries(groups).map(([dateKey, groupNotes]) => {
+      // 每组内的笔记按创建时间排序（最新的在前）
+      groupNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      return [dateKey, groupNotes] as [string, Note[]]
+    })
+    
+    // 按日期排序（最新的在前）
+    groupedNotes.sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+    
+    return groupedNotes
+  }
+
   // 过滤和计算数据 - 所有 useMemo 必须在条件返回之前
   const filteredNotes = useMemo(() => {
     if (!searchTerm) return notes
@@ -201,9 +239,69 @@ export default function MobilePage() {
     )
   }, [notes, searchTerm])
 
-  const todaySchedules = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
-    return schedules.filter(schedule => schedule.date === today)
+  const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes])
+
+  // 获取所有待办事项标签
+  const allTodoTags = useMemo(() => {
+    const tags = new Set<string>()
+    todos.forEach(todo => {
+      if (todo.tags && Array.isArray(todo.tags)) {
+        todo.tags.forEach(tag => tags.add(tag))
+      }
+    })
+    return Array.from(tags).sort()
+  }, [todos])
+  
+  // 筛选待办事项
+  const filteredTodos = useMemo(() => {
+    if (selectedTodoTag === 'All') {
+      return todos
+    }
+    return todos.filter(todo => 
+      todo.tags && Array.isArray(todo.tags) && todo.tags.includes(selectedTodoTag)
+    )
+  }, [todos, selectedTodoTag])
+
+  const upcomingSchedules = useMemo(() => {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+    
+    return schedules
+      .filter(schedule => schedule.date >= todayStr) // 只显示今天及以后的日程
+      .map(schedule => {
+        const scheduleDate = new Date(schedule.date)
+        const diffTime = scheduleDate.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        let displayDate: string
+        if (diffDays === 0) {
+          displayDate = '今天'
+        } else if (diffDays === 1) {
+          displayDate = '明天'
+        } else {
+          displayDate = `还剩${diffDays}天`
+        }
+        
+        return {
+          ...schedule,
+          daysLeft: diffDays,
+          displayDate,
+          isToday: diffDays === 0
+        }
+      })
+      .sort((a, b) => {
+        // 今天的日程优先
+        if (a.isToday && !b.isToday) return -1
+        if (!a.isToday && b.isToday) return 1
+        
+        // 按剩余天数排序
+        if (a.daysLeft !== b.daysLeft) {
+          return a.daysLeft - b.daysLeft
+        }
+        
+        // 剩余天数相同，按时间排序
+        return a.time.localeCompare(b.time)
+      })
   }, [schedules])
 
   const pendingTodos = useMemo(() => {
@@ -230,6 +328,7 @@ export default function MobilePage() {
     try {
       await addNote(newNote, '')
       setNewNote("")
+      setShowNoteInput(false)
       await loadNotes()
       toast({ title: "笔记添加成功" })
     } catch (error) {
@@ -253,6 +352,7 @@ export default function MobilePage() {
         description: newSchedule.description
       })
       setNewSchedule({ title: "", time: "", description: "" })
+      setShowScheduleInput(false)
       await loadSchedules()
       toast({ title: "日程添加成功" })
     } catch (error) {
@@ -274,6 +374,7 @@ export default function MobilePage() {
         priority: 'medium'
       })
       setNewTodo("")
+      setShowTodoInput(false)
       await loadTodos()
       toast({ title: "待办添加成功" })
     } catch (error) {
@@ -311,6 +412,7 @@ export default function MobilePage() {
         currentCount: 0
       })
       setNewGoal({ tag: "", content: "", targetCount: 0 })
+      setShowGoalInput(false)
       await loadGoals()
       toast({ title: "目标添加成功" })
     } catch (error) {
@@ -329,21 +431,20 @@ export default function MobilePage() {
     return <div className="flex items-center justify-center min-h-screen">加载中...</div>
   }
 
+  // 获取当前tab的标题
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case 'notes': return '笔记'
+      case 'schedule': return '日程'
+      case 'todo': return '待办'
+      case 'goals': return '目标'
+      case 'profile': return '我的'
+      default: return '笔记本'
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* 顶部标题栏 */}
-      <div className="flex items-center justify-between p-4 border-b bg-background/95 backdrop-blur">
-        <h1 className="text-xl font-bold">笔记本</h1>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/')}
-          className="text-sm"
-        >
-          桌面版
-        </Button>
-      </div>
-
       {/* 主内容区域 */}
       <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
@@ -352,58 +453,106 @@ export default function MobilePage() {
             {/* 笔记Tab */}
             <TabsContent value="notes" className="h-full m-0 p-4 overflow-y-auto">
               <div className="space-y-4">
-                {/* 搜索框 */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="搜索笔记..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+                {/* 顶部操作栏 */}
+                <div className="flex items-center gap-3">
+                  {/* 搜索框 */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="搜索笔记..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  {/* 添加按钮 */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNoteInput(!showNoteInput)}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                {/* 添加笔记 */}
-                <Card>
-                  <CardContent className="p-4">
-                    <Textarea
-                      placeholder="写下你的想法..."
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      className="min-h-[100px] mb-3"
-                    />
-                    <Button 
-                      onClick={handleAddNote} 
-                      disabled={isAddingNote || !newNote.trim()}
-                      className="w-full"
-                    >
-                      {isAddingNote ? "添加中..." : "添加笔记"}
-                    </Button>
-                  </CardContent>
-                </Card>
+                {/* 添加笔记输入区域 */}
+                {showNoteInput && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <Textarea
+                        placeholder="写下你的想法..."
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        className="min-h-[100px] mb-3"
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleAddNote} 
+                          disabled={isAddingNote || !newNote.trim()}
+                          className="flex-1"
+                        >
+                          {isAddingNote ? "添加中..." : "添加笔记"}
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setShowNoteInput(false)
+                            setNewNote("")
+                          }}
+                        >
+                          取消
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-                {/* 笔记列表 */}
-                <div className="space-y-3">
-                  {filteredNotes.map((note) => (
-                    <Card key={note.id}>
-                      <CardContent className="p-4">
-                        <div className="text-sm text-muted-foreground mb-2">
-                          {formatDateShort(new Date(note.createdAt))}
-                        </div>
-                        <div className="text-sm leading-relaxed">
-                          {note.content}
-                        </div>
-                        {note.tags && note.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {note.tags.map((tag, index) => (
-                              <Badge key={index} variant="secondary" className="text-xs">
-                                #{tag}
-                              </Badge>
-                            ))}
+                {/* 按日期分组的笔记列表 */}
+                <div className="space-y-6">
+                  {groupedNotes.map(([dateKey, groupNotes]) => (
+                    <div key={dateKey} className="space-y-3">
+                      {/* 日期标题 */}
+                      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/40 flex items-center py-2">
+                        <h3 className="text-lg font-semibold text-foreground">{formatDateOnly(dateKey)}</h3>
+                        <div className="ml-3 text-sm text-muted-foreground">{groupNotes.length} 条笔记</div>
+                      </div>
+                      
+                      {/* 该日期下的所有笔记 */}
+                      <div className="space-y-3 ml-2">
+                        {groupNotes.map((note) => (
+                          <div key={note.id} className="border-b border-border/50 pb-3 last:border-b-0">
+                            {/* 笔记头部：时间和标签 */}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="text-xs text-muted-foreground">
+                                {formatTime(new Date(note.createdAt))}
+                              </div>
+                              {note.tags && note.tags.length > 0 && (
+                                <div className="flex items-center gap-1 ml-2">
+                                  <div className="flex gap-1 flex-wrap">
+                                    {note.tags.slice(0, 3).map((tag, index) => (
+                                      <Badge key={index} variant="outline" className="text-xs cursor-pointer hover:bg-muted">
+                                        #{tag}
+                                      </Badge>
+                                    ))}
+                                    {note.tags.length > 3 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{note.tags.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* 笔记内容 */}
+                            <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {note.content}
+                            </div>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -412,6 +561,19 @@ export default function MobilePage() {
             {/* 日程Tab */}
             <TabsContent value="schedule" className="h-full m-0 p-4 overflow-y-auto">
               <div className="space-y-4">
+                {/* 顶部操作栏 */}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-medium">选择日期</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowScheduleInput(!showScheduleInput)}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 {/* 日历 */}
                 <Card>
                   <CardContent className="p-4">
@@ -424,55 +586,87 @@ export default function MobilePage() {
                   </CardContent>
                 </Card>
 
-                {/* 添加日程 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">添加日程</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Input
-                      placeholder="日程标题"
-                      value={newSchedule.title}
-                      onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
-                    />
-                    <Input
-                      type="time"
-                      value={newSchedule.time}
-                      onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
-                    />
-                    <Textarea
-                      placeholder="描述（可选）"
-                      value={newSchedule.description}
-                      onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
-                      className="min-h-[80px]"
-                    />
-                    <Button 
-                      onClick={handleAddSchedule} 
-                      disabled={isAddingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim()}
-                      className="w-full"
-                    >
-                      {isAddingSchedule ? "添加中..." : "添加日程"}
-                    </Button>
-                  </CardContent>
-                </Card>
+                {/* 添加日程输入区域 */}
+                {showScheduleInput && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">添加日程</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Input
+                        placeholder="日程标题"
+                        value={newSchedule.title}
+                        onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                      <Input
+                        type="time"
+                        value={newSchedule.time}
+                        onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
+                      />
+                      <Textarea
+                        placeholder="描述（可选）"
+                        value={newSchedule.description}
+                        onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
+                        className="min-h-[80px]"
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleAddSchedule} 
+                          disabled={isAddingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim()}
+                          className="flex-1"
+                        >
+                          {isAddingSchedule ? "添加中..." : "添加日程"}
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setShowScheduleInput(false)
+                            setNewSchedule({ title: "", time: "", description: "" })
+                          }}
+                        >
+                          取消
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
-                {/* 今日日程 */}
+                {/* 即将到来的日程 */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">今日日程</CardTitle>
+                    <CardTitle className="text-lg">即将到来的日程</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {todaySchedules.length === 0 ? (
+                    {upcomingSchedules.length === 0 ? (
                       <div className="text-center text-muted-foreground py-4">
-                        今日暂无日程
+                        暂无即将到来的日程
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {todaySchedules.map((schedule) => (
-                          <div key={schedule._id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                        {upcomingSchedules.map((schedule) => (
+                          <div key={schedule._id} className={cn(
+                            "flex items-start gap-3 p-3 rounded-lg border",
+                            schedule.isToday 
+                              ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800" 
+                              : schedule.daysLeft <= 3 
+                                ? "bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800"
+                                : "bg-muted/30 border-border"
+                          )}>
                             <Clock className="h-4 w-4 mt-1 text-muted-foreground" />
                             <div className="flex-1">
-                              <div className="font-medium">{schedule.title}</div>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="font-medium">{schedule.title}</div>
+                                <div className={cn(
+                                  "text-xs px-2 py-1 rounded-full",
+                                  schedule.isToday
+                                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                                    : schedule.daysLeft <= 3
+                                      ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
+                                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                                )}>
+                                  {schedule.displayDate}
+                                </div>
+                              </div>
                               <div className="text-sm text-muted-foreground">{schedule.time}</div>
                               {schedule.description && (
                                 <div className="text-sm text-muted-foreground mt-1">
@@ -492,67 +686,138 @@ export default function MobilePage() {
             {/* Todo Tab */}
             <TabsContent value="todo" className="h-full m-0 p-4 overflow-y-auto">
               <div className="space-y-4">
-                {/* 添加Todo */}
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="添加待办事项..."
-                        value={newTodo}
-                        onChange={(e) => setNewTodo(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-                        className="flex-1"
-                      />
-                      <Button 
-                        onClick={handleAddTodo} 
-                        disabled={isAddingTodo || !newTodo.trim()}
-                        size="sm"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* 顶部操作栏 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-medium">待办事项</h2>
+                    <span className="text-sm text-muted-foreground">({filteredTodos.filter(t => !t.completed).length})</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTodoInput(!showTodoInput)}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {/* 标签筛选区域 */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={selectedTodoTag === 'All' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTodoTag('All')}
+                    className="h-8 text-xs"
+                  >
+                    All
+                  </Button>
+                  {allTodoTags.map((tag) => (
+                    <Button
+                      key={tag}
+                      variant={selectedTodoTag === tag ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedTodoTag(tag)}
+                      className="h-8 text-xs"
+                    >
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* 添加Todo输入区域 */}
+                {showTodoInput && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <Input
+                          placeholder="添加待办事项..."
+                          value={newTodo}
+                          onChange={(e) => setNewTodo(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+                        />
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleAddTodo} 
+                            disabled={isAddingTodo || !newTodo.trim()}
+                            className="flex-1"
+                          >
+                            {isAddingTodo ? "添加中..." : "添加待办"}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={() => {
+                              setShowTodoInput(false)
+                              setNewTodo("")
+                            }}
+                          >
+                            取消
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Todo列表 */}
                 <div className="space-y-3">
-                  {todos.map((todo) => (
-                    <Card key={todo._id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleTodo(todo._id)}
-                            className="p-0 h-auto"
-                          >
-                            {todo.completed ? (
-                              <Check className="h-5 w-5 text-green-500" />
-                            ) : (
-                              <div className="h-5 w-5 border-2 border-muted-foreground rounded" />
-                            )}
-                          </Button>
-                          <div className="flex-1">
-                            <div className={cn(
-                              "text-sm",
-                              todo.completed ? "line-through text-muted-foreground" : "text-foreground"
-                            )}>
-                              {todo.text}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
+                  {filteredTodos.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      {selectedTodoTag === 'All' ? '暂无待办事项' : `暂无标签为 "${selectedTodoTag}" 的待办事项`}
+                    </div>
+                  ) : (
+                    filteredTodos.map((todo) => (
+                      <div key={todo._id} className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleTodo(todo._id)}
+                          className="p-0 h-auto"
+                        >
+                          {todo.completed ? (
+                            <Check className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <div className="h-5 w-5 border-2 border-muted-foreground rounded" />
+                          )}
+                        </Button>
+                        <div className="flex-1">
+                          <div className={cn(
+                            "text-sm",
+                            todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                          )}>
+                            {todo.text}
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-xs text-muted-foreground">
                               {formatDateShort(new Date(todo.createdAt))}
                             </div>
+                            <div className="flex items-center gap-2">
+                              {todo.tags && todo.tags.length > 0 && (
+                                <div className="flex gap-1">
+                                  {todo.tags.slice(0, 2).map((tag, index) => (
+                                    <Badge key={index} variant="outline" className="text-xs px-1 py-0">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {todo.tags.length > 2 && (
+                                    <Badge variant="outline" className="text-xs px-1 py-0">
+                                      +{todo.tags.length - 2}
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                              <Badge 
+                                variant={todo.priority === 'high' ? 'destructive' : todo.priority === 'medium' ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
+                              </Badge>
+                            </div>
                           </div>
-                          <Badge 
-                            variant={todo.priority === 'high' ? 'destructive' : todo.priority === 'medium' ? 'default' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
-                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -560,38 +825,64 @@ export default function MobilePage() {
             {/* 目标Tab */}
             <TabsContent value="goals" className="h-full m-0 p-4 overflow-y-auto">
               <div className="space-y-4">
-                {/* 添加目标 */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">添加目标</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Input
-                      placeholder="目标标签"
-                      value={newGoal.tag}
-                      onChange={(e) => setNewGoal(prev => ({ ...prev, tag: e.target.value }))}
-                    />
-                    <Textarea
-                      placeholder="目标描述"
-                      value={newGoal.content}
-                      onChange={(e) => setNewGoal(prev => ({ ...prev, content: e.target.value }))}
-                      className="min-h-[80px]"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="目标数量"
-                      value={newGoal.targetCount || ''}
-                      onChange={(e) => setNewGoal(prev => ({ ...prev, targetCount: parseInt(e.target.value) || 0 }))}
-                    />
-                    <Button 
-                      onClick={handleAddGoal} 
-                      disabled={isAddingGoal || !newGoal.tag.trim() || !newGoal.content.trim() || newGoal.targetCount <= 0}
-                      className="w-full"
-                    >
-                      {isAddingGoal ? "添加中..." : "添加目标"}
-                    </Button>
-                  </CardContent>
-                </Card>
+                {/* 顶部操作栏 */}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-medium">我的目标</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowGoalInput(!showGoalInput)}
+                    className="shrink-0"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* 添加目标输入区域 */}
+                {showGoalInput && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">添加目标</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Input
+                        placeholder="目标标签"
+                        value={newGoal.tag}
+                        onChange={(e) => setNewGoal(prev => ({ ...prev, tag: e.target.value }))}
+                      />
+                      <Textarea
+                        placeholder="目标描述"
+                        value={newGoal.content}
+                        onChange={(e) => setNewGoal(prev => ({ ...prev, content: e.target.value }))}
+                        className="min-h-[80px]"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="目标数量"
+                        value={newGoal.targetCount || ''}
+                        onChange={(e) => setNewGoal(prev => ({ ...prev, targetCount: parseInt(e.target.value) || 0 }))}
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleAddGoal} 
+                          disabled={isAddingGoal || !newGoal.tag.trim() || !newGoal.content.trim() || newGoal.targetCount <= 0}
+                          className="flex-1"
+                        >
+                          {isAddingGoal ? "添加中..." : "添加目标"}
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={() => {
+                            setShowGoalInput(false)
+                            setNewGoal({ tag: "", content: "", targetCount: 0 })
+                          }}
+                        >
+                          取消
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* 目标列表 */}
                 <div className="space-y-3">
@@ -605,7 +896,6 @@ export default function MobilePage() {
                               {goal.currentCount || 0} / {goal.targetCount}
                             </div>
                           </div>
-                          <div className="text-sm">{goal.content}</div>
                           <div className="w-full bg-muted rounded-full h-2">
                             <div 
                               className="bg-primary h-2 rounded-full transition-all duration-300"
@@ -679,10 +969,14 @@ export default function MobilePage() {
                     <Button 
                       variant="outline" 
                       className="w-full justify-start"
-                      onClick={() => router.push('/')}
+                      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     >
-                      <Home className="h-4 w-4 mr-2" />
-                      返回桌面版
+                      {theme === 'dark' ? (
+                        <Sun className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Moon className="h-4 w-4 mr-2" />
+                      )}
+                      {theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
                     </Button>
                     <Button 
                       variant="destructive" 
