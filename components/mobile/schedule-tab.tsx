@@ -16,7 +16,7 @@ import { Schedule, ScheduleTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
 import { startOfDay, differenceInDays, isToday, format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns"
 
-export function ScheduleTab({ user }: ScheduleTabProps) {
+export function ScheduleTab({ user, activeTab }: ScheduleTabProps) {
   const toast = showToast
   // 日程相关状态
   const [schedules, setSchedules] = useState<Schedule[]>([])  
@@ -43,7 +43,31 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     const dateStr = `${year}-${month}-${day}`
-    const scheduleElement = document.querySelector(`[data-schedule-date="${dateStr}"]`)
+    
+    // 检查该日期是否有日程
+    const hasScheduleOnDate = schedules.some(schedule => schedule.date === dateStr)
+    
+    let targetDateStr = dateStr
+    
+    // 如果当前日期没有日程，找到该日期之后最近的有日程的日期
+    if (!hasScheduleOnDate) {
+      const clickedDate = new Date(date)
+      const futureSchedules = schedules
+        .filter(schedule => {
+          const scheduleDate = new Date(schedule.date + 'T00:00:00')
+          return scheduleDate > clickedDate
+        })
+        .sort((a, b) => new Date(a.date + 'T00:00:00').getTime() - new Date(b.date + 'T00:00:00').getTime())
+      
+      if (futureSchedules.length > 0) {
+        targetDateStr = futureSchedules[0].date
+      } else {
+        // 如果没有找到未来的日程，则不执行滚动
+        return
+      }
+    }
+    
+    const scheduleElement = document.querySelector(`[data-schedule-date="${targetDateStr}"]`)
     
     if (scheduleElement && scrollContainerRef.current) {
       const containerRect = scrollContainerRef.current.getBoundingClientRect()
@@ -58,7 +82,7 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
         behavior: 'smooth'
       })
     }
-  }, [])
+  }, [schedules])
 
   // 加载日程数据
   const loadSchedules = useCallback(async () => {
@@ -102,6 +126,14 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
       loadSchedules()
     }
   }, [user, loadSchedules])
+
+  // 当切换到日程tab时，自动定位到当天或下一个有日程的日期
+  useEffect(() => {
+    if (activeTab === 'schedule' && schedules.length > 0) {
+      const today = new Date()
+      scrollToDateSchedule(today)
+    }
+  }, [activeTab, schedules, scrollToDateSchedule])
 
   // 计算三个月日程（上个月、当月、下个月）
   const currentMonthSchedules = useMemo(() => {
@@ -293,7 +325,7 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
       {/* 可滚动内容区域 */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {/* 顶部空白区域 */}
-        <div className="h-20"></div>
+        <div className="h-32"></div>
         
         <div className="px-4 space-y-4">
           {/* 三个月日程 */}
@@ -351,7 +383,7 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
           )}
           
           {/* 底部空白区域 */}
-          <div className="h-20"></div>
+           <div className="h-32"></div>
         </div>
       </div>
     </TabsContent>

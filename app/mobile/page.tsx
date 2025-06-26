@@ -72,7 +72,7 @@ export default function MobilePage() {
             </TabsContent>
 
             <TabsContent value="schedule" className="h-full m-0">
-              <ScheduleTab user={user} theme={theme} />
+              <ScheduleTab user={user} theme={theme} activeTab={activeTab} />
             </TabsContent>
 
             <TabsContent value="todo" className="h-full m-0">

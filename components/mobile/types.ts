@@ -68,6 +68,7 @@ export interface NotesTabProps extends MobileTabProps {
 }
 
 export interface ScheduleTabProps extends MobileTabProps {
+  activeTab?: string;
 }
 
 export interface TodoTabProps extends MobileTabProps {
