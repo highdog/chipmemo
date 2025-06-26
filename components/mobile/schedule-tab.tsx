@@ -38,7 +38,11 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
 
   // 滚动到指定日期的日程
   const scrollToDateSchedule = useCallback((date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    // 使用本地时间格式化日期，避免时区问题
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
     const scheduleElement = document.querySelector(`[data-schedule-date="${dateStr}"]`)
     
     if (scheduleElement && scrollContainerRef.current) {
@@ -287,60 +291,68 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
       </div>
 
       {/* 可滚动内容区域 */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* 三个月日程 */}
-        {currentMonthSchedules.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            近三个月暂无日程
-          </div>
-        ) : (
-          <div>
-            {currentMonthSchedules.map((schedule, index) => (
-              <div key={schedule._id} className="py-3" data-schedule-date={schedule.date}>
-                {/* 日程头部 - 时间在左边，还剩几天在右边 */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(schedule.date), 'MM/dd')} {schedule.time}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* 还剩几天标签 */}
-                    <Badge 
-                      variant="secondary" 
-                      className={cn(
-                        "text-xs",
-                        schedule.isToday
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                          : schedule.daysLeft <= 3 && schedule.daysLeft >= 0
-                            ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                      )}
-                    >
-                      {schedule.displayDate}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* 日程内容 */}
-                <div>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
-                    {schedule.title}
-                  </div>
-                  {schedule.description && (
-                    <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
-                      {schedule.description}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+        {/* 顶部空白区域 */}
+        <div className="h-20"></div>
+        
+        <div className="px-4 space-y-4">
+          {/* 三个月日程 */}
+          {currentMonthSchedules.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              近三个月暂无日程
+            </div>
+          ) : (
+            <div>
+              {currentMonthSchedules.map((schedule, index) => (
+                <div key={schedule._id} className="py-3" data-schedule-date={schedule.date}>
+                  {/* 日程头部 - 时间在左边，还剩几天在右边 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(schedule.date), 'MM/dd')} {schedule.time}
                     </div>
+                    <div className="flex items-center gap-2">
+                      {/* 还剩几天标签 */}
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "text-xs",
+                          schedule.isToday
+                            ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                            : schedule.daysLeft <= 3 && schedule.daysLeft >= 0
+                              ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        )}
+                      >
+                        {schedule.displayDate}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* 日程内容 */}
+                  <div>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
+                      {schedule.title}
+                    </div>
+                    {schedule.description && (
+                      <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
+                        {schedule.description}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* 分割线 - 最后一个日程不显示分割线 */}
+                  {index < currentMonthSchedules.length - 1 && (
+                    <div className="border-b border-border/50 mt-3" />
                   )}
                 </div>
-                
-                {/* 分割线 - 最后一个日程不显示分割线 */}
-                {index < currentMonthSchedules.length - 1 && (
-                  <div className="border-b border-border/50 mt-3" />
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+          
+          {/* 底部空白区域 */}
+          <div className="h-20"></div>
+        </div>
       </div>
     </TabsContent>
   )
