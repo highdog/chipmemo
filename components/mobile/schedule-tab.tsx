@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,7 +13,7 @@ import { schedulesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Schedule, ScheduleTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
-import { startOfDay, differenceInDays, isToday } from "date-fns"
+import { startOfDay, differenceInDays, isToday, format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns"
 
 export function ScheduleTab({ user }: ScheduleTabProps) {
   const toast = showToast
@@ -23,6 +23,29 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
   const [newSchedule, setNewSchedule] = useState({ title: "", time: "", description: "" })
   const [isAddingSchedule, setIsAddingSchedule] = useState(false)
   const [showScheduleInput, setShowScheduleInput] = useState(false)
+  
+  // 滚动容器引用
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // 点击日期定位到对应日程
+  const scrollToDateSchedule = useCallback((date: Date) => {
+    const dateStr = date.toISOString().split('T')[0]
+    const scheduleElement = document.querySelector(`[data-schedule-date="${dateStr}"]`)
+    
+    if (scheduleElement && scrollContainerRef.current) {
+      const containerRect = scrollContainerRef.current.getBoundingClientRect()
+      const elementRect = scheduleElement.getBoundingClientRect()
+      const scrollTop = scrollContainerRef.current.scrollTop
+      
+      // 计算目标滚动位置，使日程显示在容器顶部
+      const targetScrollTop = scrollTop + elementRect.top - containerRect.top
+      
+      scrollContainerRef.current.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      })
+    }
+  }, [])
 
   // 加载日程数据
   const loadSchedules = useCallback(async () => {
@@ -67,15 +90,20 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
     }
   }, [user, loadSchedules])
 
-  // 计算当月日程
+  // 计算三个月日程（上个月、当月、下个月）
   const currentMonthSchedules = useMemo(() => {
-    const currentMonth = selectedDate.getMonth()
-    const currentYear = selectedDate.getFullYear()
+    const currentMonth = selectedDate
+    const prevMonth = subMonths(currentMonth, 1)
+    const nextMonth = addMonths(currentMonth, 1)
+    
+    // 计算三个月的日期范围
+    const startDate = startOfMonth(prevMonth)
+    const endDate = endOfMonth(nextMonth)
     
     return schedules
       .filter(schedule => {
         const scheduleDate = new Date(schedule.date)
-        return scheduleDate.getMonth() === currentMonth && scheduleDate.getFullYear() === currentYear
+        return scheduleDate >= startDate && scheduleDate <= endDate
       })
       .map(schedule => {
         const scheduleDate = startOfDay(new Date(schedule.date))
@@ -167,14 +195,37 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
           <Calendar
             mode="single"
             selected={selectedDate}
-            onSelect={(date) => date && setSelectedDate(date)}
+            onSelect={(date) => {
+              if (date) {
+                setSelectedDate(date)
+                scrollToDateSchedule(date)
+              }
+            }}
             className="w-full max-w-none"
+            classNames={{
+              head_cell: "text-muted-foreground rounded-md w-12 font-normal text-[0.8rem]",
+              cell: "h-8 w-12 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+              day: "h-8 w-12 p-0 font-normal aria-selected:opacity-100 relative hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+            }}
+            modifiers={{
+               hasSchedule: (date) => {
+                 // 使用本地时间格式化日期，避免时区问题
+                 const year = date.getFullYear()
+                 const month = String(date.getMonth() + 1).padStart(2, '0')
+                 const day = String(date.getDate()).padStart(2, '0')
+                 const dateStr = `${year}-${month}-${day}`
+                 return schedules.some(schedule => schedule.date === dateStr)
+               }
+             }}
+             modifiersClassNames={{
+               hasSchedule: "relative after:absolute after:bottom-1 after:left-1/2 after:transform after:-translate-x-1/2 after:w-1 after:h-1 after:bg-blue-500 after:rounded-full after:content-['']"
+             }}
           />
         </div>
       </div>
 
       {/* 可滚动内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* 添加日程输入区域 */}
         {showScheduleInput && (
           <Card>
@@ -220,21 +271,21 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
           </Card>
         )}
 
-        {/* 当月日程 */}
+        {/* 三个月日程 */}
         {currentMonthSchedules.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            本月暂无日程
+            近三个月暂无日程
           </div>
         ) : (
           <div className="space-y-4">
             {currentMonthSchedules.map((schedule) => (
-              <Card key={schedule._id} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={schedule._id} className="cursor-pointer hover:shadow-md transition-shadow" data-schedule-date={schedule.date}>
                 <CardContent className="p-4">
                   {/* 日程头部 - 时间在左边，还剩几天在右边 */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {schedule.time}
+                      {format(new Date(schedule.date), 'MM/dd')} {schedule.time}
                     </div>
                     <div className="flex items-center gap-2">
                       {/* 还剩几天标签 */}
