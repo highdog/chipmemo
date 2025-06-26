@@ -21,6 +21,20 @@ import { formatDateShort, getDateKey, cn, extractTags } from "@/lib/utils"
 import { NotesTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
 
+// 提取标签并清理内容的函数
+const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
+  const tagRegex = /#([\u4e00-\u9fa5\w]+)/g
+  const tags: string[] = []
+  let match
+  
+  while ((match = tagRegex.exec(content)) !== null) {
+    tags.push(match[1])
+  }
+  
+  const cleanContent = content.replace(tagRegex, '').trim()
+  return { cleanContent, tags }
+}
+
 export function NotesTab({ user }: NotesTabProps) {
   const toast = showToast
   // 笔记相关状态
@@ -124,11 +138,36 @@ export function NotesTab({ user }: NotesTabProps) {
     
     setIsAddingNote(true)
     try {
-      await addNote(newNote, '')
-      setNewNote("")
-      setIsDialogOpen(false)
-      await loadNotes()
-      toast({ title: "笔记添加成功" })
+      // 如果当前在标签搜索模式，自动添加当前标签
+      let finalContent = newNote.trim()
+      if (searchTerm && searchTerm.startsWith('#')) {
+        const currentTag = searchTerm.slice(1)
+        // 检查内容中是否已经包含当前标签
+        const { tags } = extractTagsAndCleanContent(newNote.trim())
+        if (!tags.includes(currentTag)) {
+          finalContent = `#${currentTag} ${newNote.trim()}`
+        }
+      }
+      
+      const result = await addNote(finalContent, new Date().toISOString())
+      if (result.success) {
+        setNewNote("")
+        setIsDialogOpen(false)
+        
+        // 如果有搜索词，重新搜索；否则重新加载
+        if (searchTerm) {
+          // 稍微延迟一下再搜索，确保服务器端数据已经更新
+          setTimeout(async () => {
+            await searchNotesByTag(searchTerm.startsWith('#') ? searchTerm.slice(1) : searchTerm)
+          }, 500)
+        } else {
+          await loadNotes()
+        }
+        
+        toast({ title: "笔记添加成功" })
+      } else {
+        throw new Error('添加笔记失败')
+      }
     } catch (error) {
       console.error('Error adding note:', error)
       toast({ title: "添加笔记失败", variant: "destructive" })
@@ -208,7 +247,7 @@ export function NotesTab({ user }: NotesTabProps) {
                 <Plus className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md fixed top-24 left-1/2 transform -translate-x-1/2">
+            <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>
                 <DialogTitle>添加笔记</DialogTitle>
               </DialogHeader>
@@ -253,8 +292,6 @@ export function NotesTab({ user }: NotesTabProps) {
             className="pl-10"
           />
         </div>
-
-
       </div>
 
       {/* 可滚动的笔记列表区域 */}
@@ -285,13 +322,13 @@ export function NotesTab({ user }: NotesTabProps) {
             groupedNotes.map(([dateKey, dayNotes]) => (
               <div key={dateKey} className="mb-6" id={`date-${dateKey}`}>
                 {/* 日期标题 - 粘性定位 */}
-                <div className="sticky top-0 z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 -mb-4">
+                <div className="sticky top-0 z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 mb-2">
                   <h3 className="text-lg font-semibold text-foreground">{formatDateShort(new Date(dateKey))}</h3>
                   <div className="ml-3 text-sm text-muted-foreground">{dayNotes.length} 条笔记</div>
                 </div>
 
                 {/* 该日期下的所有笔记 */}
-                <div className="ml-4 space-y-4">
+                <div className="ml-4 space-y-4 pt-2">
                   {dayNotes.map((note) => {
                     // 使用note.tags数组而不是从内容中提取
                     const tags = note.tags || []
@@ -304,15 +341,29 @@ export function NotesTab({ user }: NotesTabProps) {
                         className="cursor-pointer"
                         onClick={() => setSelectedNoteId(selectedNoteId === note.id ? null : note.id)}
                       >
-                        {/* 笔记头部 - 时间、标签和删除按钮在同一行 */}
+                        {/* 笔记头部 - 时间在左边，删除按钮和标签在右边 */}
                         <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 flex-1">
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(note.createdAt).toLocaleTimeString('zh-CN', {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(note.createdAt).toLocaleTimeString('zh-CN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {selectedNoteId === note.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteNote(note.id)
+                                }}
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                title="删除笔记"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
                             {/* 标签 */}
                             {tags.length > 0 && (
                               <div className="flex flex-wrap gap-1">
@@ -337,20 +388,6 @@ export function NotesTab({ user }: NotesTabProps) {
                               </div>
                             )}
                           </div>
-                          {selectedNoteId === note.id && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteNote(note.id)
-                              }}
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 ml-2"
-                              title="删除笔记"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
                         
                         {/* 笔记内容 */}
