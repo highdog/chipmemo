@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -13,6 +14,20 @@ import { todosApi, notesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { Todo, TagContent, TodoTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
+
+// 提取标签和清理内容的函数
+const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
+  const tagRegex = /#([\u4e00-\u9fa5\w]+)/g
+  const tags: string[] = []
+  let match
+  
+  while ((match = tagRegex.exec(content)) !== null) {
+    tags.push(match[1])
+  }
+  
+  const cleanContent = content.replace(tagRegex, '').trim()
+  return { cleanContent, tags }
+}
 
 export function TodoTab({ user }: TodoTabProps) {
   const toast = showToast
@@ -123,10 +138,13 @@ export function TodoTab({ user }: TodoTabProps) {
     
     setIsAddingTodo(true)
     try {
+      // 解析输入内容中的标签
+      const { cleanContent, tags } = extractTagsAndCleanContent(newTodo.trim())
+      
       await todosApi.create({
-        text: newTodo,
+        text: cleanContent,
         priority: newTodoPriority,
-        tags: []
+        tags: tags
       })
       setNewTodo("")
       setNewTodoPriority('medium')
@@ -238,35 +256,55 @@ export function TodoTab({ user }: TodoTabProps) {
                 <Plus className="h-4 w-4" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>
                 <DialogTitle>添加待办事项</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <Input
+                <Textarea
                   placeholder="输入待办内容"
                   value={newTodo}
                   onChange={(e) => setNewTodo(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleAddTodo()
-                    }
-                  }}
+                  className="min-h-[80px] resize-none"
                   autoFocus
                 />
                 <div className="space-y-2">
                   <label className="text-sm font-medium">优先级</label>
-                  <Select value={newTodoPriority} onValueChange={(value: 'low' | 'medium' | 'high') => setNewTodoPriority(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">低优先级</SelectItem>
-                      <SelectItem value="medium">中优先级</SelectItem>
-                      <SelectItem value="high">高优先级</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={newTodoPriority === 'low' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('low')}
+                      className={cn(
+                        "flex-1",
+                        newTodoPriority === 'low' && "bg-green-500 hover:bg-green-600 text-white"
+                      )}
+                    >
+                      低
+                    </Button>
+                    <Button
+                      variant={newTodoPriority === 'medium' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('medium')}
+                      className={cn(
+                        "flex-1",
+                        newTodoPriority === 'medium' && "bg-yellow-500 hover:bg-yellow-600 text-white"
+                      )}
+                    >
+                      中
+                    </Button>
+                    <Button
+                      variant={newTodoPriority === 'high' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('high')}
+                      className={cn(
+                        "flex-1",
+                        newTodoPriority === 'high' && "bg-red-500 hover:bg-red-600 text-white"
+                      )}
+                    >
+                      高
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button 
