@@ -30,21 +30,23 @@ export function TodoTab({ user }: TodoTabProps) {
   const loadTodos = useCallback(async () => {
     try {
       const response = await todosApi.getAll()
-      // 转换数据格式以匹配Todo类型
-      const todosData = Array.isArray(response.data) ? response.data : 
-        (response.data && typeof response.data === 'object' ? Object.values(response.data).flat() : [])
-      const todos = todosData.map((item: any) => ({
-        _id: item._id || item.id,
-        id: item.id,
-        text: item.text,
-        completed: item.completed || false,
-        priority: item.priority || 'medium',
-        tags: Array.isArray(item.tags) ? item.tags : [],
-        userId: item.userId || user?._id || '',
-        createdAt: item.createdAt || new Date().toISOString(),
-        updatedAt: item.updatedAt || new Date().toISOString()
-      }))
-      setTodos(todos)
+      // 转换数据格式以匹配Todo类型，确保与网页端一致
+      if (response.success && response.data && response.data.todos) {
+        const todos = response.data.todos.map((item: any) => ({
+          _id: item._id,
+          id: item._id, // 使用_id作为id
+          text: item.text,
+          completed: item.completed || false,
+          priority: item.priority || 'medium',
+          tags: Array.isArray(item.tags) ? item.tags : [],
+          userId: item.userId || user?._id || '',
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString()
+        }))
+        setTodos(todos)
+      } else {
+        setTodos([])
+      }
     } catch (error) {
       console.error('Error loading todos:', error)
       toast({ title: "加载待办失败", variant: "destructive" })
