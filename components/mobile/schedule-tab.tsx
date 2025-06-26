@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TabsContent } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Plus, Clock } from "lucide-react"
 import { schedulesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -18,16 +19,24 @@ import { startOfDay, differenceInDays, isToday, format, startOfMonth, endOfMonth
 export function ScheduleTab({ user }: ScheduleTabProps) {
   const toast = showToast
   // 日程相关状态
-  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])  
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [newSchedule, setNewSchedule] = useState({ title: "", time: "", description: "" })
+  const [newSchedule, setNewSchedule] = useState({ title: "", time: "", date: "" })
   const [isAddingSchedule, setIsAddingSchedule] = useState(false)
-  const [showScheduleInput, setShowScheduleInput] = useState(false)
-  
-  // 滚动容器引用
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // 点击日期定位到对应日程
+  // 初始化日期为今天
+  useEffect(() => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    const todayStr = `${year}-${month}-${day}`
+    setNewSchedule(prev => ({ ...prev, date: todayStr }))
+  }, [])
+
+  // 滚动到指定日期的日程
   const scrollToDateSchedule = useCallback((date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
     const scheduleElement = document.querySelector(`[data-schedule-date="${dateStr}"]`)
@@ -148,20 +157,23 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
 
   // 添加日程
   const handleAddSchedule = async () => {
-    if (!newSchedule.title.trim() || !newSchedule.time.trim()) return
+    if (!newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()) return
     
     setIsAddingSchedule(true)
     try {
       await schedulesApi.create({
         title: newSchedule.title,
         time: newSchedule.time,
-        date: selectedDate.toISOString().split('T')[0],
-        description: newSchedule.description
+        date: newSchedule.date,
+        description: ""
       })
-      setNewSchedule({ title: "", time: "", description: "" })
-      setShowScheduleInput(false)
+      setNewSchedule({ title: "", time: "", date: "" })
+      setIsDialogOpen(false)
       await loadSchedules()
-      toast({ title: "日程添加成功" })
+      toast({
+        title: "日程添加成功",
+        description: `已添加日程：${newSchedule.title}`,
+      })
     } catch (error) {
       console.error('Error adding schedule:', error)
       toast({ title: "添加日程失败", variant: "destructive" })
@@ -180,14 +192,64 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
             <h2 className="text-lg font-medium">我的日程</h2>
             <span className="text-sm text-muted-foreground">({schedules.length})</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowScheduleInput(!showScheduleInput)}
-            className="shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
+              <DialogHeader>
+                <DialogTitle>添加日程</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                 <Input
+                   placeholder="日程标题"
+                   value={newSchedule.title}
+                   onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                   autoFocus
+                 />
+                 <Input
+                   type="date"
+                   value={newSchedule.date}
+                   onChange={(e) => setNewSchedule(prev => ({ ...prev, date: e.target.value }))}
+                 />
+                 <Input
+                   type="time"
+                   value={newSchedule.time}
+                   onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
+                 />
+                 <div className="flex gap-2">
+                   <Button 
+                     onClick={handleAddSchedule} 
+                     disabled={isAddingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()}
+                     className="flex-1"
+                   >
+                     {isAddingSchedule ? "添加中..." : "添加"}
+                   </Button>
+                   <Button 
+                     variant="outline"
+                     onClick={() => {
+                       setIsDialogOpen(false)
+                       // 重置表单但保持今天日期
+                       const today = new Date()
+                       const year = today.getFullYear()
+                       const month = String(today.getMonth() + 1).padStart(2, '0')
+                       const day = String(today.getDate()).padStart(2, '0')
+                       const todayStr = `${year}-${month}-${day}`
+                       setNewSchedule({ title: "", time: "", date: todayStr })
+                     }}
+                   >
+                     取消
+                   </Button>
+                 </div>
+               </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* 日历选择器 - 加宽 */}
@@ -226,98 +288,56 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
 
       {/* 可滚动内容区域 */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* 添加日程输入区域 */}
-        {showScheduleInput && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">添加日程</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                placeholder="日程标题"
-                value={newSchedule.title}
-                onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
-              />
-              <Input
-                type="time"
-                value={newSchedule.time}
-                onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
-              />
-              <Textarea
-                placeholder="描述（可选）"
-                value={newSchedule.description}
-                onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
-                className="min-h-[80px]"
-              />
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleAddSchedule} 
-                  disabled={isAddingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim()}
-                  className="flex-1"
-                >
-                  {isAddingSchedule ? "添加中..." : "添加日程"}
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setShowScheduleInput(false)
-                    setNewSchedule({ title: "", time: "", description: "" })
-                  }}
-                >
-                  取消
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* 三个月日程 */}
         {currentMonthSchedules.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             近三个月暂无日程
           </div>
         ) : (
-          <div className="space-y-4">
-            {currentMonthSchedules.map((schedule) => (
-              <Card key={schedule._id} className="cursor-pointer hover:shadow-md transition-shadow" data-schedule-date={schedule.date}>
-                <CardContent className="p-4">
-                  {/* 日程头部 - 时间在左边，还剩几天在右边 */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {format(new Date(schedule.date), 'MM/dd')} {schedule.time}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {/* 还剩几天标签 */}
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "text-xs",
-                          schedule.isToday
-                            ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                            : schedule.daysLeft <= 3 && schedule.daysLeft >= 0
-                              ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                        )}
-                      >
-                        {schedule.displayDate}
-                      </Badge>
-                    </div>
+          <div>
+            {currentMonthSchedules.map((schedule, index) => (
+              <div key={schedule._id} className="py-3" data-schedule-date={schedule.date}>
+                {/* 日程头部 - 时间在左边，还剩几天在右边 */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {format(new Date(schedule.date), 'MM/dd')} {schedule.time}
                   </div>
-                  
-                  {/* 日程内容 */}
-                  <div>
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
-                      {schedule.title}
-                    </div>
-                    {schedule.description && (
-                      <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
-                        {schedule.description}
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    {/* 还剩几天标签 */}
+                    <Badge 
+                      variant="secondary" 
+                      className={cn(
+                        "text-xs",
+                        schedule.isToday
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                          : schedule.daysLeft <= 3 && schedule.daysLeft >= 0
+                            ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                      )}
+                    >
+                      {schedule.displayDate}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                
+                {/* 日程内容 */}
+                <div>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
+                    {schedule.title}
+                  </div>
+                  {schedule.description && (
+                    <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
+                      {schedule.description}
+                    </div>
+                  )}
+                </div>
+                
+                {/* 分割线 - 最后一个日程不显示分割线 */}
+                {index < currentMonthSchedules.length - 1 && (
+                  <div className="border-b border-border/50 mt-3" />
+                )}
+              </div>
             ))}
           </div>
         )}
