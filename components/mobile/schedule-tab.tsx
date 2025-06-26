@@ -67,51 +67,56 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
     }
   }, [user, loadSchedules])
 
-  // 计算即将到来的日程
-  const upcomingSchedules = useMemo(() => {
-    const today = startOfDay(new Date())
-    const todayStr = today.toISOString().split('T')[0]
+  // 计算当月日程
+  const currentMonthSchedules = useMemo(() => {
+    const currentMonth = selectedDate.getMonth()
+    const currentYear = selectedDate.getFullYear()
     
     return schedules
-      .filter(schedule => schedule.date >= todayStr) // 只显示今天及以后的日程
+      .filter(schedule => {
+        const scheduleDate = new Date(schedule.date)
+        return scheduleDate.getMonth() === currentMonth && scheduleDate.getFullYear() === currentYear
+      })
       .map(schedule => {
-        // 使用date-fns库准确计算日期差，与网页端保持一致
         const scheduleDate = startOfDay(new Date(schedule.date))
+        const today = startOfDay(new Date())
         const daysLeft = differenceInDays(scheduleDate, today)
-        const isScheduleToday = isToday(scheduleDate)
+        const scheduleIsToday = isToday(scheduleDate)
         
         let displayDate: string
-        if (isScheduleToday) {
-          displayDate = '今天'
+        if (scheduleIsToday) {
+          displayDate = "今天"
         } else if (daysLeft === 1) {
-          displayDate = '明天'
+          displayDate = "明天"
+        } else if (daysLeft === -1) {
+          displayDate = "昨天"
         } else if (daysLeft > 0) {
           displayDate = `还剩${daysLeft}天`
+        } else if (daysLeft < 0) {
+          displayDate = `${Math.abs(daysLeft)}天前`
         } else {
-          displayDate = '今天'
+          displayDate = "今天"
         }
         
         return {
           ...schedule,
           daysLeft,
-          displayDate,
-          isToday: isScheduleToday
+          isToday: scheduleIsToday,
+          displayDate
         }
       })
       .sort((a, b) => {
-        // 今天的日程优先
-        if (a.isToday && !b.isToday) return -1
-        if (!a.isToday && b.isToday) return 1
-        
-        // 按剩余天数排序
-        if (a.daysLeft !== b.daysLeft) {
-          return a.daysLeft - b.daysLeft
+        // 按日期排序
+        const dateA = new Date(a.date)
+        const dateB = new Date(b.date)
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA.getTime() - dateB.getTime()
         }
         
-        // 剩余天数相同，按时间排序
+        // 同一天按时间排序
         return a.time.localeCompare(b.time)
       })
-  }, [schedules])
+  }, [schedules, selectedDate])
 
   // 添加日程
   const handleAddSchedule = async () => {
@@ -138,8 +143,9 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
   }
 
   return (
-    <TabsContent value="schedule" className="h-full m-0 p-4 overflow-y-auto">
-      <div className="space-y-4">
+    <TabsContent value="schedule" className="h-full m-0 flex flex-col">
+      {/* 固定顶部区域 */}
+      <div className="flex-shrink-0 p-4 space-y-4 border-b">
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -156,16 +162,19 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
           </Button>
         </div>
 
-        {/* 日历选择器 */}
+        {/* 日历选择器 - 加宽 */}
         <div className="flex justify-center">
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={(date) => date && setSelectedDate(date)}
-            className=""
+            className="w-full max-w-none"
           />
         </div>
+      </div>
 
+      {/* 可滚动内容区域 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* 添加日程输入区域 */}
         {showScheduleInput && (
           <Card>
@@ -211,50 +220,53 @@ export function ScheduleTab({ user }: ScheduleTabProps) {
           </Card>
         )}
 
-        {/* 即将到来的日程 */}
-        {upcomingSchedules.length === 0 ? (
+        {/* 当月日程 */}
+        {currentMonthSchedules.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
-            暂无即将到来的日程
+            本月暂无日程
           </div>
         ) : (
           <div className="space-y-4">
-            {upcomingSchedules.map((schedule) => (
-              <div key={schedule._id} className="cursor-pointer">
-                {/* 日程头部 - 时间在左边，还剩几天在右边 */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-muted-foreground">
-                    {schedule.time}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* 还剩几天标签 */}
-                    <Badge 
-                      variant="secondary" 
-                      className={cn(
-                        "text-xs",
-                        schedule.isToday
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                          : schedule.daysLeft <= 3
-                            ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
-                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                      )}
-                    >
-                      {schedule.displayDate}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* 日程内容 */}
-                <div className="mb-3">
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
-                    {schedule.title}
-                  </div>
-                  {schedule.description && (
-                    <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
-                      {schedule.description}
+            {currentMonthSchedules.map((schedule) => (
+              <Card key={schedule._id} className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  {/* 日程头部 - 时间在左边，还剩几天在右边 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {schedule.time}
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div className="flex items-center gap-2">
+                      {/* 还剩几天标签 */}
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "text-xs",
+                          schedule.isToday
+                            ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                            : schedule.daysLeft <= 3 && schedule.daysLeft >= 0
+                              ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
+                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                        )}
+                      >
+                        {schedule.displayDate}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* 日程内容 */}
+                  <div>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words font-medium">
+                      {schedule.title}
+                    </div>
+                    {schedule.description && (
+                      <div className="text-sm text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap break-words">
+                        {schedule.description}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}
