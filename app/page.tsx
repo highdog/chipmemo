@@ -1416,17 +1416,55 @@ export default function NotePad() {
       const newDate = new Date(selectedDate)
       newDate.setHours(currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds(), currentTime.getMilliseconds())
       
-      setDate(newDate)
+      // 检查点击的日期是否有日程
+      const dateKey = format(selectedDate, 'yyyy-MM-dd')
+      const hasScheduleOnDate = schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0
+      
+      let targetDate = newDate
+      
+      // 如果当前日期没有日程，找到该日期之后最近的有日程的日期
+      if (!hasScheduleOnDate) {
+        const clickedDate = new Date(selectedDate)
+        const futureScheduleDates = Object.keys(schedulesByDate)
+          .filter(scheduleDate => {
+            const scheduleDateTime = new Date(scheduleDate + 'T00:00:00')
+            return scheduleDateTime > clickedDate && schedulesByDate[scheduleDate].length > 0
+          })
+          .sort((a, b) => new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime())
+        
+        if (futureScheduleDates.length > 0) {
+          // 找到了未来有日程的日期，选择该日期
+          const targetDateTime = new Date(futureScheduleDates[0] + 'T00:00:00')
+          targetDateTime.setHours(currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds(), currentTime.getMilliseconds())
+          targetDate = targetDateTime
+          
+          toast({
+            title: "智能定位",
+            description: `该日期无日程，已自动定位到 ${targetDate.toLocaleDateString('zh-CN')} 的日程`,
+            duration: 3000,
+          })
+        } else {
+          // 没有找到未来的日程，选择点击的日期
+          toast({
+            title: "日期已选择",
+            description: `现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
+            duration: 2000,
+          })
+        }
+      } else {
+        // 有日程，直接选择该日期
+        toast({
+          title: "日期已选择",
+          description: `现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
+          duration: 2000,
+        })
+      }
+      
+      setDate(targetDate)
       // 如果不是在搜索状态，则跳转到对应日期的笔记
       if (!searchTerm) {
-        scrollToDate(newDate)
+        scrollToDate(targetDate)
       }
-      // 显示提示信息，告知用户现在可以添加笔记到选中的日期
-      toast({
-        title: "日期已选择",
-        description: `现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
-        duration: 2000,
-      })
     }
   }
 
@@ -4180,6 +4218,15 @@ export default function NotePad() {
                     selected={date}
                     onSelect={handleDateSelect}
                     className="rounded-md border"
+                    modifiers={{
+                      hasSchedule: (date) => {
+                        const dateKey = format(date, 'yyyy-MM-dd')
+                        return schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0
+                      }
+                    }}
+                    modifiersClassNames={{
+                      hasSchedule: "relative after:absolute after:bottom-1 after:left-1/2 after:transform after:-translate-x-1/2 after:w-1 after:h-1 after:bg-blue-500 after:rounded-full after:content-['']"
+                    }}
                   />
                   {/* 月份点击区域覆盖层 */}
                   <div 
