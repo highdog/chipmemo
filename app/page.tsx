@@ -22,8 +22,7 @@ import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
 
-import ScheduleList from "@/components/schedule-list"
-import CountdownList from "@/components/countdown-list"
+import IntegratedSchedule from "@/components/integrated-schedule"
 import GoalsList from "@/components/goals-list"
 import LargeCalendar from "@/components/large-calendar"
 import {
@@ -4198,14 +4197,9 @@ export default function NotePad() {
                 </div>
               </div>
               
-              {/* 日程区域 - 固定不滚动 */}
+              {/* 整合日程区域 - 固定不滚动 */}
               <div className="p-4 border-b">
-                <ScheduleList selectedDate={date} />
-              </div>
-              
-              {/* 倒计日区域 */}
-              <div className="p-4 border-b">
-                <CountdownList />
+                <IntegratedSchedule selectedDate={date} />
               </div>
               
               {/* 目标区域 */}

@@ -157,7 +157,7 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
   return (
     <div>
        <h3 className="font-medium text-sm mb-3">目标进度</h3>
-      <div className="space-y-4">
+      <div className="space-y-2">
         {goals.map((goal, index) => {
           const progress = goal.targetCount && goal.targetCount > 0 
             ? (goal.currentCount || 0) / goal.targetCount * 100 
@@ -172,7 +172,7 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
           return (
             <div 
               key={goal.tag} 
-              className="space-y-2 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors"
+              className="space-y-2 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
               onClick={() => handleGoalClick(goal.tag)}
             >
               <div className="flex items-center justify-between">

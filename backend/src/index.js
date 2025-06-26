@@ -23,10 +23,26 @@ app.set('trust proxy', 1);
 // Connect to MongoDB
 connectDB();
 
-// Rate limiting
+// Rate limiting - More lenient for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 1000, // increased from 100 to 1000 requests per windowMs
+  message: {
+    error: '请求过于频繁，请稍后再试',
+    retryAfter: '请在15分钟后重试'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Stricter rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 auth requests per windowMs
+  message: {
+    error: '登录请求过于频繁，请稍后再试',
+    retryAfter: '请在15分钟后重试'
+  }
 });
 
 // Middleware
@@ -39,17 +55,16 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true
 }));
-app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/notes', noteRoutes);
-app.use('/api/todos', todoRoutes);
-app.use('/api/tag-contents', tagContentRoutes);
-app.use('/api/schedules', scheduleRoutes);
-app.use('/api/admin', adminRoutes);
+// Routes with different rate limiting
+app.use('/api/auth', authLimiter, authRoutes); // Stricter limit for auth
+app.use('/api/notes', limiter, noteRoutes); // General limit for notes
+app.use('/api/todos', limiter, todoRoutes); // General limit for todos
+app.use('/api/tag-contents', limiter, tagContentRoutes); // General limit for tag contents
+app.use('/api/schedules', limiter, scheduleRoutes); // General limit for schedules
+app.use('/api/admin', authLimiter, adminRoutes); // Stricter limit for admin
 
 // Health check
 app.get('/api/health', (req, res) => {
