@@ -12,6 +12,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   Home, 
   FileText, 
@@ -96,7 +98,6 @@ export default function MobilePage() {
   // 控制输入区域显示状态
   const [showNoteInput, setShowNoteInput] = useState(false)
   const [showScheduleInput, setShowScheduleInput] = useState(false)
-  const [showTodoInput, setShowTodoInput] = useState(false)
   const [showGoalInput, setShowGoalInput] = useState(false)
   
   // 笔记相关状态
@@ -114,6 +115,7 @@ export default function MobilePage() {
   // Todo相关状态
   const [todos, setTodos] = useState<Todo[]>([])
   const [newTodo, setNewTodo] = useState("")
+  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   
   // 目标相关状态
@@ -371,10 +373,10 @@ export default function MobilePage() {
     try {
       await todosApi.create({
         text: newTodo,
-        priority: 'medium'
+        priority: newTodoPriority
       })
       setNewTodo("")
-      setShowTodoInput(false)
+      setNewTodoPriority('medium')
       await loadTodos()
       toast({ title: "待办添加成功" })
     } catch (error) {
@@ -703,22 +705,64 @@ export default function MobilePage() {
             </TabsContent>
 
             {/* Todo Tab */}
-            <TabsContent value="todo" className="h-full m-0 p-4 overflow-y-auto">
-              <div className="space-y-4">
+            <TabsContent value="todo" className="h-full m-0 flex flex-col">
+              {/* 固定的顶部区域 */}
+              <div className="p-4 bg-background border-b space-y-4">
                 {/* 顶部操作栏 */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-medium">待办事项</h2>
                     <span className="text-sm text-muted-foreground">({filteredTodos.filter(t => !t.completed).length})</span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowTodoInput(!showTodoInput)}
-                    className="shrink-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>添加待办事项</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">待办内容</label>
+                          <Input
+                            placeholder="输入待办事项..."
+                            value={newTodo}
+                            onChange={(e) => setNewTodo(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">优先级</label>
+                          <Select value={newTodoPriority} onValueChange={(value: 'low' | 'medium' | 'high') => setNewTodoPriority(value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择优先级" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">低优先级</SelectItem>
+                              <SelectItem value="medium">中优先级</SelectItem>
+                              <SelectItem value="high">高优先级</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleAddTodo} 
+                            disabled={isAddingTodo || !newTodo.trim()}
+                            className="flex-1"
+                          >
+                            {isAddingTodo ? "添加中..." : "添加待办"}
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 
                 {/* 标签筛选区域 */}
@@ -743,42 +787,10 @@ export default function MobilePage() {
                     </Button>
                   ))}
                 </div>
+              </div>
 
-                {/* 添加Todo输入区域 */}
-                {showTodoInput && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <Input
-                          placeholder="添加待办事项..."
-                          value={newTodo}
-                          onChange={(e) => setNewTodo(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddTodo()}
-                        />
-                        <div className="flex gap-2">
-                          <Button 
-                            onClick={handleAddTodo} 
-                            disabled={isAddingTodo || !newTodo.trim()}
-                            className="flex-1"
-                          >
-                            {isAddingTodo ? "添加中..." : "添加待办"}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            onClick={() => {
-                              setShowTodoInput(false)
-                              setNewTodo("")
-                            }}
-                          >
-                            取消
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Todo列表 */}
+              {/* 可滚动的Todo列表区域 */}
+              <div className="flex-1 overflow-y-auto p-4">
                 <div className="space-y-3">
                   {filteredTodos.length === 0 ? (
                     <div className="text-center text-muted-foreground py-8">
