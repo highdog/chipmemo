@@ -227,14 +227,14 @@ export function TodoTab({ user }: TodoTabProps) {
         </div>
 
         {/* 标签筛选 */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex flex-wrap gap-2">
           {tagContents.map((tag) => (
             <Button
               key={tag.name}
               variant={selectedTag === tag.name ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedTag(tag.name)}
-              className="shrink-0"
+              className="text-xs"
             >
               <Tag className="h-3 w-3 mr-1" />
               {tag.name} ({tag.count})
@@ -250,38 +250,52 @@ export function TodoTab({ user }: TodoTabProps) {
             {selectedTag === "All" ? "暂无待办事项" : `暂无"${selectedTag}"标签的待办事项`}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {filteredTodos.map((todo) => (
-              <div
-                key={todo._id}
-                className={cn(
-                  "flex items-start gap-3 p-3 rounded-lg border-l-4 bg-card",
-                  getPriorityColor(todo.priority),
-                  todo.completed && "opacity-60"
-                )}
-              >
-                <Checkbox
-                  checked={todo.completed}
-                  onCheckedChange={() => toggleTodo(todo._id)}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <div className={cn(
-                    "text-sm",
-                    todo.completed && "line-through text-muted-foreground"
-                  )}>
-                    {todo.text}
-                  </div>
-                  {todo.tags && todo.tags.length > 0 && (
-                    <div className="flex gap-1 mt-2">
-                      {todo.tags.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
+              <div key={todo._id}>
+                <div className="flex items-start gap-3 p-3">
+                  <Checkbox
+                    checked={todo.completed}
+                    onCheckedChange={() => toggleTodo(todo._id)}
+                    className="mt-1"
+                  />
+                  <div className="flex flex-1">
+                    {/* 待办内容 */}
+                    <div className="flex-1">
+                      <div className={cn(
+                        "text-sm border-l-4 pl-3",
+                        getPriorityColor(todo.priority),
+                        todo.completed && "line-through text-muted-foreground opacity-60"
+                      )}>
+                        {todo.text}
+                      </div>
                     </div>
-                  )}
+                    
+                    {/* 标签 - 放在右侧 */}
+                    {todo.tags && todo.tags.length > 0 && (
+                      <div className="flex flex-col items-end gap-1 ml-2 min-w-[80px]">
+                        {todo.tags.slice(0, 3).map((tag, index) => (
+                          <Badge 
+                            key={index} 
+                            variant="outline" 
+                            className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 transition-colors"
+                            onClick={() => setSelectedTag(tag)}
+                          >
+                            #{tag}
+                          </Badge>
+                        ))}
+                        {todo.tags.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{todo.tags.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                
+                {/* 分割线 */}
+                <div className="border-b border-border/50 my-3" />
               </div>
             ))}
           </div>

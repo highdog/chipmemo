@@ -1,17 +1,18 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TabsContent } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, X } from "lucide-react"
 import { 
   addNote,
-  getNotes,
   deleteNote,
+  getNotes,
+  searchNotesByTag,
   searchNotes,
   type Note
 } from "@/lib/actions"
@@ -27,23 +28,59 @@ export function NotesTab({ user }: NotesTabProps) {
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [showNoteInput, setShowNoteInput] = useState(false)
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const NOTES_PER_PAGE = 100
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // 加载笔记数据
-  const loadNotes = useCallback(async () => {
+  const loadNotes = useCallback(async (page = 1, append = false) => {
+    if (loading) return
+    
     try {
-      const response = await getNotes(1, 50)
-      setNotes(response.notes || [])
+      setLoading(true)
+      const response = await getNotes(page, NOTES_PER_PAGE)
+      const newNotes = response.notes || []
+      
+      if (append) {
+        setNotes(prev => [...prev, ...newNotes])
+      } else {
+        setNotes(newNotes)
+      }
+      
+      setHasMore(newNotes.length === NOTES_PER_PAGE)
+      setCurrentPage(page)
     } catch (error) {
       console.error('Error loading notes:', error)
       toast({ title: "加载笔记失败", variant: "destructive" })
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [NOTES_PER_PAGE, toast])
+  
+  // 加载更多笔记
+  const loadMoreNotes = useCallback(() => {
+    if (hasMore && !loading) {
+      loadNotes(currentPage + 1, true)
+    }
+  }, [hasMore, loading, currentPage, loadNotes])
 
   useEffect(() => {
     if (user) {
       loadNotes()
     }
-  }, [user, loadNotes])
+  }, [user]) // 移除loadNotes依赖，避免无限循环
+  
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // 按日期分组笔记的函数
   const groupNotesByDate = (notes: Note[]) => {
@@ -108,6 +145,45 @@ export function NotesTab({ user }: NotesTabProps) {
     } catch (error) {
       console.error('Error deleting note:', error)
       toast({ title: "删除笔记失败", variant: "destructive" })
+    }
+  }
+
+  // 处理标签点击
+  const handleTagClick = async (tag: string) => {
+    const trimmedTag = tag.trim()
+    if (!trimmedTag) {
+      toast({
+        title: "搜索失败",
+        description: "标签名称不能为空",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    setSearchTerm(`#${trimmedTag}`)
+    
+    try {
+      const searchResult = await searchNotesByTag(trimmedTag, 1, 5000)
+      if (searchResult && searchResult.notes) {
+        setNotes(searchResult.notes)
+        setHasMore(false) // 搜索结果不支持分页
+        toast({
+          title: "标签搜索",
+          description: `找到 ${searchResult.notes.length} 条包含 #${trimmedTag} 标签的笔记`,
+        })
+      } else {
+        // 处理返回值为空的情况
+        setNotes([])
+        setHasMore(false)
+        toast({
+          title: "标签搜索",
+          description: `未找到包含 #${trimmedTag} 标签的笔记`,
+        })
+      }
+    } catch (error) {
+      console.error('Error searching notes by tag:', error)
+      toast({ title: "搜索失败", variant: "destructive" })
+      // 出错时保持当前笔记列表不变
     }
   }
 
@@ -179,7 +255,24 @@ export function NotesTab({ user }: NotesTabProps) {
       </div>
 
       {/* 可滚动的笔记列表区域 */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div 
+        className="flex-1 overflow-y-auto p-4"
+        onScroll={(e) => {
+          // 清除之前的定时器
+          if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current)
+          }
+          
+          // 设置防抖定时器
+          scrollTimeoutRef.current = setTimeout(() => {
+            if (!e.currentTarget) return
+            const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+            if (scrollHeight - scrollTop <= clientHeight + 100 && hasMore && !loading) {
+              loadMoreNotes()
+            }
+          }, 200) // 200ms 防抖延迟
+        }}
+      >
         <div className="space-y-6">
           {groupedNotes.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
@@ -189,7 +282,7 @@ export function NotesTab({ user }: NotesTabProps) {
             groupedNotes.map(([dateKey, dayNotes]) => (
               <div key={dateKey} className="mb-6" id={`date-${dateKey}`}>
                 {/* 日期标题 - 粘性定位 */}
-                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 flex items-center py-2 mb-3">
+                <div className="sticky top-0 z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 -mb-4">
                   <h3 className="text-lg font-semibold text-foreground">{formatDateShort(new Date(dateKey))}</h3>
                   <div className="ml-3 text-sm text-muted-foreground">{dayNotes.length} 条笔记</div>
                 </div>
@@ -197,11 +290,17 @@ export function NotesTab({ user }: NotesTabProps) {
                 {/* 该日期下的所有笔记 */}
                 <div className="ml-4 space-y-4">
                   {dayNotes.map((note) => {
-                    const tags = extractTags(note.content)
-                    const contentWithoutTags = note.content.replace(/#\w+/g, '').trim()
+                    // 使用note.tags数组而不是从内容中提取
+                    const tags = note.tags || []
+                    // 显示处理过的内容（已移除标签）
+                    const contentWithoutTags = note.content
                     
                     return (
-                      <div key={note.id} className="group">
+                      <div 
+                        key={note.id} 
+                        className="cursor-pointer"
+                        onClick={() => setSelectedNoteId(selectedNoteId === note.id ? null : note.id)}
+                      >
                         {/* 笔记头部信息 */}
                         <div className="flex items-center justify-between mb-2">
                           <div className="text-xs text-muted-foreground">
@@ -211,44 +310,56 @@ export function NotesTab({ user }: NotesTabProps) {
                             })}
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteNote(note.id)}
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="删除笔记"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                            {tags.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <div className="flex gap-1">
-                                  {tags.slice(0, 3).map((tag, index) => (
-                                    <Badge 
-                                      key={index} 
-                                      variant="outline" 
-                                      className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
-                                    >
-                                      #{tag}
-                                    </Badge>
-                                  ))}
-                                  {tags.length > 3 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{tags.length - 3}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
+                            {selectedNoteId === note.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteNote(note.id)
+                                }}
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
+                                title="删除笔记"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             )}
                           </div>
                         </div>
                         
-                        {/* 笔记内容 */}
-                        <div 
-                          className="text-sm whitespace-pre-wrap break-words mb-3"
-                          style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}
-                        >
-                          {contentWithoutTags}
+                        {/* 笔记内容和标签 */}
+                        <div className="flex mb-3">
+                          {/* 笔记内容 */}
+                          <div 
+                            className="text-sm whitespace-pre-wrap break-words flex-1"
+                            style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}
+                          >
+                            {contentWithoutTags}
+                          </div>
+                          
+                          {/* 标签 - 放在右侧 */}
+                          {tags.length > 0 && (
+                            <div className="flex flex-col items-end gap-1 ml-2 min-w-[80px]">
+                              {tags.slice(0, 3).map((tag, index) => (
+                                <Badge 
+                                  key={index} 
+                                  variant="outline" 
+                                  className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleTagClick(tag)
+                                  }}
+                                >
+                                  #{tag}
+                                </Badge>
+                              ))}
+                              {tags.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{tags.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          )}  
                         </div>
                         
                         {/* 分割线 */}
@@ -259,6 +370,19 @@ export function NotesTab({ user }: NotesTabProps) {
                 </div>
               </div>
             ))
+          )}
+          
+          {/* 加载更多提示 */}
+          {loading && (
+            <div className="text-center py-4 text-muted-foreground">
+              加载中...
+            </div>
+          )}
+          
+          {!hasMore && notes.length > 0 && (
+            <div className="text-center py-4 text-muted-foreground">
+              已加载全部笔记
+            </div>
           )}
         </div>
       </div>
