@@ -322,7 +322,7 @@ export function NotesTab({ user }: NotesTabProps) {
             groupedNotes.map(([dateKey, dayNotes]) => (
               <div key={dateKey} className="mb-6" id={`date-${dateKey}`}>
                 {/* 日期标题 - 粘性定位 */}
-                <div className="sticky top-0 z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 mb-2">
+                <div className="sticky top-[-1rem] z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 mb-2">
                   <h3 className="text-lg font-semibold text-foreground">{formatDateShort(new Date(dateKey))}</h3>
                   <div className="ml-3 text-sm text-muted-foreground">{dayNotes.length} 条笔记</div>
                 </div>
