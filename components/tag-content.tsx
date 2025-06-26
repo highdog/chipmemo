@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Pencil, Save, X, Target, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { tagContentsApi, apiClient } from "@/lib/api"
+import NoteHeatmap from "@/components/note-heatmap"
 
 
 interface TagContentProps {
@@ -416,6 +417,11 @@ export function TagContent({ tag, onSave }: TagContentProps) {
                 </div>
               </div>
             )}
+            
+            {/* 笔记统计热力图 */}
+            <div className="border-t pt-4">
+              <NoteHeatmap tag={tag} />
+            </div>
           </div>
         )}
       </CardContent>
