@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Head from "next/head"
 import { useAuth } from "@/lib/auth-context"
 import { useTheme } from "next-themes"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -56,9 +57,13 @@ export default function MobilePage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* 主内容区域 */}
-      <div className="flex-1 overflow-hidden">
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      </Head>
+      <div className="flex flex-col h-screen bg-background mobile-container">
+        {/* 主内容区域 */}
+        <div className="flex-1 overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
           {/* Tab内容 */}
           <div className="flex-1 overflow-hidden">
@@ -107,9 +112,10 @@ export default function MobilePage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-      </div>
+        </div>
 
-      <Toaster />
-    </div>
+        <Toaster />
+      </div>
+    </>
   )
 }

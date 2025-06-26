@@ -105,7 +105,7 @@ export function ProfileTab({ user, theme, toggleTheme, logout }: ProfileTabProps
   }
 
   return (
-    <TabsContent value="profile" className="h-full m-0 p-4 overflow-y-auto">
+    <TabsContent value="profile" className="h-full m-0 p-4 overflow-y-auto scrollable-area">
       <div className="space-y-6">
         {/* 用户信息卡片 */}
         <Card>

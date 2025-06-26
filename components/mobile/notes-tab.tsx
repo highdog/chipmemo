@@ -256,7 +256,7 @@ export function NotesTab({ user }: NotesTabProps) {
 
       {/* 可滚动的笔记列表区域 */}
       <div 
-        className="flex-1 overflow-y-auto p-4"
+        className="flex-1 overflow-y-auto p-4 scrollable-area"
         onScroll={(e) => {
           // 清除之前的定时器
           if (scrollTimeoutRef.current) {

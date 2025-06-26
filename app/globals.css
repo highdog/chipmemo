@@ -92,3 +92,41 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* 移动端样式 - 禁止缩放和滑动 */
+@media (max-width: 768px) {
+  html, body {
+    touch-action: pan-x pan-y;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-text-size-adjust: none;
+    overscroll-behavior: none;
+    position: fixed;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .mobile-container {
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* 允许特定区域滑动 */
+  .scrollable-area {
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* 禁止双击缩放 */
+  * {
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+  }
+}

@@ -309,7 +309,7 @@ export function TodoTab({ user }: TodoTabProps) {
       </div>
 
       {/* 可滚动的待办列表 */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-4 scrollable-area">
         {filteredTodos.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             {selectedTag === "All" ? "暂无待办事项" : `暂无"${selectedTag}"标签的待办事项`}
