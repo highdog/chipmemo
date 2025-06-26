@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         const { token, user: userData } = response.data;
         localStorage.setItem('auth_token', token);
-        localStorage.setItem('userId', userData.id);
+        localStorage.setItem('userId', userData._id);
         
         // 设置apiClient的token
         apiClient.setToken(token);
@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         const { token, user: userData } = response.data;
         localStorage.setItem('auth_token', token);
-        localStorage.setItem('userId', userData.id);
+        localStorage.setItem('userId', userData._id);
         
         // 设置apiClient的token
         apiClient.setToken(token);

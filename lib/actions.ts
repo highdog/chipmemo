@@ -44,6 +44,7 @@ function convertApiNoteToNote(apiNote: ApiNote): Note {
   
   return {
     id: apiNote._id,
+    title: apiNote.title || '',
     content: contentWithoutImage,
     originalContent: apiNote.content, // 后端已经存储完整内容
     date: new Date(apiNote.createdAt).toISOString().split('T')[0],

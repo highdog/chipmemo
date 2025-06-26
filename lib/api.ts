@@ -12,7 +12,7 @@ interface ApiResponse<T = any> {
 
 // 用户相关类型
 export interface User {
-  id: string;
+  _id: string;
   username: string;
   email: string;
   isAdmin?: boolean;
@@ -20,6 +20,8 @@ export interface User {
     theme: 'light' | 'dark' | 'system';
     language: 'en' | 'zh' | 'ja';
   };
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthResponse {
