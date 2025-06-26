@@ -68,7 +68,7 @@ router.get('/', [
 
     const todos = await Todo.find(query)
       .populate('noteId', 'title')
-      .sort({ completed: 1, priority: -1, dueDate: 1, createdAt: -1 })
+      .sort({ completed: 1, priority: -1, order: 1, dueDate: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -201,15 +201,26 @@ router.post('/', [
     }
 
     const { text, priority, dueDate, category, noteId, tags } = req.body;
+    const todoPriority = priority || 'medium';
+
+    // 获取同优先级的最大order值
+    const maxOrderTodo = await Todo.findOne({
+      userId: req.user._id,
+      priority: todoPriority,
+      completed: false
+    }).sort({ order: -1 });
+
+    const nextOrder = maxOrderTodo ? (maxOrderTodo.order || 0) + 1 : 1;
 
     const todo = new Todo({
       text,
-      priority: priority || 'medium',
+      priority: todoPriority,
       dueDate: dueDate || null,
       category: category || 'general',
       noteId: noteId || null,
       tags: tags || [],
-      userId: req.user._id
+      userId: req.user._id,
+      order: nextOrder
     });
 
     await todo.save();
@@ -272,19 +283,38 @@ router.post('/batch', [
     const createdTodos = [];
     const failedTodos = [];
 
+    // 获取各优先级的当前最大order值
+    const orderCounters = {
+      low: 0,
+      medium: 0,
+      high: 0
+    };
+
+    for (const priority of ['low', 'medium', 'high']) {
+      const maxOrderTodo = await Todo.findOne({
+        userId: req.user._id,
+        priority: priority,
+        completed: false
+      }).sort({ order: -1 });
+      orderCounters[priority] = maxOrderTodo ? (maxOrderTodo.order || 0) : 0;
+    }
+
     // 批量创建Todo
     for (let i = 0; i < todos.length; i++) {
       try {
         const { text, priority, dueDate, category, noteId, tags } = todos[i];
+        const todoPriority = priority || 'medium';
+        orderCounters[todoPriority]++;
 
         const todo = new Todo({
           text,
-          priority: priority || 'medium',
+          priority: todoPriority,
           dueDate: dueDate || null,
           category: category || 'general',
           noteId: noteId || null,
           tags: tags || [],
-          userId: req.user._id
+          userId: req.user._id,
+          order: orderCounters[todoPriority]
         });
 
         await todo.save();
@@ -419,6 +449,89 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// @route   PATCH /api/todos/:id/reorder
+// @desc    Reorder todo within same priority
+// @access  Private
+router.patch('/:id/reorder', [
+  body('direction')
+    .isIn(['up', 'down'])
+    .withMessage('Direction must be "up" or "down"')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { direction } = req.body;
+    const todoId = req.params.id;
+
+    // 找到当前todo
+    const currentTodo = await Todo.findOne({
+      _id: todoId,
+      userId: req.user._id
+    });
+
+    if (!currentTodo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    // 获取同优先级的所有todos，按order排序
+    const samePriorityTodos = await Todo.find({
+      userId: req.user._id,
+      priority: currentTodo.priority,
+      completed: currentTodo.completed
+    }).sort({ order: 1, createdAt: 1 });
+
+    // 找到当前todo在列表中的索引
+    const currentIndex = samePriorityTodos.findIndex(todo => todo._id.toString() === todoId);
+    
+    if (currentIndex === -1) {
+      return res.status(404).json({ error: 'Todo not found in priority group' });
+    }
+
+    let targetIndex;
+    if (direction === 'up') {
+      targetIndex = currentIndex - 1;
+      if (targetIndex < 0) {
+        return res.status(400).json({ error: 'Cannot move up, already at top' });
+      }
+    } else {
+      targetIndex = currentIndex + 1;
+      if (targetIndex >= samePriorityTodos.length) {
+        return res.status(400).json({ error: 'Cannot move down, already at bottom' });
+      }
+    }
+
+    // 交换order值
+    const targetTodo = samePriorityTodos[targetIndex];
+    const currentOrder = currentTodo.order;
+    const targetOrder = targetTodo.order;
+
+    await Todo.updateOne(
+      { _id: currentTodo._id },
+      { order: targetOrder }
+    );
+
+    await Todo.updateOne(
+      { _id: targetTodo._id },
+      { order: currentOrder }
+    );
+
+    // 返回更新后的todo
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: `Todo moved ${direction} successfully`
+    });
+  } catch (error) {
+    console.error('Error reordering todo:', error);
+    res.status(500).json({ error: 'Server error while reordering todo' });
+  }
+});
+
 // @route   GET /api/todos/categories
 // @desc    Get all categories for user
 // @access  Private
@@ -437,6 +550,91 @@ router.get('/categories', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Server error while fetching categories' });
+  }
+});
+
+
+
+// @route   PATCH /api/todos/:id/set-order
+// @desc    Set specific order for a todo and adjust others
+// @access  Private
+router.patch('/:id/set-order', [
+  body('order').isInt({ min: 1 }).withMessage('Order must be a positive integer')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { order: targetOrder } = req.body;
+    
+    // 查找当前todo
+    const currentTodo = await Todo.findOne({ _id: id, userId: req.user._id });
+    if (!currentTodo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+    
+    // 查找同优先级和完成状态的所有todos
+    const samePriorityTodos = await Todo.find({
+      userId: req.user._id,
+      priority: currentTodo.priority,
+      completed: currentTodo.completed
+    }).sort({ order: 1 });
+    
+    // 验证目标序号是否有效
+    if (targetOrder > samePriorityTodos.length) {
+      return res.status(400).json({ error: 'Target order exceeds maximum allowed value' });
+    }
+    
+    // 获取当前todo在排序列表中的位置
+    const currentIndex = samePriorityTodos.findIndex(todo => todo._id.toString() === id);
+    if (currentIndex === -1) {
+      return res.status(404).json({ error: 'Todo not found in priority group' });
+    }
+    
+    // 如果目标序号和当前序号相同，无需操作
+    if (targetOrder === currentIndex + 1) {
+      return res.json({
+        success: true,
+        data: currentTodo
+      });
+    }
+    
+    // 重新分配序号
+    const bulkOps = [];
+    
+    // 移除当前todo从列表
+    const todosWithoutCurrent = samePriorityTodos.filter(todo => todo._id.toString() !== id);
+    
+    // 在目标位置插入当前todo
+    const reorderedTodos = [...todosWithoutCurrent];
+    reorderedTodos.splice(targetOrder - 1, 0, currentTodo);
+    
+    // 为所有todos分配新的order值
+    reorderedTodos.forEach((todo, index) => {
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: todo._id, userId: req.user._id },
+          update: { $set: { order: index + 1 } }
+        }
+      });
+    });
+    
+    // 执行批量更新
+    await Todo.bulkWrite(bulkOps);
+    
+    // 返回更新后的todo
+    const updatedTodo = await Todo.findById(id);
+    
+    res.json({
+      success: true,
+      data: updatedTodo
+    });
+  } catch (error) {
+    console.error('Error in set order:', error);
+    res.status(500).json({ error: 'Server error while setting todo order' });
   }
 });
 

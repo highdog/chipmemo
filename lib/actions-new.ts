@@ -23,6 +23,7 @@ export interface TodoItem {
   tags?: string[];
   dueDate?: string;
   startDate?: string;
+  order?: number;
 }
 
 // 将后端API的Note转换为前端Note格式
@@ -397,6 +398,23 @@ export const todoActions = {
       return {
         success: false,
         error: error instanceof Error ? error.message : '删除待办事项失败',
+      };
+    }
+  },
+
+  // 重新排序todo
+  async reorderTodo(id: string, direction: 'up' | 'down') {
+    try {
+      const response = await todosApi.reorder(id, direction);
+      return {
+        success: response.success,
+        error: response.error,
+        data: response.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '调整待办事项顺序失败',
       };
     }
   },

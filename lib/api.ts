@@ -51,6 +51,7 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high';
   dueDate?: string;
   userId: string;
+  order?: number;
 }
 
 // 管理员相关类型
@@ -515,6 +516,16 @@ class ApiClient {
     return this.delete<{ message: string }>(`/todos/${id}`);
   }
 
+  async reorderTodo(id: string, direction: 'up' | 'down'): Promise<ApiResponse<Todo>> {
+    return this.patch<Todo>(`/todos/${id}/reorder`, { direction });
+  }
+
+
+
+  async setTodoOrder(id: string, order: number): Promise<ApiResponse<Todo>> {
+    return this.patch<Todo>(`/todos/${id}/set-order`, { order });
+  }
+
   async getTodoCategories(): Promise<ApiResponse<Array<{ category: string; count: number }>>> {
     return this.get<Array<{ category: string; count: number }>>('/todos/categories');
   }
@@ -573,6 +584,9 @@ export const todosApi = {
     apiClient.updateTodo(id, data),
   toggle: (id: string) => apiClient.toggleTodo(id),
   delete: (id: string) => apiClient.deleteTodo(id),
+  reorder: (id: string, direction: 'up' | 'down') => apiClient.reorderTodo(id, direction),
+  setOrder: (id: string, order: number) => apiClient.setTodoOrder(id, order),
+
   getCategories: () => apiClient.getTodoCategories(),
 };
 

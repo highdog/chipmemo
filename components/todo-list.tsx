@@ -5,8 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { Loader2, CheckCircle2, Circle, MoreHorizontal } from "lucide-react"
+import { Loader2, CheckCircle2, Circle, MoreHorizontal, ChevronUp, ChevronDown } from "lucide-react"
 import { getTodosByDate, toggleTodo, type TodoItem } from "@/lib/actions-new"
+import { todosApi } from "@/lib/api"
 import { formatDateShort } from "@/lib/date-utils"
 import { toast } from "@/hooks/use-toast"
 
@@ -89,6 +90,32 @@ export function TodoList({ selectedDate }: TodoListProps) {
     } catch (error) {
       toast({
         title: "更新失败",
+        description: "网络错误，请重试",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleReorderTodo = async (noteId: string, todoId: string, direction: 'up' | 'down') => {
+    try {
+      const result = await todosApi.reorder(todoId, direction)
+      if (result.success) {
+        // 重新加载todos以获取最新的排序
+        await loadTodos()
+        toast({
+          title: "排序已更新",
+          description: `待办事项已${direction === 'up' ? '上移' : '下移'}`,
+        })
+      } else {
+        toast({
+          title: "排序失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "排序失败",
         description: "网络错误，请重试",
         variant: "destructive",
       })
@@ -188,6 +215,18 @@ export function TodoList({ selectedDate }: TodoListProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleReorderTodo(item.noteId, item.todo.id, 'up')}
+                      >
+                        <ChevronUp className="h-4 w-4 mr-2" />
+                        上移
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleReorderTodo(item.noteId, item.todo.id, 'down')}
+                      >
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        下移
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleUpdatePriority(item.noteId, item.todo.id, 'high')}
                         className={item.todo.priority === 'high' ? 'bg-accent' : ''}

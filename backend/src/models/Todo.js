@@ -45,6 +45,10 @@ const todoSchema = new mongoose.Schema({
     trim: true,
     maxlength: [30, 'Tag cannot exceed 30 characters']
   }],
+  order: {
+    type: Number,
+    default: 0
+  },
   reminder: {
     enabled: {
       type: Boolean,
