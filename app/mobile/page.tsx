@@ -385,18 +385,37 @@ export default function MobilePage() {
     }
   }
 
-  // 切换Todo状态
+  // 切换Todo状态 - 删除待办事项并添加笔记
   const handleToggleTodo = async (todoId: string) => {
     try {
       const todo = todos.find(t => t._id === todoId)
       if (!todo) return
       
-      await todosApi.update(todoId, { completed: !todo.completed })
-      await loadTodos()
-      toast({ title: todo.completed ? "标记为未完成" : "标记为已完成" })
+      // 如果todo从未完成变为完成，则删除todo并创建笔记
+      if (!todo.completed) {
+        // 创建笔记内容，包含原todo的内容和标签
+        const noteContent = todo.text + (todo.tags && todo.tags.length > 0 ? ' ' + todo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
+        
+        // 调用addNote API创建新笔记
+        const result = await addNote(noteContent, new Date().toISOString())
+        if (result.success) {
+          // 创建笔记成功后，删除待办事项
+          await todosApi.delete(todoId)
+          // 重新加载todos数据
+          await loadTodos()
+          toast({ title: "Todo已完成并转换为笔记" })
+        } else {
+          toast({ title: "创建笔记失败", variant: "destructive" })
+        }
+      } else {
+        // 如果是从完成变为未完成，调用更新API
+        await todosApi.update(todoId, { completed: !todo.completed })
+        await loadTodos()
+        toast({ title: "标记为未完成" })
+      }
     } catch (error) {
       console.error('Error toggling todo:', error)
-      toast({ title: "更新待办失败", variant: "destructive" })
+      toast({ title: "操作失败", variant: "destructive" })
     }
   }
 
@@ -767,12 +786,20 @@ export default function MobilePage() {
                     </div>
                   ) : (
                     filteredTodos.map((todo) => (
-                      <div key={todo._id} className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border">
+                      <div key={todo._id} className="flex items-start gap-3 p-3 bg-background rounded-lg border relative overflow-hidden">
+                        {/* 左侧优先级颜色条 */}
+                        <div className={cn(
+                          "absolute left-0 top-0 bottom-0 w-1",
+                          todo.priority === 'high' ? 'bg-red-500' : 
+                          todo.priority === 'medium' ? 'bg-yellow-500' : 
+                          'bg-green-500'
+                        )} />
+                        
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleToggleTodo(todo._id)}
-                          className="p-0 h-auto"
+                          className="p-0 h-auto ml-2"
                         >
                           {todo.completed ? (
                             <Check className="h-5 w-5 text-green-500" />
@@ -780,40 +807,30 @@ export default function MobilePage() {
                             <div className="h-5 w-5 border-2 border-muted-foreground rounded" />
                           )}
                         </Button>
-                        <div className="flex-1">
+                        
+                        <div className="flex-1 min-w-0">
                           <div className={cn(
-                            "text-sm",
+                            "text-sm leading-relaxed",
                             todo.completed ? "line-through text-muted-foreground" : "text-foreground"
                           )}>
                             {todo.text}
                           </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <div className="text-xs text-muted-foreground">
-                              {formatDateShort(new Date(todo.createdAt))}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {todo.tags && todo.tags.length > 0 && (
-                                <div className="flex gap-1">
-                                  {todo.tags.slice(0, 2).map((tag, index) => (
-                                    <Badge key={index} variant="outline" className="text-xs px-1 py-0">
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                  {todo.tags.length > 2 && (
-                                    <Badge variant="outline" className="text-xs px-1 py-0">
-                                      +{todo.tags.length - 2}
-                                    </Badge>
-                                  )}
-                                </div>
+                          
+                          {/* 标签显示 */}
+                          {todo.tags && todo.tags.length > 0 && (
+                            <div className="flex gap-1 mt-2 flex-wrap">
+                              {todo.tags.slice(0, 2).map((tag, index) => (
+                                <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {todo.tags.length > 2 && (
+                                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                                  +{todo.tags.length - 2}
+                                </Badge>
                               )}
-                              <Badge 
-                                variant={todo.priority === 'high' ? 'destructive' : todo.priority === 'medium' ? 'default' : 'secondary'}
-                                className="text-xs"
-                              >
-                                {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
-                              </Badge>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                     ))
