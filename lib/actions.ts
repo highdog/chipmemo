@@ -6,6 +6,7 @@ import { extractTags, removeTagsFromContent } from './utils';
 // 兼容原有的接口定义
 export interface Note {
   id: string;
+  title: string;
   content: string;
   originalContent: string;
   date: string;

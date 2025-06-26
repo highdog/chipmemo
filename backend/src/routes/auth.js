@@ -64,6 +64,7 @@ router.post('/register', [
           id: user._id,
           username: user.username,
           email: user.email,
+          isAdmin: user.isAdmin,
           preferences: user.preferences
         }
       }
@@ -111,6 +112,7 @@ router.post('/login', [
           id: user._id,
           username: user.username,
           email: user.email,
+          isAdmin: user.isAdmin,
           preferences: user.preferences
         }
       }

@@ -51,7 +51,26 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
             ...schedule,
             type: schedule.type as ScheduleItem['type']
           }))
-          setSchedules(daySchedules)
+          
+          // 去重处理：基于id、title、time和date的组合
+          const uniqueSchedules = daySchedules.filter((schedule, index, self) => {
+            return index === self.findIndex(s => 
+              s.id === schedule.id || 
+              (s.title === schedule.title && s.time === schedule.time)
+            )
+          })
+          
+          console.log(`📅 [日程调试] 原始数据: ${daySchedules.length}, 去重后: ${uniqueSchedules.length}`)
+          if (daySchedules.length !== uniqueSchedules.length) {
+            console.warn('📅 [日程调试] 发现重复日程数据:', daySchedules.filter((schedule, index, self) => {
+              return index !== self.findIndex(s => 
+                s.id === schedule.id || 
+                (s.title === schedule.title && s.time === schedule.time)
+              )
+            }))
+          }
+          
+          setSchedules(uniqueSchedules)
         } else {
           setSchedules([])
         }

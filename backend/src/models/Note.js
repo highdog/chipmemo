@@ -55,6 +55,9 @@ noteSchema.index({ userId: 1, createdAt: -1 });
 noteSchema.index({ userId: 1, tags: 1 });
 noteSchema.index({ userId: 1, title: 'text', content: 'text' });
 
+// Unique index to prevent duplicate notes (same user, title, and content)
+noteSchema.index({ userId: 1, title: 1, content: 1 }, { unique: true });
+
 // Virtual for formatted date
 noteSchema.virtual('formattedDate').get(function() {
   return this.createdAt.toLocaleDateString();

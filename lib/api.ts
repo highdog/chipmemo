@@ -15,6 +15,7 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  isAdmin?: boolean;
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: 'en' | 'zh' | 'ja';
@@ -48,6 +49,51 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high';
   dueDate?: string;
   userId: string;
+}
+
+// 管理员相关类型
+export interface AdminStats {
+  summary: {
+    totalUsers: number;
+    totalNotes: number;
+    totalTodos: number;
+    totalSchedules: number;
+    totalTagContents: number;
+    totalItems: number;
+  };
+  users: Array<{
+    _id: string;
+    username: string;
+    email: string;
+    password: string;
+    isAdmin: boolean;
+    createdAt: string;
+    notesCount: number;
+    todosCount: number;
+    schedulesCount: number;
+    tagContentsCount: number;
+    totalItems: number;
+  }>;
+}
+
+export interface UserDetail {
+  user: {
+    _id: string;
+    username: string;
+    email: string;
+    createdAt: string;
+    preferences: {
+      theme: string;
+      language: string;
+    };
+  };
+  recentData: {
+    notes: any[];
+    todos: any[];
+    schedules: any[];
+    tagContents: any[];
+  };
+
   noteId?: string;
   category: string;
   tags: string[];
@@ -470,6 +516,27 @@ class ApiClient {
   async getTodoCategories(): Promise<ApiResponse<Array<{ category: string; count: number }>>> {
     return this.get<Array<{ category: string; count: number }>>('/todos/categories');
   }
+
+  // 管理员相关方法
+  async getAdminStats(): Promise<ApiResponse<AdminStats>> {
+    return this.get<AdminStats>('/admin/stats');
+  }
+
+  async getUserDetail(userId: string): Promise<ApiResponse<UserDetail>> {
+    return this.get<UserDetail>(`/admin/users/${userId}`);
+  }
+
+  async deleteUser(userId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(`/admin/users/${userId}`);
+  }
+
+  async updateUser(userId: string, data: { username?: string; email?: string; isAdmin?: boolean }): Promise<ApiResponse<any>> {
+    return this.put<any>(`/admin/users/${userId}`, data);
+  }
+
+  async updateUserPassword(userId: string, password: string): Promise<ApiResponse<{ message: string }>> {
+    return this.put<{ message: string }>(`/admin/users/${userId}/password`, { password });
+  }
 }
 
 // 创建API客户端实例
@@ -520,6 +587,14 @@ export const schedulesApi = {
   update: (id: string, data: Parameters<typeof apiClient.updateSchedule>[1]) =>
     apiClient.updateSchedule(id, data),
   delete: (id: string) => apiClient.deleteSchedule(id),
+};
+
+export const adminApi = {
+  getStats: () => apiClient.getAdminStats(),
+  getUserDetail: (userId: string) => apiClient.getUserDetail(userId),
+  deleteUser: (userId: string) => apiClient.deleteUser(userId),
+  updateUser: (userId: string, data: { username?: string; email?: string; isAdmin?: boolean }) => apiClient.updateUser(userId, data),
+  updateUserPassword: (userId: string, password: string) => apiClient.updateUserPassword(userId, password),
 };
 
 export default apiClient;

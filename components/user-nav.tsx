@@ -18,7 +18,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "@/hooks/use-toast"
 import { useTheme } from "next-themes"
-import { Download, Upload, Loader2, Sun, Moon } from "lucide-react"
+import { Download, Upload, Loader2, Sun, Moon, Settings } from "lucide-react"
 
 interface UserNavProps {
   onLogout?: () => void
@@ -128,6 +128,14 @@ export function UserNav({
         <DropdownMenuItem>
           设置
         </DropdownMenuItem>
+        {user.isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <Settings className="h-4 w-4 mr-2" />
+              后台管理
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>
           退出登录

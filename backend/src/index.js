@@ -10,10 +10,15 @@ const noteRoutes = require('./routes/notes');
 const todoRoutes = require('./routes/todos');
 const tagContentRoutes = require('./routes/tagContents');
 const scheduleRoutes = require('./routes/schedules');
+const adminRoutes = require('./routes/admin');
 const errorHandler = require('./middleware/errorHandler');
+const createAdminUser = require('./scripts/createAdmin');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Trust proxy for rate limiting behind nginx
+app.set('trust proxy', 1);
 
 // Connect to MongoDB
 connectDB();
@@ -44,6 +49,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/todos', todoRoutes);
 app.use('/api/tag-contents', tagContentRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -58,6 +64,6 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

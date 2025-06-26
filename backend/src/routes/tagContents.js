@@ -147,7 +147,10 @@ router.delete('/:tag', [
 router.post('/batch', [
   body('tagContents').isArray().withMessage('Tag contents must be an array'),
   body('tagContents.*.tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Each tag must be between 1 and 50 characters'),
-  body('tagContents.*.content').isString().isLength({ min: 1, max: 100000 }).withMessage('Each content must be between 1 and 100000 characters')
+  body('tagContents.*.content').isString().isLength({ min: 1, max: 100000 }).withMessage('Each content must be between 1 and 100000 characters'),
+  body('tagContents.*.isGoalEnabled').optional().isBoolean().withMessage('isGoalEnabled must be a boolean'),
+  body('tagContents.*.targetCount').optional().isInt({ min: 0 }).withMessage('targetCount must be a non-negative integer'),
+  body('tagContents.*.currentCount').optional().isInt({ min: 0 }).withMessage('currentCount must be a non-negative integer')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -163,15 +166,24 @@ router.post('/batch', [
 
     for (const tagContentData of tagContents) {
       try {
+        // 构建更新对象
+        const updateData = { content: tagContentData.content };
+        if (tagContentData.isGoalEnabled !== undefined) updateData.isGoalEnabled = tagContentData.isGoalEnabled;
+        if (tagContentData.targetCount !== undefined) updateData.targetCount = tagContentData.targetCount;
+        if (tagContentData.currentCount !== undefined) updateData.currentCount = tagContentData.currentCount;
+
         const tagContent = await TagContent.findOneAndUpdate(
           { userId: req.user._id, tag: tagContentData.tag },
-          { content: tagContentData.content },
+          updateData,
           { new: true, upsert: true, runValidators: true }
         );
 
         results.created.push({
           tag: tagContent.tag,
           content: tagContent.content,
+          isGoalEnabled: tagContent.isGoalEnabled || false,
+          targetCount: tagContent.targetCount || 0,
+          currentCount: tagContent.currentCount || 0,
           updatedAt: tagContent.updatedAt
         });
       } catch (error) {

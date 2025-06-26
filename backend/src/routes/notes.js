@@ -215,6 +215,23 @@ router.post('/batch', [
       try {
         const { title, content, tags, color, customDate } = notes[i];
 
+        // 检查是否存在重复笔记
+        const existingNote = await Note.findOne({
+          userId: req.user._id,
+          title: title,
+          content: content
+        });
+
+        if (existingNote) {
+          console.log(`🔍 [笔记重复检查] 跳过重复笔记: ${title}`);
+          failedNotes.push({
+            index: i,
+            note: notes[i],
+            error: 'Duplicate note: A note with the same title and content already exists'
+          });
+          continue;
+        }
+
         const note = new Note({
           title,
           content,
@@ -232,11 +249,22 @@ router.post('/batch', [
         await note.save();
         createdNotes.push(note);
       } catch (error) {
-        failedNotes.push({
-          index: i,
-          note: notes[i],
-          error: error.message
-        });
+        console.log(`🔍 [笔记创建错误] 第${i+1}条笔记创建失败:`, error.message);
+        
+        // 检查是否是重复键错误
+        if (error.code === 11000) {
+          failedNotes.push({
+            index: i,
+            note: notes[i],
+            error: 'Duplicate note: A note with the same title and content already exists'
+          });
+        } else {
+          failedNotes.push({
+            index: i,
+            note: notes[i],
+            error: error.message
+          });
+        }
       }
     }
 

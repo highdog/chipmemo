@@ -175,6 +175,24 @@ router.post('/batch', [
       try {
         const { title, time, date, description, type } = schedules[i];
 
+        // 检查是否已存在相同的日程（基于用户ID、标题、日期和时间）
+        const existingSchedule = await Schedule.findOne({
+          userId: req.user._id,
+          title: title.trim(),
+          date: date.trim(),
+          time: time.trim()
+        });
+
+        if (existingSchedule) {
+          console.log(`跳过重复日程: ${title} - ${date} ${time}`);
+          failedSchedules.push({
+            index: i,
+            schedule: schedules[i],
+            error: 'Duplicate schedule exists'
+          });
+          continue;
+        }
+
         const schedule = new Schedule({
           title,
           time,
@@ -194,10 +212,18 @@ router.post('/batch', [
           type: schedule.type
         });
       } catch (error) {
+        let errorMessage = error.message;
+        
+        // 处理重复键错误
+        if (error.code === 11000) {
+          errorMessage = 'Duplicate schedule: A schedule with the same title, date, and time already exists';
+          console.log(`重复日程错误: ${title} - ${date} ${time}`);
+        }
+        
         failedSchedules.push({
           index: i,
           schedule: schedules[i],
-          error: error.message
+          error: errorMessage
         });
       }
     }

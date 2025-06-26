@@ -48,6 +48,8 @@ const scheduleSchema = new mongoose.Schema({
 // 创建索引
 scheduleSchema.index({ userId: 1, date: 1 });
 scheduleSchema.index({ userId: 1, createdAt: -1 });
+// 防止重复日程的复合唯一索引
+scheduleSchema.index({ userId: 1, title: 1, date: 1, time: 1 }, { unique: true });
 scheduleSchema.index({ externalId: 1 });
 
 module.exports = mongoose.model('Schedule', scheduleSchema);

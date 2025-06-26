@@ -37,8 +37,59 @@ import {
 import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn, extractTags } from "@/lib/utils"
 import { format } from 'date-fns'
 import { toast } from "@/hooks/use-toast"
-import { apiClient, notesApi, schedulesApi } from "@/lib/api"
+import { apiClient, notesApi, schedulesApi, todosApi, type Todo as ApiTodo } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
+
+// 添加缺失的类型定义
+interface Schedule {
+  _id: string;
+  title: string;
+  time: string;
+  date: string;
+  description?: string;
+  type?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 更新Todo接口以匹配API返回的数据结构
+interface Todo {
+  _id: string;
+  text: string;
+  completed: boolean;
+  priority: 'low' | 'medium' | 'high';
+  dueDate?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  // 兼容导入数据的字段
+  id?: string;
+  content?: string;
+  tags?: string[];
+  startDate?: string;
+}
+
+interface TagContent {
+  _id: string;
+  tag: string;
+  content: string;
+  isGoalEnabled?: boolean;
+  targetCount?: number;
+  currentCount?: number;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 添加缺失的函数声明
+const getTodos = async (page: number = 1, limit: number = 50) => {
+  return todosApi.getAll();
+};
+
+const getSchedules = async (page: number = 1, limit: number = 50) => {
+  return schedulesApi.getAll();
+};
 
 // 提取标签和清理内容的函数
 const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
@@ -1623,28 +1674,81 @@ export default function NotePad() {
       if (searchTerm) {
         notesToExport = notes
       } else {
-        const notesResponse = await getNotes()
-        notesToExport = notesResponse.notes
+        // 分页获取所有笔记
+        let allNotes: Note[] = []
+        let currentPage = 1
+        const limit = 1000
+        
+        while (true) {
+          const notesResponse = await getNotes(currentPage, limit)
+          if (notesResponse.notes.length === 0) break
+          
+          allNotes = [...allNotes, ...notesResponse.notes]
+          
+          // 如果返回的笔记数量少于limit，说明已经是最后一页
+          if (notesResponse.notes.length < limit) break
+          
+          currentPage++
+        }
+        
+        notesToExport = allNotes
       }
       
-      const allTodos = Object.values(todosByDate).flat()
+      // 分页获取所有待办事项
+      let allTodos: Todo[] = []
+      try {
+        let currentPage = 1
+        const limit = 100
+        
+        while (true) {
+          const todosResponse = await todosApi.getAll()
+          if (!todosResponse.success || !todosResponse.data?.todos || todosResponse.data.todos.length === 0) break
+          
+          // 转换API Todo到本地Todo格式
+          const convertedTodos: Todo[] = todosResponse.data.todos.map((apiTodo: ApiTodo) => ({
+            _id: apiTodo._id,
+            text: apiTodo.text,
+            completed: apiTodo.completed,
+            priority: apiTodo.priority,
+            dueDate: apiTodo.dueDate,
+            userId: apiTodo.userId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }))
+          allTodos = [...allTodos, ...convertedTodos]
+          
+          // 如果返回的待办事项数量少于limit，说明已经是最后一页
+          if (todosResponse.data.todos.length < limit) break
+          
+          currentPage++
+        }
+      } catch (error) {
+        console.error('获取待办事项失败:', error)
+        // 转换当前页面的待办事项格式
+        const currentTodos = Object.values(todosByDate).flat()
+        allTodos = currentTodos.map((todo: any) => ({
+          _id: todo.id || todo._id || '',
+          text: todo.content || todo.text || '',
+          completed: todo.completed || false,
+          priority: todo.priority || 'medium',
+          dueDate: todo.dueDate,
+          userId: '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })) as Todo[]
+      }
+      
       const allSchedules = Object.values(schedulesByDate).flat()
       
-      // 获取所有标签的固定内容
-      const tagContentsResponse = await fetch('http://localhost:3001/api/tag-contents', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
-      })
-      let allTagContents: Array<{ tag: string; content: string; updatedAt: string }> = []
-      console.log('🔍 [导出调试] 标签固定内容API响应状态:', tagContentsResponse.status)
-      if (tagContentsResponse.ok) {
-        const tagContentsData = await tagContentsResponse.json()
-        console.log('🔍 [导出调试] 标签固定内容API响应数据:', tagContentsData)
-        allTagContents = tagContentsData.data || []
+      // 获取所有标签的固定内容和目标设置
+      const tagContentsResponse = await tagContentsApi.getAll()
+      let allTagContents: Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }> = []
+      console.log('🔍 [导出调试] 标签固定内容API响应:', tagContentsResponse)
+      if (tagContentsResponse.success && tagContentsResponse.data) {
+        allTagContents = tagContentsResponse.data
         console.log('🔍 [导出调试] 处理后的标签固定内容数组:', allTagContents)
       } else {
-        console.error('🔍 [导出调试] 标签固定内容API请求失败:', tagContentsResponse.status, tagContentsResponse.statusText)
+        console.error('🔍 [导出调试] 标签固定内容API请求失败:', tagContentsResponse.error)
       }
       
       // 检查是否有数据可导出
@@ -1660,11 +1764,21 @@ export default function NotePad() {
       // 生成统一的Markdown内容
       let markdownContent = `# 土豆笔记本完整导出\n\n`
       markdownContent += `导出时间: ${new Date().toLocaleString('zh-CN')}\n\n`
+      
+      // 统计目标相关信息
+      const enabledGoals = allTagContents.filter(tc => tc.isGoalEnabled)
+      const totalTargetCount = enabledGoals.reduce((sum, tc) => sum + (tc.targetCount || 0), 0)
+      const totalCurrentCount = enabledGoals.reduce((sum, tc) => sum + (tc.currentCount || 0), 0)
+      
       markdownContent += `数据统计:\n`
       markdownContent += `- 笔记: ${notesToExport.length} 条\n`
-      markdownContent += `- 待办事项: ${allTodos.length} 条\n`
+      markdownContent += `- 待办事项: ${allTodos.length} 条 (已完成: ${allTodos.filter(t => t.completed).length} 条)\n`
       markdownContent += `- 日程安排: ${allSchedules.length} 条\n`
-      markdownContent += `- 标签固定内容: ${allTagContents.length} 个\n\n`
+      markdownContent += `- 标签固定内容: ${allTagContents.length} 个\n`
+      markdownContent += `- 启用目标的标签: ${enabledGoals.length} 个\n`
+      markdownContent += `- 总目标数量: ${totalTargetCount}\n`
+      markdownContent += `- 总完成进度: ${totalCurrentCount}\n`
+      markdownContent += `- 整体完成率: ${totalTargetCount > 0 ? Math.round(totalCurrentCount / totalTargetCount * 100) : 0}%\n\n`
       markdownContent += `---\n\n`
 
       // 收集所有日期并按日期组织数据
@@ -1677,10 +1791,9 @@ export default function NotePad() {
       })
       
       // 收集Todo日期
-      Object.keys(todosByDate).forEach(dateKey => {
-        if (todosByDate[dateKey].length > 0) {
-          allDates.add(dateKey)
-        }
+      allTodos.forEach(todo => {
+        const dateKey = todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        allDates.add(dateKey)
       })
       
       // 收集日程日期
@@ -1732,23 +1845,23 @@ export default function NotePad() {
         }
         
         // 当日Todo事项
-        const dayTodos = todosByDate[dateKey] || []
+        const dayTodos = allTodos.filter(todo => {
+          const todoDate = todo.dueDate ? new Date(todo.dueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+          return todoDate === dateKey
+        })
         if (dayTodos.length > 0) {
           markdownContent += `### ✅ Todo事项 (${dayTodos.length}条)\n\n`
           dayTodos.forEach((todo, index) => {
             const status = todo.completed ? '✅' : '⬜'
-            markdownContent += `${index + 1}. ${status} ${todo.content}\n`
-              
-            if (todo.tags && todo.tags.length > 0) {
-              markdownContent += `   **标签:** ${todo.tags.map((tag: string) => `#${tag}`).join(' ')}\n`
+            markdownContent += `${index + 1}. ${status} ${todo.text}\n`
+            
+            if (todo.priority) {
+              const priorityMap: { [key: string]: string } = { low: '低', medium: '中', high: '高' }
+              markdownContent += `   **优先级:** ${priorityMap[todo.priority]}\n`
             }
             
             if (todo.dueDate) {
-              markdownContent += `   **截止日期:** ${todo.dueDate}\n`
-            }
-            
-            if (todo.startDate) {
-              markdownContent += `   **开始日期:** ${todo.startDate}\n`
+              markdownContent += `   **截止日期:** ${new Date(todo.dueDate).toLocaleDateString('zh-CN')}\n`
             }
             
             markdownContent += `\n`
@@ -1797,17 +1910,18 @@ export default function NotePad() {
         }
       })
       
-      // 从Todo中收集标签
+      // 从Todo中收集标签（Todo本身不包含标签，但可以从文本中提取）
       allTodos.forEach(todo => {
-        if (todo.tags && todo.tags.length > 0) {
-          todo.tags.forEach(tag => {
+        const todoTags = extractTags(todo.text)
+        if (todoTags.length > 0) {
+          todoTags.forEach((tag: string) => {
             if (!tagMap.has(tag)) {
               tagMap.set(tag, [])
             }
             tagMap.get(tag)!.push({
               type: 'todo',
-              content: todo.content,
-              date: new Date().toLocaleDateString('zh-CN')
+              content: todo.text,
+              date: todo.dueDate ? new Date(todo.dueDate).toLocaleDateString('zh-CN') : new Date().toLocaleDateString('zh-CN')
             })
           })
         }
@@ -1828,12 +1942,27 @@ export default function NotePad() {
         allSortedTags.forEach(tag => {
           markdownContent += `## #${tag}\n\n`
           
-          // 添加标签的固定内容
+          // 添加标签的固定内容和目标设置
           const tagContent = allTagContents.find(tc => tc.tag === tag)
-          if (tagContent && tagContent.content.trim()) {
-            markdownContent += `**标签固定内容:**\n\n`
-            markdownContent += `${tagContent.content}\n\n`
-            markdownContent += `---\n\n`
+          if (tagContent) {
+            if (tagContent.content && tagContent.content.trim()) {
+              markdownContent += `**标签固定内容:**\n\n`
+              markdownContent += `${tagContent.content}\n\n`
+            }
+            
+            // 添加目标相关信息
+            if (tagContent.isGoalEnabled) {
+              markdownContent += `**目标设置:**\n\n`
+              markdownContent += `- 目标功能: 已启用\n`
+              markdownContent += `- 目标数量: ${tagContent.targetCount || 0}\n`
+              markdownContent += `- 当前进度: ${tagContent.currentCount || 0}\n`
+              const progress = tagContent.targetCount ? Math.round((tagContent.currentCount || 0) / tagContent.targetCount * 100) : 0
+              markdownContent += `- 完成进度: ${progress}%\n\n`
+            }
+            
+            if ((tagContent.content && tagContent.content.trim()) || tagContent.isGoalEnabled) {
+              markdownContent += `---\n\n`
+            }
           }
           
           // 添加关联的笔记和待办
@@ -1844,7 +1973,7 @@ export default function NotePad() {
             items.forEach((item, index) => {
               markdownContent += `${index + 1}. ${item.type === 'note' ? '📝' : '✅'} ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}\n`
             })
-          } else if (!tagContent || !tagContent.content.trim()) {
+          } else if (!tagContent || (!tagContent.content?.trim() && !tagContent.isGoalEnabled)) {
             markdownContent += `暂无关联内容\n`
           }
           
@@ -1980,8 +2109,50 @@ export default function NotePad() {
         console.log('🔍 [导入调试] 开始批量导入笔记，总数:', importedNotes.length)
         if (importedNotes.length > 0) {
           try {
-            // 准备批量数据
-            const notesToCreate = importedNotes.map((noteData, i) => {
+            // 获取现有笔记用于重复检查
+            let existingNotes: Note[] = []
+            try {
+              let currentPage = 1
+              const limit = 1000
+              
+              while (true) {
+                const notesResponse = await getNotes(currentPage, limit)
+                if (notesResponse.notes.length === 0) break
+                
+                existingNotes = [...existingNotes, ...notesResponse.notes]
+                
+                if (notesResponse.notes.length < limit) break
+                currentPage++
+              }
+            } catch (error) {
+              console.warn('🔍 [导入调试] 获取现有笔记失败，将跳过重复检查:', error)
+            }
+            
+            console.log('🔍 [导入调试] 现有笔记数量:', existingNotes.length)
+            
+            // 准备批量数据，过滤重复项
+            const notesToCreate = importedNotes.filter((noteData, i) => {
+              // 检查是否存在重复笔记（基于标题和内容）
+              const isDuplicate = existingNotes.some(existingNote => {
+                const existingTitle = (existingNote.title || '').trim().toLowerCase()
+                const existingContent = (existingNote.originalContent || existingNote.content || '').trim()
+                const importTitle = (noteData.title || '').trim().toLowerCase()
+                const importContent = (noteData.content || '').trim()
+                
+                // 如果标题和内容都相同，认为是重复
+                return existingTitle === importTitle && existingContent === importContent
+              })
+              
+              if (isDuplicate) {
+                console.log(`🔍 [导入调试] 跳过重复笔记 ${i + 1}:`, {
+                  title: noteData.title?.substring(0, 30) + '...',
+                  content: noteData.content?.substring(0, 50) + '...'
+                })
+                return false
+              }
+              
+              return true
+            }).map((noteData, i) => {
               console.log(`🔍 [导入调试] 处理第 ${i + 1} 条笔记:`, {
                 originalContent: noteData.content ? noteData.content.substring(0, 100) + '...' : 'undefined',
                 tags: noteData.tags,
@@ -2011,9 +2182,17 @@ export default function NotePad() {
               const noteToCreate = {
                 title: (title.trim() || '导入的笔记').substring(0, 200), // 确保不超过200字符
                 content: (contentWithTags.trim() || '导入的空笔记').substring(0, 100000), // 确保不超过100000字符
-                tags: Array.isArray(tags) ? tags : [],
+                tags: Array.isArray(tags) ? tags.filter(tag => typeof tag === 'string' && tag.trim().length > 0) : [], // 确保tags数组中只包含有效字符串
                 color: 'default', // 添加默认颜色
-                customDate
+                customDate: customDate // 确保customDate是有效的ISO字符串
+              }
+              
+              // 额外验证数据完整性
+              if (!noteToCreate.title || noteToCreate.title.trim().length === 0) {
+                noteToCreate.title = '导入的笔记'
+              }
+              if (!noteToCreate.content || noteToCreate.content.trim().length === 0) {
+                noteToCreate.content = '导入的空笔记'
               }
               
               console.log(`🔍 [导入调试] 第 ${i + 1} 条笔记准备的数据:`, {
@@ -2034,7 +2213,8 @@ export default function NotePad() {
                             note.content.trim().length > 0 &&
                             note.content.length <= 100000 &&
                             Array.isArray(note.tags) &&
-                            note.customDate
+                            (note.color === undefined || ['default', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'].includes(note.color)) &&
+                            (note.customDate === undefined || typeof note.customDate === 'string')
               
               if (!isValid) {
                 console.warn(`⚠️ [导入调试] 过滤掉无效笔记:`, note)
@@ -2051,45 +2231,117 @@ export default function NotePad() {
               return
             }
             
-            // 调用批量创建API
-            const requestBody = { notes: notesToCreate }
-            console.log(`🔍 [导入调试] 发送请求体:`, JSON.stringify(requestBody).substring(0, 500) + '...')
+            // 分批处理，每批最多500条
+            const BATCH_SIZE = 500
+            const totalBatches = Math.ceil(notesToCreate.length / BATCH_SIZE)
+            console.log(`🔍 [导入调试] 将分 ${totalBatches} 批处理，每批最多 ${BATCH_SIZE} 条`)
             
-            const response = await fetch('http://localhost:3001/api/notes/batch', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-              },
-              body: JSON.stringify(requestBody)
-            })
+            let totalCreated = 0
+            let totalFailed = 0
             
-            if (response.ok) {
-              const result = await response.json()
-              console.log(`🔍 [导入调试] 批量创建笔记响应:`, result)
+            for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+              const startIndex = batchIndex * BATCH_SIZE
+              const endIndex = Math.min(startIndex + BATCH_SIZE, notesToCreate.length)
+              const batchNotes = notesToCreate.slice(startIndex, endIndex)
               
-              if (result.success) {
-                notesSuccessCount = result.data.summary.created
-                console.log(`✅ [导入调试] 批量创建笔记成功: ${result.data.summary.created}/${result.data.summary.total}`)
-                
-                if (result.data.failed.length > 0) {
-                  console.warn(`⚠️ [导入调试] 部分笔记创建失败:`, result.data.failed)
-                }
-              }
-            } else {
-              const errorText = await response.text()
-              console.error(`❌ [导入调试] 批量创建笔记失败:`, response.status, response.statusText)
-              console.error(`❌ [导入调试] 错误详情:`, errorText)
+              console.log(`🔍 [导入调试] 处理第 ${batchIndex + 1}/${totalBatches} 批，包含 ${batchNotes.length} 条笔记`)
               
               try {
-                const errorJson = JSON.parse(errorText)
-                if (errorJson.errors) {
-                  console.error(`❌ [导入调试] 验证错误:`, errorJson.errors)
+                // 在发送前再次验证每条笔记的数据格式
+                const validatedNotes = batchNotes.map((note, index) => {
+                  const validated = {
+                    title: String(note.title || '导入的笔记').substring(0, 200),
+                    content: String(note.content || '导入的空笔记').substring(0, 100000),
+                    tags: Array.isArray(note.tags) ? note.tags.filter(tag => typeof tag === 'string' && tag.trim().length > 0) : [],
+                    color: note.color || 'default',
+                    customDate: note.customDate
+                  }
+                  
+                  // 验证customDate格式
+                  if (validated.customDate) {
+                    try {
+                      new Date(validated.customDate).toISOString()
+                    } catch (e) {
+                      console.warn(`⚠️ [导入调试] 第 ${batchIndex + 1} 批第 ${index + 1} 条笔记的customDate格式无效:`, validated.customDate)
+                      validated.customDate = new Date().toISOString()
+                    }
+                  }
+                  
+                  return validated
+                })
+                
+                const requestBody = { notes: validatedNotes }
+                console.log(`🔍 [导入调试] 第 ${batchIndex + 1} 批发送请求体:`, JSON.stringify(requestBody, null, 2).substring(0, 500) + '...')
+                console.log(`🔍 [导入调试] 第 ${batchIndex + 1} 批第一条笔记完整数据:`, JSON.stringify(validatedNotes[0], null, 2))
+                
+                const response = await fetch('http://localhost:3001/api/notes/batch', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                  },
+                  body: JSON.stringify(requestBody)
+                })
+                
+                if (response.ok) {
+                  const result = await response.json()
+                  console.log(`🔍 [导入调试] 第 ${batchIndex + 1} 批创建笔记响应:`, result)
+                  
+                  if (result.success) {
+                    totalCreated += result.data.summary.created
+                    totalFailed += result.data.summary.failed || 0
+                    console.log(`✅ [导入调试] 第 ${batchIndex + 1} 批创建笔记成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                    
+                    if (result.data.failed && result.data.failed.length > 0) {
+                      console.warn(`⚠️ [导入调试] 第 ${batchIndex + 1} 批部分笔记创建失败:`, result.data.failed)
+                    }
+                  }
+                } else {
+                  const errorText = await response.text()
+                  console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批创建笔记失败:`, response.status, response.statusText)
+                  console.error(`❌ [导入调试] 错误详情:`, errorText)
+                  
+                  totalFailed += validatedNotes.length
+                  
+                  try {
+                    const errorJson = JSON.parse(errorText)
+                    if (errorJson.errors) {
+                      console.error(`❌ [导入调试] 验证错误详情:`)
+                      errorJson.errors.forEach((error: any, index: number) => {
+                         console.error(`  错误 ${index + 1}:`, {
+                           type: error.type,
+                           field: error.path || error.param,
+                           message: error.msg || error.message,
+                           value: error.value ? JSON.stringify(error.value).substring(0, 200) + '...' : 'undefined'
+                         })
+                       })
+                      
+                      // 显示导致错误的数据样本
+                      console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批数据样本 (前3条):`, validatedNotes.slice(0, 3).map(note => ({
+                        title: note.title.substring(0, 50) + '...',
+                        contentLength: note.content.length,
+                        tagsCount: note.tags.length,
+                        color: note.color,
+                        customDate: note.customDate
+                      })))
+                    }
+                  } catch (e) {
+                    console.error(`❌ [导入调试] 无法解析错误响应:`, e)
+                  }
                 }
-              } catch (e) {
-                console.error(`❌ [导入调试] 无法解析错误响应:`, e)
+              } catch (error) {
+                console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批处理异常:`, error)
+                totalFailed += batchNotes.length
+              }
+              
+              // 批次间稍作延迟，避免服务器压力过大
+              if (batchIndex < totalBatches - 1) {
+                await new Promise(resolve => setTimeout(resolve, 100))
               }
             }
+            
+            notesSuccessCount = totalCreated
+            console.log(`✅ [导入调试] 所有批次处理完成，总计成功: ${totalCreated}，失败: ${totalFailed}`)
           } catch (error) {
             console.error(`❌ [导入调试] 批量创建笔记异常:`, error)
           }
@@ -2100,8 +2352,58 @@ export default function NotePad() {
         console.log('🔍 [导入调试] 开始批量导入待办事项，总数:', importedTodos.length)
         if (importedTodos.length > 0) {
           try {
-            // 准备批量数据
-            const todosToCreate = importedTodos.map(todoData => ({
+            // 获取现有待办事项用于重复检查
+            let existingTodos: Todo[] = []
+            try {
+              let currentPage = 1
+              const limit = 1000
+              
+              while (true) {
+                const todosResponse = await getTodos(currentPage, limit)
+                if (!todosResponse.data?.todos || todosResponse.data.todos.length === 0) break
+                
+                // 转换API Todo到本地Todo格式
+                const convertedTodos: Todo[] = todosResponse.data.todos.map((apiTodo: ApiTodo) => ({
+                  _id: apiTodo._id,
+                  text: apiTodo.text,
+                  completed: apiTodo.completed,
+                  priority: apiTodo.priority,
+                  dueDate: apiTodo.dueDate,
+                  userId: apiTodo.userId,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }))
+                existingTodos = [...existingTodos, ...convertedTodos]
+                
+                if (todosResponse.data.todos.length < limit) break
+                currentPage++
+              }
+            } catch (error) {
+              console.warn('🔍 [导入调试] 获取现有待办事项失败，将跳过重复检查:', error)
+            }
+            
+            console.log('🔍 [导入调试] 现有待办事项数量:', existingTodos.length)
+            
+            // 准备批量数据，过滤重复项
+            const todosToCreate = importedTodos.filter((todoData, i) => {
+              // 检查是否存在重复待办事项（基于内容和截止日期）
+              const isDuplicate = existingTodos.some(existingTodo => {
+                const existingText = (existingTodo.text || '').trim()
+                const importText = (todoData.todo.content || '').trim()
+                const existingDueDate = existingTodo.dueDate ? new Date(existingTodo.dueDate).getTime() : null
+                const importDueDate = todoData.todo.dueDate ? new Date(todoData.todo.dueDate).getTime() : null
+                
+                // 如果内容相同且截止日期相同，认为是重复
+                return existingText === importText && existingDueDate === importDueDate
+              })
+              
+              if (isDuplicate) {
+                console.log(`🔍 [导入调试] 跳过重复待办事项 ${i + 1}:`, todoData.todo.content?.substring(0, 50) + '...')
+                return false
+              }
+              
+              return true
+            }).map(todoData => ({
               text: todoData.todo.content,
               tags: todoData.todo.tags || [],
               dueDate: todoData.todo.dueDate,
@@ -2111,30 +2413,66 @@ export default function NotePad() {
             
             console.log(`🔍 [导入调试] 准备批量创建待办事项:`, todosToCreate.length)
             
-            // 调用批量创建API
-            const response = await fetch('http://localhost:3001/api/todos/batch', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-              },
-              body: JSON.stringify({ todos: todosToCreate })
-            })
-            
-            if (response.ok) {
-              const result = await response.json()
-              console.log(`🔍 [导入调试] 批量创建待办事项响应:`, result)
+            if (todosToCreate.length === 0) {
+              console.warn('⚠️ [导入调试] 没有有效的待办事项数据可以创建')
+            } else {
+              // 分批处理，每批最多500条
+              const BATCH_SIZE = 500
+              const totalBatches = Math.ceil(todosToCreate.length / BATCH_SIZE)
+              console.log(`🔍 [导入调试] 将分 ${totalBatches} 批处理待办事项，每批最多 ${BATCH_SIZE} 条`)
               
-              if (result.success) {
-                todosSuccessCount = result.data.summary.created
-                console.log(`✅ [导入调试] 批量创建待办事项成功: ${result.data.summary.created}/${result.data.summary.total}`)
+              let totalCreated = 0
+              let totalFailed = 0
+              
+              for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                const startIndex = batchIndex * BATCH_SIZE
+                const endIndex = Math.min(startIndex + BATCH_SIZE, todosToCreate.length)
+                const batchTodos = todosToCreate.slice(startIndex, endIndex)
                 
-                if (result.data.failed.length > 0) {
-                  console.warn(`⚠️ [导入调试] 部分待办事项创建失败:`, result.data.failed)
+                console.log(`🔍 [导入调试] 处理第 ${batchIndex + 1}/${totalBatches} 批待办事项，包含 ${batchTodos.length} 条`)
+                
+                try {
+                  const response = await fetch('http://localhost:3001/api/todos/batch', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    },
+                    body: JSON.stringify({ todos: batchTodos })
+                  })
+                  
+                  if (response.ok) {
+                    const result = await response.json()
+                    console.log(`🔍 [导入调试] 第 ${batchIndex + 1} 批创建待办事项响应:`, result)
+                    
+                    if (result.success) {
+                      totalCreated += result.data.summary.created
+                      totalFailed += result.data.summary.failed || 0
+                      console.log(`✅ [导入调试] 第 ${batchIndex + 1} 批创建待办事项成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                      
+                      if (result.data.failed && result.data.failed.length > 0) {
+                        console.warn(`⚠️ [导入调试] 第 ${batchIndex + 1} 批部分待办事项创建失败:`, result.data.failed)
+                      }
+                    }
+                  } else {
+                    const errorText = await response.text()
+                    console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批创建待办事项失败:`, response.status, response.statusText)
+                    console.error(`❌ [导入调试] 错误详情:`, errorText)
+                    totalFailed += batchTodos.length
+                  }
+                } catch (error) {
+                  console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批处理待办事项异常:`, error)
+                  totalFailed += batchTodos.length
+                }
+                
+                // 批次间稍作延迟
+                if (batchIndex < totalBatches - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 100))
                 }
               }
-            } else {
-              console.error(`❌ [导入调试] 批量创建待办事项失败:`, response.status, response.statusText)
+              
+              todosSuccessCount = totalCreated
+              console.log(`✅ [导入调试] 所有待办事项批次处理完成，总计成功: ${totalCreated}，失败: ${totalFailed}`)
             }
           } catch (error) {
             console.error(`❌ [导入调试] 批量创建待办事项异常:`, error)
@@ -2145,8 +2483,98 @@ export default function NotePad() {
         console.log('🔍 [导入调试] 开始批量导入日程安排，总数:', importedSchedules.length)
         if (importedSchedules.length > 0) {
           try {
-            // 准备批量数据
-            const schedulesToCreate = importedSchedules.map(scheduleData => ({
+            // 获取现有日程安排用于重复检查
+            let existingSchedules: Schedule[] = []
+            try {
+              let currentPage = 1
+              const limit = 1000
+              
+              while (true) {
+                const schedulesResponse = await getSchedules(currentPage, limit)
+                if (!schedulesResponse.data || Object.keys(schedulesResponse.data).length === 0) break
+                
+                const schedules = Object.values(schedulesResponse.data).flat()
+                // 转换为本地Schedule格式
+                const convertedSchedules: Schedule[] = schedules.map((schedule: any) => ({
+                  _id: schedule.id || schedule._id || '',
+                  title: schedule.title || '',
+                  time: schedule.time || '',
+                  date: schedule.date || '',
+                  description: schedule.description,
+                  type: schedule.type,
+                  userId: '',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }))
+                existingSchedules = [...existingSchedules, ...convertedSchedules]
+                
+                if (schedules.length < limit) break
+                currentPage++
+              }
+            } catch (error) {
+              console.warn('🔍 [导入调试] 获取现有日程安排失败，将跳过重复检查:', error)
+            }
+            
+            console.log('🔍 [导入调试] 现有日程安排数量:', existingSchedules.length)
+            
+            // 调试：打印现有日程样本
+            if (existingSchedules.length > 0) {
+              console.log('🔍 [导入调试] 现有日程样本:', existingSchedules.slice(0, 3))
+            }
+            
+            // 调试：打印导入日程样本
+            if (importedSchedules.length > 0) {
+              console.log('🔍 [导入调试] 导入日程样本:', importedSchedules.slice(0, 3))
+            }
+            
+            // 准备批量数据，过滤重复项
+            const schedulesToCreate = importedSchedules.filter((scheduleData, i) => {
+              // 检查是否存在重复日程安排（基于标题、日期和时间）
+              const isDuplicate = existingSchedules.some(existingSchedule => {
+                const existingTitle = (existingSchedule.title || '').trim().toLowerCase()
+                const importTitle = (scheduleData.schedule.title || '').trim().toLowerCase()
+                const existingDate = existingSchedule.date
+                const importDate = scheduleData.date
+                const existingTime = (existingSchedule.time || '').trim()
+                const importTime = (scheduleData.schedule.time || '').trim()
+                
+                // 标准化时间格式（去除秒数，统一格式）
+                const normalizeTime = (time: string) => {
+                  if (!time) return ''
+                  // 处理 HH:MM:SS 格式，只保留 HH:MM
+                  const timeMatch = time.match(/^(\d{1,2}):(\d{2})/)
+                  if (timeMatch) {
+                    const [, hours, minutes] = timeMatch
+                    return `${hours.padStart(2, '0')}:${minutes}`
+                  }
+                  return time
+                }
+                
+                const normalizedExistingTime = normalizeTime(existingTime)
+                const normalizedImportTime = normalizeTime(importTime)
+                
+                // 如果标题、日期和时间都相同，认为是重复
+                const isMatch = existingTitle === importTitle && 
+                               existingDate === importDate && 
+                               normalizedExistingTime === normalizedImportTime
+                
+                if (isMatch) {
+                  console.log(`🔍 [导入调试] 发现重复日程:`, {
+                    existing: { title: existingTitle, date: existingDate, time: normalizedExistingTime },
+                    import: { title: importTitle, date: importDate, time: normalizedImportTime }
+                  })
+                }
+                
+                return isMatch
+              })
+              
+              if (isDuplicate) {
+                console.log(`🔍 [导入调试] 跳过重复日程安排 ${i + 1}:`, scheduleData.schedule.title?.substring(0, 50) + '...')
+                return false
+              }
+              
+              return true
+            }).map(scheduleData => ({
               title: scheduleData.schedule.title,
               time: scheduleData.schedule.time,
               date: scheduleData.date,
@@ -2156,30 +2584,66 @@ export default function NotePad() {
             
             console.log(`🔍 [导入调试] 准备批量创建日程安排:`, schedulesToCreate.length)
             
-            // 调用批量创建API
-            const response = await fetch('http://localhost:3001/api/schedules/batch', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-              },
-              body: JSON.stringify({ schedules: schedulesToCreate })
-            })
-            
-            if (response.ok) {
-              const result = await response.json()
-              console.log(`🔍 [导入调试] 批量创建日程安排响应:`, result)
+            if (schedulesToCreate.length === 0) {
+              console.warn('⚠️ [导入调试] 没有有效的日程安排数据可以创建')
+            } else {
+              // 分批处理，每批最多500条
+              const BATCH_SIZE = 500
+              const totalBatches = Math.ceil(schedulesToCreate.length / BATCH_SIZE)
+              console.log(`🔍 [导入调试] 将分 ${totalBatches} 批处理日程安排，每批最多 ${BATCH_SIZE} 条`)
               
-              if (result.success) {
-                schedulesSuccessCount = result.data.summary.created
-                console.log(`✅ [导入调试] 批量创建日程安排成功: ${result.data.summary.created}/${result.data.summary.total}`)
+              let totalCreated = 0
+              let totalFailed = 0
+              
+              for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+                const startIndex = batchIndex * BATCH_SIZE
+                const endIndex = Math.min(startIndex + BATCH_SIZE, schedulesToCreate.length)
+                const batchSchedules = schedulesToCreate.slice(startIndex, endIndex)
                 
-                if (result.data.failed.length > 0) {
-                  console.warn(`⚠️ [导入调试] 部分日程安排创建失败:`, result.data.failed)
+                console.log(`🔍 [导入调试] 处理第 ${batchIndex + 1}/${totalBatches} 批日程安排，包含 ${batchSchedules.length} 条`)
+                
+                try {
+                  const response = await fetch('http://localhost:3001/api/schedules/batch', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    },
+                    body: JSON.stringify({ schedules: batchSchedules })
+                  })
+                  
+                  if (response.ok) {
+                    const result = await response.json()
+                    console.log(`🔍 [导入调试] 第 ${batchIndex + 1} 批创建日程安排响应:`, result)
+                    
+                    if (result.success) {
+                      totalCreated += result.data.summary.created
+                      totalFailed += result.data.summary.failed || 0
+                      console.log(`✅ [导入调试] 第 ${batchIndex + 1} 批创建日程安排成功: ${result.data.summary.created}/${result.data.summary.total}`)
+                      
+                      if (result.data.failed && result.data.failed.length > 0) {
+                        console.warn(`⚠️ [导入调试] 第 ${batchIndex + 1} 批部分日程安排创建失败:`, result.data.failed)
+                      }
+                    }
+                  } else {
+                    const errorText = await response.text()
+                    console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批创建日程安排失败:`, response.status, response.statusText)
+                    console.error(`❌ [导入调试] 错误详情:`, errorText)
+                    totalFailed += batchSchedules.length
+                  }
+                } catch (error) {
+                  console.error(`❌ [导入调试] 第 ${batchIndex + 1} 批处理日程安排异常:`, error)
+                  totalFailed += batchSchedules.length
+                }
+                
+                // 批次间稍作延迟
+                if (batchIndex < totalBatches - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 100))
                 }
               }
-            } else {
-              console.error(`❌ [导入调试] 批量创建日程安排失败:`, response.status, response.statusText)
+              
+              schedulesSuccessCount = totalCreated
+              console.log(`✅ [导入调试] 所有日程安排批次处理完成，总计成功: ${totalCreated}，失败: ${totalFailed}`)
             }
           } catch (error) {
             console.error(`❌ [导入调试] 批量创建日程安排异常:`, error)
@@ -2190,13 +2654,64 @@ export default function NotePad() {
         console.log('🔍 [导入调试] 开始批量导入标签内容，总数:', importedTagContents.length)
         if (importedTagContents.length > 0) {
           try {
-            // 准备批量数据
-            const tagContentsToCreate = importedTagContents.map(tagContentData => ({
-              tag: tagContentData.tag,
-              content: tagContentData.content
-            }))
+            // 获取现有标签内容用于重复检查
+            let existingTagContents: TagContent[] = []
+            try {
+              const tagContentsResponse = await fetch('http://localhost:3001/api/tag-contents', {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                }
+              })
+              
+              if (tagContentsResponse.ok) {
+                const result = await tagContentsResponse.json()
+                existingTagContents = result.data || []
+              }
+            } catch (error) {
+              console.warn('🔍 [导入调试] 获取现有标签内容失败，将跳过重复检查:', error)
+            }
+            
+            console.log('🔍 [导入调试] 现有标签内容数量:', existingTagContents.length)
+            
+            // 准备批量数据，过滤重复项和无效数据
+            const tagContentsToCreate = importedTagContents.filter((tagContentData, i) => {
+              // 检查内容是否有效
+              if (!tagContentData.content || tagContentData.content.trim().length === 0) {
+                console.log(`🔍 [导入调试] 跳过空内容标签 ${i + 1}:`, tagContentData.tag)
+                return false
+              }
+              
+              // 检查是否存在重复标签内容（基于标签名）
+              const isDuplicate = existingTagContents.some(existingTagContent => {
+                return existingTagContent.tag === tagContentData.tag
+              })
+              
+              if (isDuplicate) {
+                console.log(`🔍 [导入调试] 跳过重复标签内容 ${i + 1}:`, tagContentData.tag)
+                return false
+              }
+              
+              return true
+            }).map(tagContentData => ({
+              tag: tagContentData.tag || '未命名标签',
+              content: (tagContentData.content || '').trim() || '默认标签内容',
+              isGoalEnabled: tagContentData.isGoalEnabled || false,
+              targetCount: tagContentData.targetCount || 0,
+              currentCount: tagContentData.currentCount || 0
+            })).filter(tagContent => {
+              // 最终验证：确保content字段符合后端要求（1-100000字符）
+              const isValid = tagContent.content.length >= 1 && tagContent.content.length <= 100000
+              if (!isValid) {
+                console.warn(`⚠️ [导入调试] 过滤掉无效标签内容:`, tagContent.tag, '内容长度:', tagContent.content.length)
+              }
+              return isValid
+            })
             
             console.log(`🔍 [导入调试] 准备批量创建标签内容:`, tagContentsToCreate.length)
+            console.log(`🔍 [导入调试] 第一条标签内容完整数据:`, JSON.stringify(tagContentsToCreate[0], null, 2))
+            
+            const requestBody = { tagContents: tagContentsToCreate }
+            console.log(`🔍 [导入调试] 发送标签内容请求体:`, JSON.stringify(requestBody, null, 2).substring(0, 1000) + '...')
             
             // 调用批量创建API
             const response = await fetch('http://localhost:3001/api/tag-contents/batch', {
@@ -2205,7 +2720,7 @@ export default function NotePad() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
               },
-              body: JSON.stringify({ tagContents: tagContentsToCreate })
+              body: JSON.stringify(requestBody)
             })
             
             if (response.ok) {
@@ -2221,7 +2736,18 @@ export default function NotePad() {
                 }
               }
             } else {
+              const errorText = await response.text()
               console.error(`❌ [导入调试] 批量创建标签内容失败:`, response.status, response.statusText)
+              console.error(`❌ [导入调试] 错误详情:`, errorText)
+              
+              try {
+                const errorJson = JSON.parse(errorText)
+                if (errorJson.errors) {
+                  console.error(`❌ [导入调试] 验证错误:`, errorJson.errors)
+                }
+              } catch (e) {
+                console.error(`❌ [导入调试] 无法解析错误响应:`, e)
+              }
             }
           } catch (error) {
             console.error(`❌ [导入调试] 批量创建标签内容异常:`, error)
@@ -2237,11 +2763,31 @@ export default function NotePad() {
         window.dispatchEvent(new CustomEvent('scheduleUpdated'))
         
         const totalSuccess = notesSuccessCount + todosSuccessCount + schedulesSuccessCount + tagContentsSuccessCount
+        const totalSkipped = (importedNotes.length - notesSuccessCount) + (importedTodos.length - todosSuccessCount) + (importedSchedules.length - schedulesSuccessCount) + (importedTagContents.length - tagContentsSuccessCount)
+        
         let description = `成功导入 ${totalSuccess} 条数据`
-        if (notesSuccessCount > 0) description += `\n- 笔记: ${notesSuccessCount} 条`
-        if (todosSuccessCount > 0) description += `\n- Todo: ${todosSuccessCount} 条`
-        if (schedulesSuccessCount > 0) description += `\n- 日程: ${schedulesSuccessCount} 条`
-        if (tagContentsSuccessCount > 0) description += `\n- 标签固定内容: ${tagContentsSuccessCount} 条`
+        if (totalSkipped > 0) description += `，跳过重复项 ${totalSkipped} 条`
+        
+        if (notesSuccessCount > 0) {
+          const notesSkipped = importedNotes.length - notesSuccessCount
+          description += `\n- 笔记: ${notesSuccessCount} 条`
+          if (notesSkipped > 0) description += ` (跳过 ${notesSkipped} 条重复)`
+        }
+        if (todosSuccessCount > 0) {
+          const todosSkipped = importedTodos.length - todosSuccessCount
+          description += `\n- Todo: ${todosSuccessCount} 条`
+          if (todosSkipped > 0) description += ` (跳过 ${todosSkipped} 条重复)`
+        }
+        if (schedulesSuccessCount > 0) {
+          const schedulesSkipped = importedSchedules.length - schedulesSuccessCount
+          description += `\n- 日程: ${schedulesSuccessCount} 条`
+          if (schedulesSkipped > 0) description += ` (跳过 ${schedulesSkipped} 条重复)`
+        }
+        if (tagContentsSuccessCount > 0) {
+          const tagContentsSkipped = importedTagContents.length - tagContentsSuccessCount
+          description += `\n- 标签固定内容: ${tagContentsSuccessCount} 条`
+          if (tagContentsSkipped > 0) description += ` (跳过 ${tagContentsSkipped} 条重复)`
+        }
         
         toast({
           title: "导入成功",
@@ -2679,7 +3225,7 @@ export default function NotePad() {
     const notes: Array<{ content: string; tags: string[]; createdAt: Date }> = []
     const todos: Array<{ date: string; todo: any }> = []
     const schedules: Array<{ date: string; schedule: any }> = []
-    const tagContents: Array<{ tag: string; content: string }> = []
+    const tagContents: Array<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }> = []
     const lines = text.split('\n')
     
     let currentDate: Date | null = null
@@ -2691,6 +3237,10 @@ export default function NotePad() {
     let inContent = false
     let currentTag: string = ''
     let inTagSection = false
+    let currentTagContent = ''
+    let currentTagGoalEnabled = false
+    let currentTagTargetCount = 0
+    let currentTagCurrentCount = 0
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
@@ -2711,22 +3261,57 @@ export default function NotePad() {
       if (inTagSection) {
         const tagMatch = line.match(/^## (.+)$/)
         if (tagMatch) {
-          // 保存上一个标签的内容
-          if (currentTag && currentContent.trim()) {
+          // 保存上一个标签的内容（只有当内容不为空时）
+          if (currentTag && currentTagContent.trim()) {
             tagContents.push({
-              tag: currentTag,
-              content: currentContent.trim()
+              tag: currentTag.replace('#', ''), // 移除可能的#前缀
+              content: currentTagContent.trim(),
+              isGoalEnabled: currentTagGoalEnabled,
+              targetCount: currentTagTargetCount,
+              currentCount: currentTagCurrentCount
             })
           }
-          currentTag = tagMatch[1]
-          currentContent = ''
+          // 重置当前标签状态
+          currentTag = tagMatch[1].replace('#', '') // 移除可能的#前缀
+          currentTagContent = ''
+          currentTagGoalEnabled = false
+          currentTagTargetCount = 0
+          currentTagCurrentCount = 0
           continue
         }
         
-        // 收集标签内容
-        if (currentTag && line.trim() && !line.startsWith('#')) {
-          if (currentContent) currentContent += '\n'
-          currentContent += line
+        // 解析目标设置信息
+        if (line.includes('**目标设置:**')) {
+          continue // 跳过标题行
+        }
+        
+        const goalEnabledMatch = line.match(/- 目标功能:\s*已启用/)
+        if (goalEnabledMatch) {
+          currentTagGoalEnabled = true
+          continue
+        }
+        
+        const targetCountMatch = line.match(/- 目标数量:\s*(\d+)/)
+        if (targetCountMatch) {
+          currentTagTargetCount = parseInt(targetCountMatch[1])
+          continue
+        }
+        
+        const currentCountMatch = line.match(/- 当前进度:\s*(\d+)/)
+        if (currentCountMatch) {
+          currentTagCurrentCount = parseInt(currentCountMatch[1])
+          continue
+        }
+        
+        // 跳过完成进度行和分隔线
+        if (line.includes('- 完成进度:') || line === '---' || line.includes('**关联内容:**') || line.match(/^\d+\. [📝✅]/)) {
+          continue
+        }
+        
+        // 收集标签固定内容（跳过标签固定内容标题）
+        if (currentTag && line.trim() && !line.startsWith('#') && !line.includes('**标签固定内容:**')) {
+          if (currentTagContent) currentTagContent += '\n'
+          currentTagContent += line
         }
         continue
       }
@@ -2944,11 +3529,14 @@ export default function NotePad() {
       })
     }
     
-    // 保存最后一个标签的内容
-    if (currentTag && currentContent.trim() && inTagSection) {
+    // 保存最后一个标签的内容（只有当内容不为空时）
+    if (currentTag && inTagSection && currentTagContent.trim()) {
       tagContents.push({
-        tag: currentTag,
-        content: currentContent.trim()
+        tag: currentTag.replace('#', ''), // 移除可能的#前缀
+        content: currentTagContent.trim(),
+        isGoalEnabled: currentTagGoalEnabled,
+        targetCount: currentTagTargetCount,
+        currentCount: currentTagCurrentCount
       })
     }
     
