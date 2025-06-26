@@ -126,7 +126,6 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
     console.log('⏳ [GoalsList] 显示加载状态')
     return (
       <div>
-        <h3 className="font-medium text-sm mb-3">目标进度</h3>
         <p>加载中...</p>
       </div>
     )
@@ -136,7 +135,6 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
     console.log('❌ [GoalsList] 显示错误状态:', error)
     return (
       <div>
-         <h3 className="font-medium text-sm mb-3">目标进度</h3>
          <p className="text-red-500">{error}</p>
        </div>
     )
@@ -146,7 +144,6 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
     console.log('📭 [GoalsList] 显示无目标状态')
     return (
       <div>
-         <h3 className="font-medium text-sm mb-3">目标进度</h3>
          <p className="text-gray-500">暂无设置目标的标签</p>
        </div>
     )
@@ -155,9 +152,7 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
   console.log('🎯 [GoalsList] 显示目标列表，共', goals.length, '个目标')
   
   return (
-    <div>
-       <h3 className="font-medium text-sm mb-3">目标进度</h3>
-      <div className="space-y-2">
+    <div className="space-y-2">
         {goals.map((goal, index) => {
           const progress = goal.targetCount && goal.targetCount > 0 
             ? (goal.currentCount || 0) / goal.targetCount * 100 
@@ -190,7 +185,6 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
             </div>
           )
         })}
-      </div>
     </div>
   )
 }

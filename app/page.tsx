@@ -24,6 +24,8 @@ import { SearchBar } from "@/components/search-bar"
 
 import IntegratedSchedule from "@/components/integrated-schedule"
 import GoalsList from "@/components/goals-list"
+import CheckInList from "@/components/checkin-list"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
@@ -4489,9 +4491,23 @@ export default function NotePad() {
                 <IntegratedSchedule selectedDate={date} />
               </div>
               
-              {/* 目标区域 */}
+              {/* 目标和打卡区域 */}
               <div className="p-4 border-b">
-                <GoalsList onTagSelect={setSelectedTag} />
+                <Tabs defaultValue="goals" className="w-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium text-sm">目标与打卡</h3>
+                    <TabsList className="grid w-32 grid-cols-2">
+                      <TabsTrigger value="goals" className="text-xs">目标</TabsTrigger>
+                      <TabsTrigger value="checkin" className="text-xs">打卡</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  <TabsContent value="goals" className="mt-0">
+                    <GoalsList onTagSelect={setSelectedTag} />
+                  </TabsContent>
+                  <TabsContent value="checkin" className="mt-0">
+                    <CheckInList onTagSelect={setSelectedTag} />
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
             )}
