@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TabsContent } from "@/components/ui/tabs"
 import { Plus, Search, Edit, Trash2, X } from "lucide-react"
 import { 
@@ -27,7 +28,7 @@ export function NotesTab({ user }: NotesTabProps) {
   const [newNote, setNewNote] = useState("")
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
-  const [showNoteInput, setShowNoteInput] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
@@ -125,7 +126,7 @@ export function NotesTab({ user }: NotesTabProps) {
     try {
       await addNote(newNote, '')
       setNewNote("")
-      setShowNoteInput(false)
+      setIsDialogOpen(false)
       await loadNotes()
       toast({ title: "笔记添加成功" })
     } catch (error) {
@@ -197,14 +198,49 @@ export function NotesTab({ user }: NotesTabProps) {
             <h2 className="text-lg font-medium">我的笔记</h2>
             <span className="text-sm text-muted-foreground">({notes.length})</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowNoteInput(!showNoteInput)}
-            className="shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md fixed top-24 left-1/2 transform -translate-x-1/2">
+              <DialogHeader>
+                <DialogTitle>添加笔记</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Textarea
+                  placeholder="写下你的想法..."
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className="min-h-[120px] resize-none"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleAddNote} 
+                    disabled={isAddingNote || !newNote.trim()}
+                    className="flex-1"
+                  >
+                    {isAddingNote ? "添加中..." : "添加"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setIsDialogOpen(false)
+                      setNewNote("")
+                    }}
+                  >
+                    取消
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* 搜索栏 */}
@@ -218,40 +254,7 @@ export function NotesTab({ user }: NotesTabProps) {
           />
         </div>
 
-        {/* 添加笔记输入区域 */}
-        {showNoteInput && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">添加笔记</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                placeholder="写下你的想法..."
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="min-h-[120px]"
-              />
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleAddNote} 
-                  disabled={isAddingNote || !newNote.trim()}
-                  className="flex-1"
-                >
-                  {isAddingNote ? "添加中..." : "添加笔记"}
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setShowNoteInput(false)
-                    setNewNote("")
-                  }}
-                >
-                  取消
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
       </div>
 
       {/* 可滚动的笔记列表区域 */}
@@ -301,65 +304,62 @@ export function NotesTab({ user }: NotesTabProps) {
                         className="cursor-pointer"
                         onClick={() => setSelectedNoteId(selectedNoteId === note.id ? null : note.id)}
                       >
-                        {/* 笔记头部信息 */}
+                        {/* 笔记头部 - 时间、标签和删除按钮在同一行 */}
                         <div className="flex items-center justify-between mb-2">
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleTimeString('zh-CN', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {selectedNoteId === note.id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteNote(note.id)
-                                }}
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive transition-colors"
-                                title="删除笔记"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                          <div className="flex items-center gap-2 flex-1">
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(note.createdAt).toLocaleTimeString('zh-CN', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                            {/* 标签 */}
+                            {tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {tags.slice(0, 3).map((tag, index) => (
+                                  <Badge 
+                                    key={index} 
+                                    variant="secondary" 
+                                    className="text-xs cursor-pointer hover:bg-secondary/80"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleTagClick(tag)
+                                    }}
+                                  >
+                                    #{tag}
+                                  </Badge>
+                                ))}
+                                {tags.length > 3 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{tags.length - 3}
+                                  </Badge>
+                                )}
+                              </div>
                             )}
                           </div>
+                          {selectedNoteId === note.id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteNote(note.id)
+                              }}
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 ml-2"
+                              title="删除笔记"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                         
-                        {/* 笔记内容和标签 */}
-                        <div className="flex mb-3">
-                          {/* 笔记内容 */}
+                        {/* 笔记内容 */}
+                        <div className="mb-3">
                           <div 
-                            className="text-sm whitespace-pre-wrap break-words flex-1"
-                            style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}
+                            className="text-sm leading-relaxed whitespace-pre-wrap break-words"
                           >
                             {contentWithoutTags}
                           </div>
-                          
-                          {/* 标签 - 放在右侧 */}
-                          {tags.length > 0 && (
-                            <div className="flex flex-col items-end gap-1 ml-2 min-w-[80px]">
-                              {tags.slice(0, 3).map((tag, index) => (
-                                <Badge 
-                                  key={index} 
-                                  variant="outline" 
-                                  className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleTagClick(tag)
-                                  }}
-                                >
-                                  #{tag}
-                                </Badge>
-                              ))}
-                              {tags.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{tags.length - 3}
-                                </Badge>
-                              )}
-                            </div>
-                          )}  
                         </div>
                         
                         {/* 分割线 */}
