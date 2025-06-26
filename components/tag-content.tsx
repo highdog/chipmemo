@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Pencil, Save, X, Target, Loader2 } from "lucide-react"
+import { Pencil, Save, X, Target, Loader2, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { tagContentsApi, apiClient } from "@/lib/api"
 import NoteHeatmap from "@/components/note-heatmap"
@@ -33,6 +33,11 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   const [currentCount, setCurrentCount] = useState(0)
   const [checkedBoxes, setCheckedBoxes] = useState<boolean[]>([])
   
+  // 打卡相关状态
+  const [isCheckInEnabled, setIsCheckInEnabled] = useState(false)
+  const [checkInCount, setCheckInCount] = useState(0)
+  const [isCheckingIn, setIsCheckingIn] = useState(false)
+  
 
 
   // 加载标签内容
@@ -46,6 +51,9 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         setIsGoalEnabled(response.data.isGoalEnabled || false)
         setTargetCount(response.data.targetCount || 0)
         setCurrentCount(response.data.currentCount || 0)
+        // 加载打卡设置数据
+        setIsCheckInEnabled(response.data.isCheckInEnabled || false)
+        setCheckInCount(response.data.checkInCount || 0)
         // 初始化勾选框状态
         const boxes = new Array(response.data.targetCount || 0).fill(false)
         for (let i = 0; i < (response.data.currentCount || 0); i++) {
@@ -58,6 +66,8 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         setIsGoalEnabled(false)
         setTargetCount(0)
         setCurrentCount(0)
+        setIsCheckInEnabled(false)
+        setCheckInCount(0)
         setCheckedBoxes([])
       }
     } catch (error) {
@@ -66,6 +76,8 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       setIsGoalEnabled(false)
       setTargetCount(0)
       setCurrentCount(0)
+      setIsCheckInEnabled(false)
+      setCheckInCount(0)
       setCheckedBoxes([])
       toast.error('加载标签内容失败')
     } finally {
@@ -109,7 +121,9 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       const goalSettings = {
         isGoalEnabled,
         targetCount: isGoalEnabled ? targetCount : 0,
-        currentCount: isGoalEnabled ? currentCount : 0
+        currentCount: isGoalEnabled ? currentCount : 0,
+        isCheckInEnabled,
+        checkInCount: isCheckInEnabled ? checkInCount : 0
       }
       
       console.log('🎯 [TagContent] 目标设置数据:', goalSettings)
@@ -267,6 +281,35 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     }
   }, [targetCount, currentCount, isGoalEnabled])
 
+  // 处理打卡功能
+  const handleCheckIn = async () => {
+    if (!isCheckInEnabled) {
+      toast.error('打卡功能未启用')
+      return
+    }
+
+    setIsCheckingIn(true)
+    try {
+      const result = await tagContentsApi.checkIn(tag)
+      if (result.success && result.data) {
+        setCheckInCount(result.data.checkInCount)
+        toast.success(`打卡成功！已打卡${result.data.checkInCount}次`)
+        
+        // 触发笔记列表刷新
+        window.dispatchEvent(new CustomEvent('notes-refresh', {
+          detail: { currentTag: tag }
+        }))
+      } else {
+        toast.error(result.error || '打卡失败')
+      }
+    } catch (error: any) {
+      console.error('打卡失败:', error)
+      toast.error('打卡失败: ' + (error?.message || '未知错误'))
+    } finally {
+      setIsCheckingIn(false)
+    }
+  }
+
 
 
   // 将Markdown格式的内容转换为HTML
@@ -290,15 +333,40 @@ export function TagContent({ tag, onSave }: TagContentProps) {
             {/* 目标设置区域 - 移到标题右边 */}
             {isEditing && (
               <div className="flex items-center gap-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`goal-${tag}`}
-                    checked={isGoalEnabled}
-                    onCheckedChange={(checked) => setIsGoalEnabled(checked as boolean)}
-                  />
-                  <Label htmlFor={`goal-${tag}`} className="text-sm">
-                    设置为目标标签
-                  </Label>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`goal-${tag}`}
+                      checked={isGoalEnabled}
+                      onCheckedChange={(checked) => {
+                        const isChecked = checked as boolean
+                        setIsGoalEnabled(isChecked)
+                        if (isChecked) {
+                          setIsCheckInEnabled(false)
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`goal-${tag}`} className="text-sm">
+                      设置为目标标签
+                    </Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`checkin-${tag}`}
+                      checked={isCheckInEnabled}
+                      onCheckedChange={(checked) => {
+                        const isChecked = checked as boolean
+                        setIsCheckInEnabled(isChecked)
+                        if (isChecked) {
+                          setIsGoalEnabled(false)
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`checkin-${tag}`} className="text-sm">
+                      设置为打卡标签
+                    </Label>
+                  </div>
                 </div>
                 
                 {isGoalEnabled && (
@@ -353,6 +421,29 @@ export function TagContent({ tag, onSave }: TagContentProps) {
                 </div>
               </div>
             )}
+            
+            {/* 非编辑模式下的打卡功能显示 */}
+            {!isEditing && isCheckInEnabled && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  已打卡{checkInCount}次
+                </span>
+                <Button
+                  onClick={handleCheckIn}
+                  disabled={isCheckingIn}
+                  size="sm"
+                  className="flex items-center gap-1"
+                >
+                  {isCheckingIn ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  打卡
+                </Button>
+              </div>
+            )}
+
           </div>
           {isEditing ? (
             <div className="flex gap-2">

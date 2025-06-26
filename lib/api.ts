@@ -336,15 +336,17 @@ class ApiClient {
   }
 
   // 标签内容相关API
-  async getTagContent(tag: string): Promise<ApiResponse<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>> {
-    return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>(`/tag-contents/${encodeURIComponent(tag)}`);
+  async getTagContent(tag: string): Promise<ApiResponse<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>> {
+    return this.get<{ tag: string; content: string; isDefault?: boolean; updatedAt?: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>(`/tag-contents/${encodeURIComponent(tag)}`);
   }
 
   async saveTagContent(tag: string, content: string, goalSettings?: {
     isGoalEnabled?: boolean
     targetCount?: number
     currentCount?: number
-  }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>> {
+    isCheckInEnabled?: boolean
+    checkInCount?: number
+  }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number; updatedAt: string }>> {
     console.log('🌐 [API] saveTagContent 调用开始')
     console.log('📤 [API] 请求参数:', {
       tag: tag,
@@ -361,7 +363,7 @@ class ApiClient {
     console.log('🔗 [API] 请求URL:', `/tag-contents/${encodeURIComponent(tag)}`)
     
     try {
-      const response = await this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, requestBody)
+      const response = await this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, requestBody)
       
       console.log('📥 [API] saveTagContent 响应:', response)
       console.log('✅ [API] saveTagContent 成功')
@@ -373,12 +375,12 @@ class ApiClient {
     }
   }
 
-  async getAll(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>>> {
+  async getAll(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>>> {
     console.log('🌐 [API] getAll 调用开始')
     console.log('🔗 [API] 请求URL: /tag-contents')
     
     try {
-      const response = await this.get<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }>>('/tag-contents')
+      const response = await this.get<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>>('/tag-contents')
       console.log('📥 [API] getAll 响应:', response)
       console.log('📊 [API] getAll 数据类型:', typeof response)
       console.log('📋 [API] getAll 数据结构:', response ? Object.keys(response) : 'null')
@@ -405,6 +407,11 @@ class ApiClient {
 
   async getAllTagContents(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string }>>> {
     return this.get<Array<{ tag: string; content: string; updatedAt: string }>>('/tag-contents');
+  }
+
+  // 打卡相关API
+  async checkInTag(tag: string): Promise<ApiResponse<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>> {
+    return this.post<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>(`/tag-contents/${encodeURIComponent(tag)}/check-in`, {});
   }
 
   // 日程相关API
@@ -592,9 +599,10 @@ export const todosApi = {
 
 export const tagContentsApi = {
   get: (tag: string) => apiClient.getTagContent(tag),
-  save: (tag: string, content: string, goalSettings?: { isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }) => apiClient.saveTagContent(tag, content, goalSettings),
+  save: (tag: string, content: string, goalSettings?: { isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }) => apiClient.saveTagContent(tag, content, goalSettings),
   delete: (tag: string) => apiClient.deleteTagContent(tag),
   getAll: () => apiClient.getAllTagContents(),
+  checkIn: (tag: string) => apiClient.checkInTag(tag),
 };
 
 export const schedulesApi = {

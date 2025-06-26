@@ -31,6 +31,16 @@ const tagContentSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: [0, 'Current count cannot be negative']
+  },
+  // 打卡设置相关字段
+  isCheckInEnabled: {
+    type: Boolean,
+    default: false
+  },
+  checkInCount: {
+    type: Number,
+    default: 0,
+    min: [0, 'Check-in count cannot be negative']
   }
 }, {
   timestamps: true
