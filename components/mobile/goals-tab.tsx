@@ -359,18 +359,20 @@ export function GoalsTab({ user }: GoalsTabProps) {
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-6 gap-2">
-                    {Array.from({ length: selectedGoal.targetCount || 0 }, (_, index) => (
-                      <div key={index} className="flex flex-col items-center">
-                        <Checkbox
-                          id={`goal-checkbox-${selectedGoal.tag}-${index}`}
-                          checked={checkedBoxes[index] || false}
-                          onCheckedChange={() => handleCheckboxClick(index)}
-                          className="h-4 w-4"
-                        />
-                        <span className="text-xs text-gray-400 mt-0.5">{index + 1}</span>
-                      </div>
-                    ))}
+                  <div className="max-h-48 overflow-y-auto">
+                    <div className="grid grid-cols-6 gap-2">
+                      {Array.from({ length: selectedGoal.targetCount || 0 }, (_, index) => (
+                        <div key={index} className="flex flex-col items-center">
+                          <Checkbox
+                            id={`goal-checkbox-${selectedGoal.tag}-${index}`}
+                            checked={checkedBoxes[index] || false}
+                            onCheckedChange={() => handleCheckboxClick(index)}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-xs text-gray-400 mt-0.5">{index + 1}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   
                   <div className="text-xs text-gray-500">

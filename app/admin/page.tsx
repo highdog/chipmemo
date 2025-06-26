@@ -540,7 +540,7 @@ export default function AdminPage() {
                           <Button 
                             variant="destructive" 
                             size="sm"
-                            disabled={user._id === currentUser?.id}
+                            disabled={user._id === currentUser?._id}
                           >
                             删除
                           </Button>
