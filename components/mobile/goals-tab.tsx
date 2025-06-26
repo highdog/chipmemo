@@ -6,11 +6,16 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TabsContent } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 import { Plus, Target, Calendar } from "lucide-react"
-import { tagContentsApi } from "@/lib/api"
+import { tagContentsApi, apiClient } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { GoalsTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Separator } from "@/components/ui/separator"
 
 interface Goal {
   _id: string
@@ -22,15 +27,26 @@ interface Goal {
   userId: string
   createdAt: string
   updatedAt: string
+  // 添加进度相关字段
+  tag: string
+  targetCount: number
+  currentCount: number
 }
 
 export function GoalsTab({ user }: GoalsTabProps) {
   const toast = showToast
   // 目标相关状态
   const [goals, setGoals] = useState<Goal[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showGoalInput, setShowGoalInput] = useState(false)
   const [newGoal, setNewGoal] = useState({ title: "", description: "", targetDate: "" })
   const [isAddingGoal, setIsAddingGoal] = useState(false)
-  const [showGoalInput, setShowGoalInput] = useState(false)
+  
+  // 弹框相关状态
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
+  const [showGoalDialog, setShowGoalDialog] = useState(false)
+  const [checkedBoxes, setCheckedBoxes] = useState<boolean[]>([])
 
   // 加载目标数据
   const loadGoals = useCallback(async () => {
@@ -49,9 +65,13 @@ export function GoalsTab({ user }: GoalsTabProps) {
           description: item.description || item.content || '',
           completed: (item.currentCount || 0) >= (item.targetCount || 1),
           targetDate: item.targetDate || item.dueDate,
-          userId: item.userId || user?.id || '',
+          userId: item.userId || user?._id || '',
           createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt: item.updatedAt || new Date().toISOString()
+          updatedAt: item.updatedAt || new Date().toISOString(),
+          // 添加进度相关字段
+          tag: item.tag || item.title || item.name || '未命名目标',
+          targetCount: item.targetCount || 1,
+          currentCount: item.currentCount || 0
         }))
       
       setGoals(goals)
@@ -87,6 +107,87 @@ export function GoalsTab({ user }: GoalsTabProps) {
       toast({ title: "添加目标失败", variant: "destructive" })
     } finally {
       setIsAddingGoal(false)
+    }
+  }
+
+  // 处理目标点击，打开弹框
+  const handleGoalClick = (goal: Goal) => {
+    setSelectedGoal(goal)
+    setShowGoalDialog(true)
+    
+    // 初始化勾选框状态
+    const boxes = new Array(goal.targetCount || 0).fill(false)
+    for (let i = 0; i < (goal.currentCount || 0); i++) {
+      boxes[i] = true
+    }
+    setCheckedBoxes(boxes)
+  }
+
+  // 处理勾选框点击
+  const handleCheckboxClick = async (index: number) => {
+    if (!selectedGoal) return
+    
+    const newCheckedBoxes = [...checkedBoxes]
+    const wasChecked = newCheckedBoxes[index]
+    newCheckedBoxes[index] = !wasChecked
+    
+    // 更新本地状态
+    setCheckedBoxes(newCheckedBoxes)
+    const newCurrentCount = newCheckedBoxes.filter(Boolean).length
+    
+    try {
+      // 保存进度到后端
+      const goalSettings = {
+        isGoalEnabled: true,
+        targetCount: selectedGoal.targetCount || 0,
+        currentCount: newCurrentCount
+      }
+      
+      await tagContentsApi.save(selectedGoal.tag, '', goalSettings)
+      
+      // 如果是勾选（进度+1），自动创建笔记
+      if (!wasChecked) {
+        const noteTitle = `${selectedGoal.tag} 目标进度 +1`
+        const noteContent = `完成了 #${selectedGoal.tag} 标签的一个目标项目，当前进度：${newCurrentCount}/${selectedGoal.targetCount}`
+        
+        const noteData = {
+          title: noteTitle,
+          content: noteContent,
+          tags: [selectedGoal.tag],
+          color: 'blue'
+        }
+        
+        await apiClient.createNote(noteData)
+        toast({ title: `进度 +1，已自动创建笔记` })
+        
+        // 触发笔记列表刷新
+        window.dispatchEvent(new CustomEvent('notes-refresh', {
+          detail: { currentTag: selectedGoal.tag }
+        }))
+      } else {
+        toast({ title: `进度已更新：${newCurrentCount}/${selectedGoal.targetCount}` })
+      }
+      
+      // 更新目标列表中的当前目标
+      setGoals(goals.map(g => 
+        g._id === selectedGoal._id 
+          ? { ...g, currentCount: newCurrentCount }
+          : g
+      ))
+      
+      // 更新选中的目标
+      setSelectedGoal({ ...selectedGoal, currentCount: newCurrentCount })
+      
+      // 触发目标列表刷新
+      window.dispatchEvent(new CustomEvent('goals-list-refresh'))
+      
+    } catch (error: any) {
+      console.error('更新进度失败:', error)
+      
+      // 回滚状态
+      newCheckedBoxes[index] = wasChecked
+      setCheckedBoxes(newCheckedBoxes)
+      toast({ title: '更新进度失败: ' + (error?.message || '未知错误'), variant: "destructive" })
     }
   }
 
@@ -210,6 +311,76 @@ export function GoalsTab({ user }: GoalsTabProps) {
             </CardContent>
           </Card>
         )}
+        
+        {/* 目标进度弹框 */}
+        <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-600" />
+                目标进度
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedGoal && (
+              <div className="space-y-4">
+                {/* 目标信息 */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline">{selectedGoal.tag}</Badge>
+                    <span className="text-sm font-medium">
+                      {selectedGoal.currentCount || 0} / {selectedGoal.targetCount || 0}
+                    </span>
+                  </div>
+                  
+                  {selectedGoal.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedGoal.description}
+                    </p>
+                  )}
+                  
+                  {selectedGoal.targetDate && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>{selectedGoal.targetDate}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <Separator />
+                
+                {/* 进度勾选框 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-700">目标进度</span>
+                    <span className="text-xs text-gray-500">
+                      ({selectedGoal.currentCount || 0}/{selectedGoal.targetCount || 0})
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-6 gap-2">
+                    {Array.from({ length: selectedGoal.targetCount || 0 }, (_, index) => (
+                      <div key={index} className="flex flex-col items-center">
+                        <Checkbox
+                          id={`goal-checkbox-${selectedGoal.tag}-${index}`}
+                          checked={checkedBoxes[index] || false}
+                          onCheckedChange={() => handleCheckboxClick(index)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-xs text-gray-400 mt-0.5">{index + 1}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="text-xs text-gray-500">
+                    点击勾选框来更新进度，每次勾选会自动创建一条进度笔记
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* 目标列表 */}
         {goals.length === 0 ? (
@@ -217,72 +388,74 @@ export function GoalsTab({ user }: GoalsTabProps) {
             暂无目标，开始设定你的第一个目标吧！
           </div>
         ) : (
-          <div className="space-y-3">
-            {goals.map((goal) => {
-              const daysLeft = goal.targetDate ? getDaysLeft(goal.targetDate) : null
+          <div className="space-y-0">
+            {goals.map((goal, index) => {
+              const progress = goal.targetCount && goal.targetCount > 0 
+                ? (goal.currentCount || 0) / goal.targetCount * 100 
+                : 0
               
               return (
-                <Card key={goal._id} className={cn(
-                  "border-l-4 cursor-pointer transition-all hover:shadow-md",
-                  getGoalStatusColor(goal)
-                )}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-4 w-4" />
-                          <h3 className={cn(
-                            "font-medium",
-                            goal.completed && "line-through text-muted-foreground"
-                          )}>
-                            {goal.title}
-                          </h3>
-                        </div>
-                        
+                <div key={goal._id}>
+                  <div 
+                    className="space-y-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                    onClick={() => handleGoalClick(goal)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">{goal.tag}</Badge>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {goal.currentCount || 0} / {goal.targetCount || 0}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {Math.round(progress)}%
+                      </span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                    
+                    {/* 额外信息区域 */}
+                    {(goal.description || goal.targetDate) && (
+                      <div className="space-y-2 pt-2">
                         {goal.description && (
-                          <p className="text-sm text-muted-foreground mb-2">
+                          <p className="text-sm text-muted-foreground">
                             {goal.description}
                           </p>
                         )}
                         
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          {goal.targetDate && (
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>{goal.targetDate}</span>
-                              {daysLeft !== null && (
-                                <span className={cn(
-                                  "ml-1 px-2 py-1 rounded-full",
-                                  daysLeft < 0 
-                                    ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                                    : daysLeft <= 7
-                                      ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
-                                      : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                                )}>
-                                  {daysLeft < 0 
-                                    ? `已过期${Math.abs(daysLeft)}天`
-                                    : daysLeft === 0
-                                      ? "今天到期"
-                                      : `还剩${daysLeft}天`
-                                  }
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {goal.targetDate && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            <span>{goal.targetDate}</span>
+                            {(() => {
+                              const daysLeft = getDaysLeft(goal.targetDate)
+                              if (daysLeft !== null) {
+                                return (
+                                  <span className={cn(
+                                    "ml-1 px-2 py-1 rounded-full",
+                                    daysLeft < 0 
+                                      ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
+                                      : daysLeft <= 7
+                                        ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
+                                        : "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                                  )}>
+                                    {daysLeft < 0 
+                                      ? `已过期${Math.abs(daysLeft)}天`
+                                      : daysLeft === 0
+                                        ? "今天到期"
+                                        : `还剩${daysLeft}天`
+                                    }
+                                  </span>
+                                )
+                              }
+                              return null
+                            })()} 
+                          </div>
+                        )}
                       </div>
-                      
-                      <Button
-                        variant={goal.completed ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => toggleGoal(goal._id)}
-                        className="ml-2"
-                      >
-                        {goal.completed ? "已完成" : "标记完成"}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    )}
+                  </div>
+                  {index < goals.length - 1 && <Separator />}
+                </div>
               )
             })}
           </div>
