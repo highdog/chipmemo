@@ -333,7 +333,7 @@ export function GoalsTab({ user }: GoalsTabProps) {
                     </span>
                   </div>
                   
-                  {selectedGoal.description && (
+                  {selectedGoal.description && !selectedGoal.description.includes('这是关于') && !selectedGoal.description.includes('标签的基本内容') && (
                     <p className="text-sm text-muted-foreground">
                       {selectedGoal.description}
                     </p>
@@ -416,7 +416,7 @@ export function GoalsTab({ user }: GoalsTabProps) {
                     {/* 额外信息区域 */}
                     {(goal.description || goal.targetDate) && (
                       <div className="space-y-2 pt-2">
-                        {goal.description && (
+                        {goal.description && !goal.description.includes('这是关于') && !goal.description.includes('标签的基本内容') && (
                           <p className="text-sm text-muted-foreground">
                             {goal.description}
                           </p>
