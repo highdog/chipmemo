@@ -1197,7 +1197,7 @@ export default function NotePad() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  // 移除重复的认证状态，直接使用AuthContext的状态
   const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
   const [todoDueDate, setTodoDueDate] = useState('')
   const [todoStartDate, setTodoStartDate] = useState('')
@@ -1216,7 +1216,7 @@ export default function NotePad() {
   const [currentTag, setCurrentTag] = useState<string>("") // 当前搜索的标签
   const [selectedTag, setSelectedTag] = useState<string>('all') // 目标列表选中的标签
   const [selectedImage, setSelectedImage] = useState<string | null>(null) // 选择的图片
-  const [isLoggedIn, setIsLoggedIn] = useState(false) // 用户登录状态
+  // 移除重复的登录状态，直接使用AuthContext的isAuthenticated
   const [isLargeCalendarOpen, setIsLargeCalendarOpen] = useState(false) // 大日历弹窗状态
   const [schedulesByDate, setSchedulesByDate] = useState<Record<string, any[]>>({}) // 日程数据
   const [isExporting, setIsExporting] = useState(false) // 导出状态
@@ -3998,28 +3998,21 @@ export default function NotePad() {
 
   // 检查用户登录状态
   useEffect(() => {
-    if (!authLoading) {
-      if (!isAuthenticated) {
-        // 用户未登录，重定向到登录页面
-        router.push("/login")
-        return
-      }
-      
-      setIsLoggedIn(true)
-      setIsCheckingAuth(false)
+    if (!authLoading && !isAuthenticated) {
+      // 用户未登录，重定向到登录页面
+      router.push("/login")
     }
   }, [authLoading, isAuthenticated, router])
 
   // 处理用户登出
   const handleLogout = () => {
     logout()
-    setIsLoggedIn(false)
     router.push("/login")
   }
 
   // 组件加载时获取笔记和todos（仅在已登录时）
   useEffect(() => {
-    if (isLoggedIn && !isCheckingAuth) {
+    if (!authLoading && isAuthenticated) {
       // 加载搜索历史记录
       const savedSearchHistory = localStorage.getItem('searchHistory')
       if (savedSearchHistory) {
@@ -4057,7 +4050,7 @@ export default function NotePad() {
       loadTodosData()
       loadAllSchedules() // 加载日程数据
     }
-  }, [isLoggedIn, isCheckingAuth])
+  }, [authLoading, isAuthenticated])
 
   // 加载todo数据
   const loadTodosData = useCallback(async () => {
@@ -4102,7 +4095,7 @@ export default function NotePad() {
   const groupedNotes = useMemo(() => groupNotesByDate(notes), [notes])
 
   // 如果正在检查认证状态，显示加载界面
-  if (isCheckingAuth) {
+  if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center">
@@ -4114,7 +4107,7 @@ export default function NotePad() {
   }
 
   // 如果未登录，不渲染主界面（因为会重定向到登录页面）
-  if (!isLoggedIn) {
+  if (!isAuthenticated) {
     return null
   }
 
