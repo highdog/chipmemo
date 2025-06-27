@@ -14,7 +14,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { ImageViewer } from "@/components/image-viewer"
 
 interface NoteItemProps {
   note: Note
@@ -32,6 +32,8 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const [isSaving, setIsSaving] = useState(false)
   const [editContent, setEditContent] = useState('')
   const [editTags, setEditTags] = useState<string[]>([])
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -255,43 +257,41 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
       return null;
     }
 
+    const handleImageClick = (index: number) => {
+      setSelectedImageIndex(index)
+      setImageViewerOpen(true)
+    }
+
     return (
-      <div className="mt-3 pt-3 border-t border-border/30">
-        <div className="flex flex-wrap gap-2">
-          {imageUrls.map((url, index) => (
-            <Dialog key={index}>
-              <DialogTrigger asChild>
-                <div className="relative cursor-pointer group">
-                  <img 
-                    src={url}
-                    alt={`图片 ${index + 1}`}
-                    className="w-20 h-20 object-cover rounded-md hover:opacity-80 transition-opacity"
-                    onError={(e) => {
-                      console.error("图片加载失败:", url);
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-md flex items-center justify-center">
-                    <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
+      <>
+        <div className="mt-3 pt-3 border-t border-border/30">
+          <div className="flex flex-wrap gap-2">
+            {imageUrls.map((url, index) => (
+              <div key={index} className="relative cursor-pointer group" onClick={() => handleImageClick(index)}>
+                <img 
+                  src={url}
+                  alt={`图片 ${index + 1}`}
+                  className="w-20 h-20 object-cover rounded-md hover:opacity-80 transition-opacity"
+                  onError={(e) => {
+                    console.error("图片加载失败:", url);
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-md flex items-center justify-center">
+                  <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] p-2">
-                <div className="flex items-center justify-center">
-                  <img 
-                    src={url}
-                    alt={`图片 ${index + 1}`}
-                    className="max-w-full max-h-[80vh] object-contain rounded-md"
-                    onError={(e) => {
-                      console.error("图片加载失败:", url);
-                    }}
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+        <ImageViewer
+          images={imageUrls}
+          initialIndex={selectedImageIndex}
+          open={imageViewerOpen}
+          onOpenChange={setImageViewerOpen}
+          isMobile={false}
+        />
+      </>
     );
   };
 

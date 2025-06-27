@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ImageViewer } from "@/components/image-viewer"
 import { TabsContent } from "@/components/ui/tabs"
 import { Plus, Search, Edit, Trash2, X, Image, ZoomIn } from "lucide-react"
 import { 
@@ -46,8 +47,9 @@ export function NotesTab({ user }: NotesTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [selectedImages, setSelectedImages] = useState<string[]>([])
-  const [imageDialogOpen, setImageDialogOpen] = useState(false)
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [currentNoteImages, setCurrentNoteImages] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -644,6 +646,15 @@ export function NotesTab({ user }: NotesTabProps) {
           )}
         </div>
       </div>
+      
+      {/* 图片查看器 */}
+      <ImageViewer
+        images={currentNoteImages}
+        initialIndex={selectedImageIndex}
+        open={imageViewerOpen}
+        onOpenChange={setImageViewerOpen}
+        isMobile={true}
+      />
     </TabsContent>
   )
 }
