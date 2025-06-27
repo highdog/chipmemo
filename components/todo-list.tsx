@@ -116,13 +116,13 @@ function SortableTodoItem({
   const getPriorityCheckboxClass = (priority?: string) => {
     switch (priority) {
       case 'high':
-        return 'border-red-500 data-[state=checked]:border-red-500'
+        return 'border-red-500 border-2 data-[state=checked]:border-red-500'
       case 'medium':
-        return 'border-yellow-500 data-[state=checked]:border-yellow-500'
+        return 'border-yellow-500 border-2 data-[state=checked]:border-yellow-500'
       case 'low':
-        return 'border-gray-400 data-[state=checked]:border-gray-400'
+        return 'border-gray-400 border-2 data-[state=checked]:border-gray-400'
       default:
-        return 'border-gray-300 data-[state=checked]:border-gray-300'
+        return 'border-gray-300 border-2 data-[state=checked]:border-gray-300'
     }
   }
 
@@ -201,9 +201,7 @@ function SortableTodoItem({
               onCheckedChange={() => onToggleTodo(todo.id || (todo as any)._id)}
               className={cn("mt-0.5", getPriorityCheckboxClass(todo.priority))}
             />
-            <div className="text-xs text-muted-foreground mt-1 font-mono">
-              #{priorityIndex}
-            </div>
+
           </div>
           <div 
             className="flex-1 cursor-grab active:cursor-grabbing hover:bg-accent/50 transition-colors"
@@ -376,6 +374,7 @@ export const TodoList = React.memo(function TodoList({
   const [editStartDate, setEditStartDate] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
   const [menuOpenTodo, setMenuOpenTodo] = useState<string | null>(null)
+  const [orderSelectTodo, setOrderSelectTodo] = useState<string | null>(null)
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
   const [newTodoTag, setNewTodoTag] = useState<string | null>(null)
   const [newTodoContent, setNewTodoContent] = useState('')
@@ -926,6 +925,7 @@ export const TodoList = React.memo(function TodoList({
                           editStartDate={editStartDate}
                           editDueDate={editDueDate}
                           menuOpenTodo={menuOpenTodo}
+                          orderSelectTodo={orderSelectTodo}
                           allTodos={allTodos as any}
                           onToggleTodo={handleToggleTodo}
                           onEditTodo={handleEditTodo}
@@ -935,6 +935,7 @@ export const TodoList = React.memo(function TodoList({
                           onUpdateTodo={onUpdateTodo}
                           onDeleteTodo={onDeleteTodo}
                           onLoadTodos={onLoadTodos}
+                          setOrderSelectTodo={setOrderSelectTodo}
                           setEditContent={setEditContent}
                           setEditStartDate={setEditStartDate}
                           setEditDueDate={setEditDueDate}
@@ -1018,9 +1019,7 @@ export const TodoList = React.memo(function TodoList({
                                  }}
                                >
                                  <div className="flex items-start space-x-2">
-                                   <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                                     #{priorityIndex}
-                                   </div>
+
                                    <div
                                      className={cn(
                                        "text-sm flex-1",

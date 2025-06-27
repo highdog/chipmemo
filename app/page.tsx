@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause, ChevronUp, ChevronDown, Hash } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
-import { TodoList } from "@/components/todo-list"
+import TodoList from "@/components/todo-list"
 import { TagContent } from "@/components/tag-content"
 import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
@@ -455,37 +455,16 @@ export default function NotePad() {
       const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const hasScheduleOnDate = schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0
       
-      let targetDate = newDate
+      // 始终使用用户点击的日期作为选中日期
+      setDate(newDate)
       
-      // 如果当前日期没有日程，找到该日期之后最近的有日程的日期
+      // 检查点击的日期是否有日程
       if (!hasScheduleOnDate) {
-        const clickedDate = new Date(selectedDate)
-        const futureScheduleDates = Object.keys(schedulesByDate)
-          .filter(scheduleDate => {
-            const scheduleDateTime = new Date(scheduleDate + 'T00:00:00')
-            return scheduleDateTime > clickedDate && schedulesByDate[scheduleDate].length > 0
-          })
-          .sort((a, b) => new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime())
-        
-        if (futureScheduleDates.length > 0) {
-          // 找到了未来有日程的日期，选择该日期
-          const targetDateTime = new Date(futureScheduleDates[0] + 'T00:00:00')
-          targetDateTime.setHours(currentTime.getHours(), currentTime.getMinutes(), currentTime.getSeconds(), currentTime.getMilliseconds())
-          targetDate = targetDateTime
-          
-          toast({
-            title: "智能定位",
-            description: `该日期无日程，已自动定位到 ${targetDate.toLocaleDateString('zh-CN')} 的日程`,
-            duration: 3000,
-          })
-        } else {
-          // 没有找到未来的日程，选择点击的日期
-          toast({
-            title: "日期已选择",
-            description: `现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
-            duration: 2000,
-          })
-        }
+        toast({
+          title: "日期已选择",
+          description: `该日期暂无日程，现在添加的笔记将保存到 ${newDate.toLocaleDateString('zh-CN')}`,
+          duration: 2000,
+        })
       } else {
         // 有日程，直接选择该日期
         toast({
@@ -494,11 +473,9 @@ export default function NotePad() {
           duration: 2000,
         })
       }
-      
-      setDate(targetDate)
       // 如果不是在搜索状态，则跳转到对应日期的笔记
       if (!searchTerm) {
-        scrollToDate(targetDate)
+        scrollToDate(newDate)
       }
     }
   }

@@ -143,26 +143,50 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
       const selectedDateKey = format(selectedDate, 'yyyy-MM-dd')
       let targetSchedule = allSchedules.find(schedule => schedule.date === selectedDateKey)
       
-      // 如果选中日期没有日程，找到下一个有日程的日期
+      // 如果选中日期没有日程，找到最接近的日程（优先查找未来的日程）
       if (!targetSchedule) {
         const selectedDateTime = startOfDay(selectedDate)
+        
+        // 先查找未来的日程
         const futureSchedules = allSchedules.filter(schedule => {
           const scheduleDate = startOfDay(new Date(schedule.date))
-          return scheduleDate > selectedDateTime
+          return scheduleDate >= selectedDateTime
         })
         
         if (futureSchedules.length > 0) {
           // 按日期排序，找到最近的日程
           futureSchedules.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           targetSchedule = futureSchedules[0]
+        } else {
+          // 如果没有未来的日程，找最近的过去日程
+          const pastSchedules = allSchedules.filter(schedule => {
+            const scheduleDate = startOfDay(new Date(schedule.date))
+            return scheduleDate < selectedDateTime
+          })
+          
+          if (pastSchedules.length > 0) {
+            // 按日期倒序排序，找到最近的过去日程
+            pastSchedules.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            targetSchedule = pastSchedules[0]
+          }
         }
       }
       
       if (targetSchedule) {
-        const targetElement = scheduleListRef.current.querySelector(`[data-schedule-date="${targetSchedule.date}"]`)
-        if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
+        // 使用setTimeout确保DOM已更新
+        setTimeout(() => {
+          const targetElement = scheduleListRef.current?.querySelector(`[data-schedule-date="${targetSchedule.date}"]`)
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }, 100)
+      } else {
+        // 如果没有任何日程，滚动到顶部
+        setTimeout(() => {
+          if (scheduleListRef.current) {
+            scheduleListRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+          }
+        }, 100)
       }
     }
   }, [selectedDate, allSchedules])
@@ -562,7 +586,7 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
                     <span className={`text-sm font-medium ${
                       isPast ? 'text-gray-400 dark:text-gray-500' : 
                       isToday ? 'text-green-600 dark:text-green-400' : 
-                      'text-blue-600 dark:text-blue-400'
+                      'text-foreground'
                     }`}>
                       {format(new Date(schedule.date), 'MM-dd')} {schedule.time}
                     </span>
