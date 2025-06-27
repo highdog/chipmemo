@@ -224,7 +224,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       // 如果是勾选（进度+1），自动创建笔记
       if (!wasChecked) {
         const noteTitle = `${tag} 目标进度 +1`
-        const noteContent = `完成了 #${tag} 标签的一个目标项目，当前进度：${newCurrentCount}/${targetCount}`
+        const noteContent = `完成了 ${tag} 的一个目标进度，当前进度：${newCurrentCount}/${targetCount}`
         
         const noteData = {
           title: noteTitle,
