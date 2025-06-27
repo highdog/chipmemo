@@ -331,7 +331,7 @@ export function NotesTab({ user }: NotesTabProps) {
     setSearchTerm(`#${trimmedTag}`)
     
     try {
-      const searchResult = await searchNotesByTag(trimmedTag, 1, 5000)
+      const searchResult = await searchNotesByTag(trimmedTag, 1, 1000)
       if (searchResult && searchResult.notes) {
         setNotes(searchResult.notes)
         setHasMore(false) // 搜索结果不支持分页

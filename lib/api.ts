@@ -310,9 +310,29 @@ class ApiClient {
       });
     }
     const query = searchParams.toString();
-    return this.get<{ notes: Note[]; pagination: any }>(
-      `/notes${query ? `?${query}` : ''}`
-    );
+    const url = `/notes${query ? `?${query}` : ''}`;
+    
+    // 添加调试信息
+    if (params?.search) {
+      console.log('🔍 [DEBUG] Search request:', {
+        params,
+        url: `${this.baseURL}${url}`,
+        query
+      });
+    }
+    
+    const result = await this.get<{ notes: Note[]; pagination: any }>(url);
+    
+    // 添加响应调试信息
+    if (params?.search) {
+      console.log('📡 [DEBUG] Search response:', {
+        success: result.success,
+        notesCount: result.data?.notes?.length || 0,
+        error: result.error
+      });
+    }
+    
+    return result;
   }
 
   async getNote(id: string): Promise<ApiResponse<Note>> {

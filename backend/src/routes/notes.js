@@ -16,11 +16,13 @@ router.get('/', [
   query('limit').optional().isInt({ min: 1, max: 1000 }).withMessage('Limit must be between 1 and 1000'),
   query('search').optional().isString().withMessage('Search must be a string'),
   query('tags').optional().isString().withMessage('Tags must be a string'),
-  query('archived').optional().isBoolean().withMessage('Archived must be a boolean')
+  query('archived').optional().isIn(['true', 'false']).withMessage('Archived must be true or false')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('🚨 [BACKEND ERROR] Validation errors:', errors.array());
+      console.log('🚨 [BACKEND ERROR] Request query:', req.query);
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -28,6 +30,16 @@ router.get('/', [
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
     const { search, tags, archived } = req.query;
+
+    // 添加调试日志
+    console.log('🔍 [BACKEND DEBUG] Notes search request:', {
+      userId: req.user._id,
+      search,
+      tags,
+      archived,
+      page,
+      limit
+    });
 
     // Build query
     const query = { userId: req.user._id };
@@ -44,23 +56,67 @@ router.get('/', [
     }
 
     let notes;
+    let searchQuery = { ...query };
+    
+    console.log('🔍 [BACKEND DEBUG] Base query:', query);
+    
     if (search) {
-      // Text search
-      notes = await Note.find({
-        ...query,
-        $text: { $search: search }
-      }, { score: { $meta: 'textScore' } })
-        .sort({ score: { $meta: 'textScore' }, isPinned: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit);
+      console.log('🔍 [BACKEND DEBUG] Performing search for:', search);
+      // Try text search first, fallback to regex search if no results or no text index
+      try {
+        searchQuery.$text = { $search: search };
+        console.log('🔍 [BACKEND DEBUG] Text search query:', searchQuery);
+        notes = await Note.find(searchQuery, { score: { $meta: 'textScore' } })
+          .sort({ score: { $meta: 'textScore' }, isPinned: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit);
+        console.log('🔍 [BACKEND DEBUG] Text search results:', notes.length);
+        
+        // If text search returns no results, try regex search
+        if (notes.length === 0) {
+          console.log('🔍 [BACKEND DEBUG] Text search returned no results, trying regex fallback');
+          searchQuery = {
+            ...query,
+            $or: [
+              { title: { $regex: search, $options: 'i' } },
+              { content: { $regex: search, $options: 'i' } }
+            ]
+          };
+          console.log('🔍 [BACKEND DEBUG] Regex search query:', searchQuery);
+          notes = await Note.find(searchQuery)
+            .sort({ isPinned: -1, createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+          console.log('🔍 [BACKEND DEBUG] Regex search results:', notes.length);
+        }
+      } catch (error) {
+        // Fallback to regex search if text index doesn't exist
+        console.log('🔍 [BACKEND DEBUG] Text search failed, using regex fallback:', error.message);
+        searchQuery = {
+          ...query,
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { content: { $regex: search, $options: 'i' } }
+          ]
+        };
+        console.log('🔍 [BACKEND DEBUG] Regex search query:', searchQuery);
+        notes = await Note.find(searchQuery)
+          .sort({ isPinned: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit);
+        console.log('🔍 [BACKEND DEBUG] Regex search results:', notes.length);
+      }
     } else {
+      console.log('🔍 [BACKEND DEBUG] No search term, getting all notes');
       notes = await Note.find(query)
         .sort({ isPinned: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit);
+      console.log('🔍 [BACKEND DEBUG] All notes results:', notes.length);
     }
 
-    const total = await Note.countDocuments(query);
+    const total = await Note.countDocuments(searchQuery);
+    console.log('🔍 [BACKEND DEBUG] Total count:', total);
 
     res.json({
       success: true,

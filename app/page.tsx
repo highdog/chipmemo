@@ -343,7 +343,7 @@ export default function NotePad() {
       if (targetTag) {
         console.log('📝 [HomePage] 重新加载标签笔记:', targetTag)
         try {
-          const searchResult = await searchNotesByTag(targetTag, 1, 5000)
+          const searchResult = await searchNotesByTag(targetTag, 1, 1000)
           setNotes(searchResult.notes)
           setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
           // 如果事件传递了标签但当前页面标签状态不一致，更新当前标签状态
@@ -581,10 +581,10 @@ export default function NotePad() {
           throw new Error('标签名称不能为空');
         }
         setCurrentTag(tag) // 设置当前标签
-        searchResult = await searchNotesByTag(tag, 1, 5000) // 增加搜索限制到1000条
+        searchResult = await searchNotesByTag(tag, 1, 1000) // 增加搜索限制到1000条
       } else {
         setCurrentTag("") // 清除当前标签
-        searchResult = await searchNotes(term, 1, 5000) // 增加搜索限制到1000条
+        searchResult = await searchNotes(term, 1, 1000) // 增加搜索限制到1000条
       }
       
       setNotes(searchResult.notes)
@@ -645,7 +645,7 @@ export default function NotePad() {
     setIsSearching(true)
 
     try {
-      const searchResult = await searchNotesByTag(trimmedTag, 1, 5000)
+      const searchResult = await searchNotesByTag(trimmedTag, 1, 1000)
       setNotes(searchResult.notes)
       setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
       toast({
