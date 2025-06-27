@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X } from "lucide-react"
+import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X, ZoomIn } from "lucide-react"
 import { deleteNote, type Note } from "@/lib/actions"
 import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
@@ -14,7 +14,7 @@ import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 
 interface NoteItemProps {
   note: Note
@@ -79,31 +79,22 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     setIsEditing(true)
   }
 
-  // 保存编辑后的笔记
+  // 保存编辑
   const handleSave = async () => {
-    if (!editContent.trim()) {
-      toast({
-        title: "内容不能为空",
-        description: "请输入笔记内容",
-        variant: "destructive",
-      })
-      return
-    }
-
+    if (!onUpdate) return
+    
     setIsSaving(true)
     try {
-      if (onUpdate) {
-        await onUpdate(note.id, editContent, editTags)
-        setIsEditing(false)
-        toast({
-          title: "保存成功",
-          description: "笔记已更新",
-        })
-      }
+      await onUpdate(note.id, editContent, editTags)
+      setIsEditing(false)
+      toast({
+        title: "保存成功",
+        description: "笔记已更新",
+      })
     } catch (error) {
       toast({
         title: "保存失败",
-        description: "更新笔记失败，请重试",
+        description: "请重试",
         variant: "destructive",
       })
     } finally {
@@ -112,137 +103,190 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   }
 
   // 取消编辑
-  const handleCancelEdit = () => {
+  const handleCancel = () => {
     setIsEditing(false)
     setEditContent('')
     setEditTags([])
   }
 
   // 处理标签输入
-  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const tagsInput = e.target.value
-    // 将输入的标签字符串分割成数组
-    const tagsArray = tagsInput.split(/[,\s]+/).filter(tag => tag.trim() !== '')
-    setEditTags(tagsArray)
+  const handleTagsChange = (value: string) => {
+    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    setEditTags(tags)
   }
 
-  // 渲染笔记内容的组件
-  const renderNoteContent = () => {
-    // 自定义组件来处理标签点击
-    const components = {
-      p: ({ children, ...props }: any) => {
-        return (
-          <p {...props} className="mb-2 last:mb-0" style={{ lineHeight: '1.5' }}>
-            {processTextWithTags(children)}
-          </p>
-        );
-      },
-      // 处理其他Markdown元素
-      h1: ({ children, ...props }: any) => <h1 {...props} className="text-xl font-bold mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h1>,
-      h2: ({ children, ...props }: any) => <h2 {...props} className="text-lg font-semibold mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h2>,
-      h3: ({ children, ...props }: any) => <h3 {...props} className="text-base font-medium mb-2" style={{ lineHeight: '1.4' }}>{processTextWithTags(children)}</h3>,
-      ul: ({ children, ...props }: any) => <ul {...props} className="list-disc list-inside mb-2" style={{ lineHeight: '1.5' }}>{children}</ul>,
-      ol: ({ children, ...props }: any) => <ol {...props} className="list-decimal list-inside mb-2" style={{ lineHeight: '1.5' }}>{children}</ol>,
-      li: ({ children, ...props }: any) => <li {...props}>{processTextWithTags(children)}</li>,
-      blockquote: ({ children, ...props }: any) => (
-          <blockquote {...props} className="border-l-4 border-gray-300 pl-4 italic mb-2" style={{ lineHeight: '1.5' }}>
-            {processTextWithTags(children)}
-          </blockquote>
-        ),
-      code: ({ children, ...props }: any) => (
-        <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">
-          {children}
-        </code>
-      ),
-      pre: ({ children, ...props }: any) => (
-        <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-3 rounded mb-2 overflow-x-auto">
-          {children}
-        </pre>
-      ),
-      // 自定义图片渲染器
-      img: ({ src, alt, ...props }: any) => (
-        <div className="mt-2 mb-2">
-          <img 
-            {...props}
-            src={src}
-            alt={alt || '笔记图片'}
-            className="rounded-md max-w-full max-h-96 object-contain border shadow-sm"
-            onError={(e) => {
-              console.error("图片加载失败:", src);
-              e.currentTarget.style.display = 'none';
-            }}
-            onLoad={(e) => {
-              console.log("图片加载成功:", src);
-            }}
-          />
-        </div>
-      ),
-    };
-
-
+  // 从内容中提取图片URL
+  const extractImageUrls = (content: string): string[] => {
+    const imageRegex = /!\[.*?\]\((.*?)\)/g;
+    const urls: string[] = [];
+    let match;
     
-    return (
-      <div className="markdown-content">
+    while ((match = imageRegex.exec(content)) !== null) {
+      urls.push(match[1]);
+    }
+    
+    return urls;
+  };
+
+  // 从内容中移除图片markdown语法
+  const removeImagesFromContent = (content: string): string => {
+    return content.replace(/!\[.*?\]\(.*?\)/g, '').trim();
+  };
+
+  // 渲染笔记内容（不含图片）
+  const renderNoteContent = () => {
+    const contentWithoutImages = removeImagesFromContent(note.originalContent || note.content);
+    
+    if (searchTerm) {
+      const highlightedContent = highlightTags(contentWithoutImages)
+      return (
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkBreaks]}
-          components={components}
+          components={{
+            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-medium mb-1">{children}</h3>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+            li: ({ children }) => <li className="text-sm">{children}</li>,
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-border pl-4 italic text-muted-foreground mb-2">
+                {children}
+              </blockquote>
+            ),
+            code: ({ children, className }) => {
+              const isInline = !className
+              if (isInline) {
+                return (
+                  <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">
+                    {children}
+                  </code>
+                )
+              }
+              return (
+                <pre className="bg-muted p-3 rounded-md overflow-x-auto mb-2">
+                  <code className="text-sm font-mono">{children}</code>
+                </pre>
+              )
+            },
+            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+            em: ({ children }) => <em className="italic">{children}</em>,
+            a: ({ href, children }) => (
+              <a 
+                href={href} 
+                className="text-primary hover:underline" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                {children}
+              </a>
+            ),
+          }}
         >
-          {note.originalContent || note.content}
+          {highlightedContent}
         </ReactMarkdown>
+      )
+    } else {
+      return (
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkBreaks]}
+          components={{
+            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-medium mb-1">{children}</h3>,
+            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+            li: ({ children }) => <li className="text-sm">{children}</li>,
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-border pl-4 italic text-muted-foreground mb-2">
+                {children}
+              </blockquote>
+            ),
+            code: ({ children, className }) => {
+              const isInline = !className
+              if (isInline) {
+                return (
+                  <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">
+                    {children}
+                  </code>
+                )
+              }
+              return (
+                <pre className="bg-muted p-3 rounded-md overflow-x-auto mb-2">
+                  <code className="text-sm font-mono">{children}</code>
+                </pre>
+              )
+            },
+            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+            em: ({ children }) => <em className="italic">{children}</em>,
+            a: ({ href, children }) => (
+              <a 
+                href={href} 
+                className="text-primary hover:underline" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                {children}
+              </a>
+            ),
+          }}
+        >
+          {contentWithoutImages}
+        </ReactMarkdown>
+      )
+    }
+  };
+  
+  // 渲染图片缩略图组件
+  const renderImageThumbnails = () => {
+    const imageUrls = extractImageUrls(note.originalContent || note.content);
+    
+    if (imageUrls.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="mt-3 pt-3 border-t border-border/30">
+        <div className="flex flex-wrap gap-2">
+          {imageUrls.map((url, index) => (
+            <Dialog key={index}>
+              <DialogTrigger asChild>
+                <div className="relative cursor-pointer group">
+                  <img 
+                    src={url}
+                    alt={`图片 ${index + 1}`}
+                    className="w-20 h-20 object-cover rounded-md hover:opacity-80 transition-opacity"
+                    onError={(e) => {
+                      console.error("图片加载失败:", url);
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-md flex items-center justify-center">
+                    <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] p-2">
+                <div className="flex items-center justify-center">
+                  <img 
+                    src={url}
+                    alt={`图片 ${index + 1}`}
+                    className="max-w-full max-h-[80vh] object-contain rounded-md"
+                    onError={(e) => {
+                      console.error("图片加载失败:", url);
+                    }}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          ))}
+        </div>
       </div>
     );
   };
 
-  // 处理文本中的标签和搜索高亮
-  const processTextWithTags = (children: any): any => {
-    if (typeof children === 'string') {
-      return processStringWithTagsAndHighlight(children);
-    }
-    
-    if (Array.isArray(children)) {
-      return children.map((child, index) => {
-        if (typeof child === 'string') {
-          return <span key={index}>{processStringWithTagsAndHighlight(child)}</span>;
-        }
-        return child;
-      });
-    }
-    
-    return children;
-  };
-
-  // 处理字符串中的标签和搜索高亮
-  const processStringWithTagsAndHighlight = (text: string) => {
-    const tagRegex = /#[\w\u4e00-\u9fa5]+/g;
-    // 移除标签文字，只保留其他内容
-    const textWithoutTags = text.replace(tagRegex, '').replace(/\s+/g, ' ').trim();
-    
-    if (!textWithoutTags) {
-      return null;
-    }
-    
-    // 处理搜索高亮
-    if (searchTerm && textWithoutTags.toLowerCase().includes(searchTerm.toLowerCase())) {
-      const regex = new RegExp(`(${searchTerm})`, 'gi');
-      const highlightedParts = textWithoutTags.split(regex);
-      return (
-        <span>
-          {highlightedParts.map((part, index) => 
-            regex.test(part) ? (
-              <span key={index} className="bg-yellow-200 dark:bg-yellow-800">
-                {part}
-              </span>
-            ) : (
-              part
-            )
-          )}
-        </span>
-      );
-    }
-    
-    return textWithoutTags;
-  };
-  
   // 处理标签点击
   const handleContentClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -273,112 +317,89 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
 
         {/* 右上角：按钮和标签 */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleEdit}
-            disabled={isEditing}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-            title="编辑笔记"
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleConvertToTodo}
-            disabled={isConverting || isEditing}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-            title="转换为Todo"
-          >
-            <ListTodo className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={isDeleting || isEditing}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0"
-            title="删除笔记"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-          {note.tags.length > 0 && (
-            <div className="flex items-center gap-1">
-              <Tag className="h-3 w-3 text-muted-foreground" />
-              <div className="flex gap-1">
-                {note.tags.slice(0, 3).map((tag) => (
-                  <Badge 
-                    key={tag} 
-                    variant="outline" 
-                    className="text-xs cursor-pointer hover:bg-muted bg-gray-100 dark:bg-gray-800"
-                    onClick={() => onTagClick && onTagClick(tag)}
-                  >
-                    #{tag}
-                  </Badge>
-                ))}
-                {note.tags.length > 3 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{note.tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-            </div>
+          {!isEditing && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleEdit}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleConvertToTodo}
+                disabled={isConverting}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
+              >
+                <ListTodo className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+          
+          {isEditing && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="h-7 w-7 p-0 text-green-600 hover:text-green-700"
+              >
+                <Save className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+                className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* 笔记内容 */}
       {isEditing ? (
         <div className="space-y-3">
           <Textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            className="min-h-[100px] text-sm"
-            placeholder="输入笔记内容..."
+            className="min-h-[100px] resize-none"
+            placeholder="编辑笔记内容..."
           />
-          <div className="flex flex-col space-y-2">
-            <div className="text-sm font-medium">标签:</div>
-            <Input
-              value={editTags.join(', ')}
-              onChange={handleTagsChange}
-              className="text-sm"
-              placeholder="输入标签，用逗号或空格分隔"
-            />
-            <div className="flex justify-end space-x-2 mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCancelEdit}
-                className="h-8"
-              >
-                <X className="h-3 w-3 mr-1" />
-                取消
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="h-8"
-              >
-                {isSaving ? (
-                  <span>保存中...</span>
-                ) : (
-                  <>
-                    <Save className="h-3 w-3 mr-1" />
-                    保存
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+          <Input
+            value={editTags.join(', ')}
+            onChange={(e) => handleTagsChange(e.target.value)}
+            placeholder="标签（用逗号分隔）"
+            className="text-sm"
+          />
         </div>
       ) : (
-        <div 
-          className="text-sm whitespace-pre-wrap break-words"
-          style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
-          onClick={handleContentClick}
-        >
-          {renderNoteContent()}
+        <div>
+          <div 
+            className="text-sm whitespace-pre-wrap break-words"
+            style={{ whiteSpace: 'pre-wrap', lineHeight: '1.2' }}
+            onClick={handleContentClick}
+          >
+            {renderNoteContent()}
+          </div>
+          
+          {/* 图片缩略图区域 */}
+          {renderImageThumbnails()}
         </div>
       )}
 

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause, ChevronUp, ChevronDown, Hash } from "lucide-react"
+import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause, ChevronUp, ChevronDown, Hash, ZoomIn } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
 
@@ -27,6 +27,7 @@ import IntegratedSchedule from "@/components/integrated-schedule"
 import GoalsList from "@/components/goals-list"
 import CheckInList from "@/components/checkin-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
@@ -251,7 +252,7 @@ export default function NotePad() {
   const [isSearching, setIsSearching] = useState(false)
   const [currentTag, setCurrentTag] = useState<string>("") // 当前搜索的标签
   const [selectedTag, setSelectedTag] = useState<string>('all') // 目标列表选中的标签
-  const [selectedImage, setSelectedImage] = useState<string | null>(null) // 选择的图片
+  const [selectedImages, setSelectedImages] = useState<string[]>([]) // 选择的图片列表
   // 移除重复的登录状态，直接使用AuthContext的isAuthenticated
   const [isLargeCalendarOpen, setIsLargeCalendarOpen] = useState(false) // 大日历弹窗状态
   const [schedulesByDate, setSchedulesByDate] = useState<Record<string, any[]>>({}) // 日程数据
@@ -265,8 +266,8 @@ export default function NotePad() {
   // Memoized button disabled states to optimize performance
   const isMainButtonDisabled = useMemo(() => {
     const isInputEmpty = !inputValue.trim()
-    return isAdding || (isInputEmpty && (inputMode === 'note' && !selectedImage))
-  }, [inputValue, isAdding, inputMode, selectedImage])
+    return isAdding || (isInputEmpty && (inputMode === 'note' && selectedImages.length === 0))
+  }, [inputValue, isAdding, inputMode, selectedImages])
   
   const isSearchButtonDisabled = useMemo(() => {
     const isInputEmpty = !inputValue.trim()
@@ -668,59 +669,73 @@ export default function NotePad() {
 
   // 处理图片上传
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
 
-    // 检查文件类型
-    if (!file.type.startsWith('image/')) {
+    // 检查文件数量限制（最多10张）
+    if (selectedImages.length + files.length > 10) {
       toast({
         title: "上传失败",
-        description: "请选择图片文件",
+        description: "最多只能上传10张图片",
         variant: "destructive",
       })
       return
     }
 
-    // 检查文件大小（限制为5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "上传失败",
-        description: "图片大小不能超过5MB",
-        variant: "destructive",
-      })
-      return
-    }
+    const uploadPromises = Array.from(files).map(async (file) => {
+      // 检查文件类型
+      if (!file.type.startsWith('image/')) {
+        throw new Error(`${file.name} 不是图片文件`)
+      }
+
+      // 检查文件大小（限制为5MB）
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error(`${file.name} 大小超过5MB限制`)
+      }
+
+      // 上传到腾讯云
+      const response = await uploadApi.uploadImage(file)
+      console.log('图片上传响应:', response)
+      
+      // 检查响应结构并获取正确的URL
+      const imageUrl = response.data?.url
+      if (!imageUrl) {
+        throw new Error(`${file.name} 未获取到图片URL`)
+      }
+      
+      return imageUrl
+    })
 
     try {
-       // 上传到腾讯云
-       const response = await uploadApi.uploadImage(file)
-       console.log('图片上传响应:', response)
-       
-       // 检查响应结构并获取正确的URL
-        const imageUrl = response.data?.url
-        if (!imageUrl) {
-          throw new Error('未获取到图片URL')
-        }
-       
-       setSelectedImage(imageUrl)
-       
-       toast({
-         title: "上传成功",
-         description: "图片已上传到云存储",
-       })
-     } catch (error) {
-       console.error('图片上传失败:', error)
-       toast({
-         title: "上传失败",
-         description: error instanceof Error ? error.message : "图片上传失败，请重试",
-         variant: "destructive",
-       })
-     }
+      const uploadedUrls = await Promise.all(uploadPromises)
+      setSelectedImages(prev => [...prev, ...uploadedUrls])
+      
+      toast({
+        title: "上传成功",
+        description: `${uploadedUrls.length}张图片已上传到云存储`,
+      })
+    } catch (error) {
+      console.error('图片上传失败:', error)
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "图片上传失败，请重试",
+        variant: "destructive",
+      })
+    }
+
+    // 清空input值，允许重复选择相同文件
+    e.target.value = ''
   }
 
   // 移除已选择的图片
-  const handleRemoveImage = () => {
-    setSelectedImage(null)
+  // 移除单张图片
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // 清空所有图片
+  const handleClearAllImages = () => {
+    setSelectedImages([])
   }
 
   // 统一导出所有数据为一个Markdown文档
@@ -2610,7 +2625,7 @@ export default function NotePad() {
 
   // 添加笔记
   const handleAddNote = async () => {
-    if (!inputValue.trim() && !selectedImage) return
+    if (!inputValue.trim() && selectedImages.length === 0) return
 
     setIsAdding(true)
     try {
@@ -2653,10 +2668,13 @@ export default function NotePad() {
           }
         }
         
-        const result = await addNote(noteContent, new Date().toISOString(), selectedImage || undefined)
+        // 将多张图片转换为单个图片URL字符串（用于兼容现有API）
+        const imageUrl = selectedImages.length > 0 ? selectedImages.join('\n') : undefined
+        
+        const result = await addNote(noteContent, new Date().toISOString(), imageUrl)
         if (result.success) {
           setInputValue("")
-          setSelectedImage(null) // 清除已选择的图片
+          setSelectedImages([]) // 清除已选择的图片
           // 如果有搜索词，重新搜索；否则重新加载
           if (searchTerm) {
             // 稍微延迟一下再搜索，确保服务器端数据已经更新
@@ -3380,32 +3398,66 @@ export default function NotePad() {
                             id="image-upload"
                             type="file"
                             accept="image/*"
+                            multiple
                             onChange={handleImageUpload}
                             className="hidden"
                           />
                         </label>
                         
-                        {selectedImage && (
+                        {selectedImages.length > 0 && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={handleRemoveImage}
+                            onClick={handleClearAllImages}
                             className="h-6 px-2 text-xs text-destructive"
                           >
                             <X className="h-3 w-3 mr-1" />
-                            移除图片
+                            清空图片 ({selectedImages.length})
                           </Button>
                         )}
                       </div>
                       
-                      {/* 图片预览 */}
-                      {selectedImage && (
-                        <div className="relative border rounded-md p-2 mt-2">
-                          <img 
-                            src={selectedImage} 
-                            alt="预览图片" 
-                            className="max-h-48 object-contain mx-auto" 
-                          />
+                      {/* 图片预览 - 缩略图模式 */}
+                      {selectedImages.length > 0 && (
+                        <div className="mt-2">
+                          <div className="flex flex-wrap gap-2">
+                            {selectedImages.map((imageUrl, index) => (
+                              <div key={index} className="relative">
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <div className="relative inline-block cursor-pointer group">
+                                      <img 
+                                        src={imageUrl} 
+                                        alt={`预览图片${index + 1}`} 
+                                        className="w-20 h-20 object-cover rounded-md hover:opacity-80 transition-opacity" 
+                                      />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-md flex items-center justify-center">
+                                        <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </div>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-4xl max-h-[90vh] p-2">
+                                    <div className="flex items-center justify-center">
+                                      <img 
+                                        src={imageUrl}
+                                        alt={`预览图片${index + 1}`}
+                                        className="max-w-full max-h-[80vh] object-contain rounded-md"
+                                      />
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                                {/* 单张图片删除按钮 */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveImage(index)}
+                                  className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/80"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </>

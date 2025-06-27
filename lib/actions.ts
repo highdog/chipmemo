@@ -124,7 +124,10 @@ export async function addNote(
     
     // 如果有图片，将图片添加到内容中
     if (imageUrl) {
-      originalContent = originalContent + (originalContent ? '\n\n' : '') + `![图片](${imageUrl})`;
+      // 支持多张图片，每行一个URL
+      const imageUrls = imageUrl.split('\n').filter(url => url.trim())
+      const imageMarkdown = imageUrls.map((url, index) => `![图片${index + 1}](${url.trim()})`).join('\n\n')
+      originalContent = originalContent + (originalContent ? '\n\n' : '') + imageMarkdown;
     }
     
     const tags = extractTags(originalContent);
