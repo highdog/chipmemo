@@ -116,12 +116,12 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
       }
       setLastTap(now)
       
-      if (scale === 1) {
-        // 未缩放时处理滑动切换
-        setTouchEnd(null)
-        setTouchStart(touches[0].clientX)
-      } else {
-        // 已缩放时处理拖拽
+      // 总是记录触摸位置，用于滑动切换判断
+      setTouchEnd(null)
+      setTouchStart(touches[0].clientX)
+      
+      // 如果已缩放，准备拖拽功能
+      if (scale > 1.1) {
         setIsDragging(true)
         setDragStart({ x: touches[0].clientX, y: touches[0].clientY })
       }
@@ -148,8 +148,8 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
     const touches = e.touches
     
     if (touches.length === 1) {
-      if (scale === 1 && !isScaling) {
-        // 未缩放时处理滑动
+      if (scale <= 1.1 && !isScaling) {
+        // 未缩放或接近1x时处理滑动
         setTouchEnd(touches[0].clientX)
       } else if (isDragging && scale > 1.1 && !isScaling) {
         // 已缩放时处理拖拽
@@ -200,17 +200,20 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
       setIsScaling(false)
     }, 100)
     
-    // 处理滑动切换（仅在未缩放且未进行缩放操作时）
-    if (scale <= 1.1 && !isScaling && touchStart !== null && touchEnd !== null) {
+    // 处理滑动切换（在未缩放时或缩放回到1x时）
+    if (touchStart !== null && touchEnd !== null) {
       const distance = touchStart - touchEnd
       const isLeftSwipe = distance > 50
       const isRightSwipe = distance < -50
-
-      if (isLeftSwipe && images.length > 1) {
-        goToNext()
-      }
-      if (isRightSwipe && images.length > 1) {
-        goToPrevious()
+      
+      // 只有在未缩放状态下才允许滑动切换
+      if (scale <= 1.1 && (isLeftSwipe || isRightSwipe) && images.length > 1) {
+        if (isLeftSwipe) {
+          goToNext()
+        }
+        if (isRightSwipe) {
+          goToPrevious()
+        }
       }
     }
   }
