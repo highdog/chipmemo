@@ -78,7 +78,7 @@ function SortableTodoItem({
   setEditDueDate: (date: string) => void;
   setMenuOpenTodo: (id: string | null) => void;
   setOrderSelectTodo: (id: string | null) => void;
-  getPriorityTextColor: (priority?: string) => string;
+  getPriorityTextColor: (priority?: string, priorityIndex?: number) => string;
 }) {
   const {
     attributes,
@@ -211,7 +211,7 @@ function SortableTodoItem({
             <label
               className={cn(
                 "text-sm block",
-                todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
               )}
             >
               {todo.content || todo.text}
@@ -469,17 +469,23 @@ export const TodoList = React.memo(function TodoList({
   // 获取所有标签
   const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap((todo) => todo.tags || []))), [allTodos])
 
-  // 根据优先级获取文字颜色
-  const getPriorityTextColor = (priority?: string) => {
+  // 根据优先级和序号获取文字颜色
+  const getPriorityTextColor = (priority?: string, priorityIndex?: number) => {
     switch (priority) {
       case 'high':
         return 'text-gray-900 dark:text-gray-100 font-medium' // 高优先级：黑色，加粗
       case 'medium':
-        return 'text-gray-600 dark:text-gray-400' // 中优先级：灰色
+        // 中优先级：只有序号1的加粗，其他为灰色
+        return priorityIndex === 1 
+          ? 'text-gray-900 dark:text-gray-100 font-medium' 
+          : 'text-gray-400 dark:text-gray-600'
       case 'low':
         return 'text-gray-400 dark:text-gray-600' // 低优先级：浅灰色
       default:
-        return 'text-gray-600 dark:text-gray-400' // 默认为中优先级
+        // 默认为中优先级逻辑
+        return priorityIndex === 1 
+          ? 'text-gray-900 dark:text-gray-100 font-medium' 
+          : 'text-gray-400 dark:text-gray-600'
     }
   }
 
@@ -972,7 +978,7 @@ export const TodoList = React.memo(function TodoList({
       {/* 大的Todo列表弹窗 */}
       {isLargeTodoListOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-7xl h-[80vh] flex flex-col">
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-none h-[80vh] flex flex-col">
             {/* 弹窗标题栏 */}
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Todo 列表总览</h2>
@@ -1023,7 +1029,7 @@ export const TodoList = React.memo(function TodoList({
                                    <div
                                      className={cn(
                                        "text-sm flex-1",
-                                       todo.completed ? "line-through text-muted-foreground" : "text-foreground"
+                                       todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
                                      )}
                                    >
                                      {todo.content}
