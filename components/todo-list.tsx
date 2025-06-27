@@ -38,6 +38,7 @@ function SortableTodoItem({
   editContent, 
   editStartDate, 
   editDueDate, 
+  editTags,
   menuOpenTodo, 
   orderSelectTodo, 
   allTodos,
@@ -52,6 +53,7 @@ function SortableTodoItem({
   setEditContent,
   setEditStartDate,
   setEditDueDate,
+  setEditTags,
   setMenuOpenTodo,
   setOrderSelectTodo,
   getPriorityTextColor
@@ -62,6 +64,7 @@ function SortableTodoItem({
   editContent: string;
   editStartDate: string;
   editDueDate: string;
+  editTags: string;
   menuOpenTodo: string | null;
   orderSelectTodo: string | null;
   allTodos: Todo[];
@@ -76,6 +79,7 @@ function SortableTodoItem({
   setEditContent: (content: string) => void;
   setEditStartDate: (date: string) => void;
   setEditDueDate: (date: string) => void;
+  setEditTags: (tags: string) => void;
   setMenuOpenTodo: (id: string | null) => void;
   setOrderSelectTodo: (id: string | null) => void;
   getPriorityTextColor: (priority?: string, priorityIndex?: number) => string;
@@ -151,27 +155,34 @@ function SortableTodoItem({
               placeholder="编辑todo内容"
             />
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 flex-1">
-              <label className="text-xs text-gray-600 whitespace-nowrap">起始日期:</label>
-              <Input
-                type="date"
-                value={editStartDate}
-                onChange={(e) => setEditStartDate(e.target.value)}
-                className="flex-1 text-xs"
-                placeholder="年/月/日"
-              />
-            </div>
-            <div className="flex items-center space-x-1 flex-1">
-              <label className="text-xs text-gray-600 whitespace-nowrap">截止日期:</label>
-              <Input
-                type="date"
-                value={editDueDate}
-                onChange={(e) => setEditDueDate(e.target.value)}
-                className="flex-1 text-xs"
-                placeholder="年/月/日"
-              />
-            </div>
+          <div className="flex items-center space-x-1">
+            <label className="text-xs text-gray-600 whitespace-nowrap">起始日期:</label>
+            <Input
+              type="date"
+              value={editStartDate}
+              onChange={(e) => setEditStartDate(e.target.value)}
+              className="flex-1 text-xs"
+              placeholder="年/月/日"
+            />
+          </div>
+          <div className="flex items-center space-x-1">
+            <label className="text-xs text-gray-600 whitespace-nowrap">截止日期:</label>
+            <Input
+              type="date"
+              value={editDueDate}
+              onChange={(e) => setEditDueDate(e.target.value)}
+              className="flex-1 text-xs"
+              placeholder="年/月/日"
+            />
+          </div>
+          <div className="flex items-center space-x-1">
+            <label className="text-xs text-gray-600 whitespace-nowrap">标签:</label>
+            <Input
+              value={editTags}
+              onChange={(e) => setEditTags(e.target.value)}
+              className="flex-1 text-xs"
+              placeholder="输入标签，用逗号分隔（如：工作, 重要）"
+            />
           </div>
           <div className="flex justify-end space-x-1">
             <Button
@@ -362,7 +373,7 @@ export const TodoList = React.memo(function TodoList({
     priority: 'low' | 'medium' | 'high';
   }>>;
   onToggleTodo: (todoId: string) => void;
-  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => void;
+  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
   onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority: 'low' | 'medium' | 'high' }) => void;
@@ -373,6 +384,7 @@ export const TodoList = React.memo(function TodoList({
   const [editContent, setEditContent] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
+  const [editTags, setEditTags] = useState('')
   const [menuOpenTodo, setMenuOpenTodo] = useState<string | null>(null)
   const [orderSelectTodo, setOrderSelectTodo] = useState<string | null>(null)
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
@@ -570,23 +582,32 @@ export const TodoList = React.memo(function TodoList({
     setEditContent(todo.content || todo.text)
     setEditStartDate(todo.startDate || '')
     setEditDueDate(todo.dueDate || '')
+    setEditTags(todo.tags ? todo.tags.join(', ') : '')
   }
 
   const handleSaveEdit = async () => {
     if (!editingTodo) return
     
     try {
+      // 处理标签：将逗号分隔的字符串转换为数组，并去除空白
+      const tagsArray = editTags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0)
+      
       // 调用父组件的更新函数并等待完成
       await onUpdateTodo(editingTodo, {
         content: editContent,
         startDate: editStartDate,
-        dueDate: editDueDate
+        dueDate: editDueDate,
+        tags: tagsArray
       })
       // 只有在更新成功后才清空编辑状态
       setEditingTodo(null)
       setEditContent('')
       setEditStartDate('')
       setEditDueDate('')
+      setEditTags('')
     } catch (error) {
       console.error('更新todo失败:', error)
       // 可以在这里添加错误提示
@@ -603,6 +624,7 @@ export const TodoList = React.memo(function TodoList({
     setEditContent('')
     setEditStartDate('')
     setEditDueDate('')
+    setEditTags('')
   }
 
   const handleDeleteTodo = async (todoId: string) => {
@@ -930,6 +952,7 @@ export const TodoList = React.memo(function TodoList({
                           editContent={editContent}
                           editStartDate={editStartDate}
                           editDueDate={editDueDate}
+                          editTags={editTags}
                           menuOpenTodo={menuOpenTodo}
                           orderSelectTodo={orderSelectTodo}
                           allTodos={allTodos as any}
@@ -945,6 +968,7 @@ export const TodoList = React.memo(function TodoList({
                           setEditContent={setEditContent}
                           setEditStartDate={setEditStartDate}
                           setEditDueDate={setEditDueDate}
+                          setEditTags={setEditTags}
                           setMenuOpenTodo={setMenuOpenTodo}
                           getPriorityTextColor={getPriorityTextColor}
                         />

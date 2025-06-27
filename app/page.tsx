@@ -2884,14 +2884,35 @@ export default function NotePad() {
     }
   }
 
-  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' }) => {
+  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high'; tags?: string[] }) => {
     try {
       // 调用后端API更新todo
       const updateData: any = {}
       if (updates.content !== undefined) updateData.text = updates.content
-      if (updates.startDate !== undefined) updateData.startDate = updates.startDate
-      if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate
+      
+      // 处理日期格式，确保符合ISO8601标准
+      if (updates.startDate !== undefined) {
+        if (updates.startDate === '') {
+          updateData.startDate = null
+        } else {
+          // 如果是YYYY-MM-DD格式，转换为ISO8601格式
+          const startDate = new Date(updates.startDate)
+          updateData.startDate = startDate.toISOString()
+        }
+      }
+      
+      if (updates.dueDate !== undefined) {
+        if (updates.dueDate === '') {
+          updateData.dueDate = null
+        } else {
+          // 如果是YYYY-MM-DD格式，转换为ISO8601格式
+          const dueDate = new Date(updates.dueDate)
+          updateData.dueDate = dueDate.toISOString()
+        }
+      }
+      
       if (updates.priority !== undefined) updateData.priority = updates.priority
+      if (updates.tags !== undefined) updateData.tags = updates.tags
       
       const result = await apiClient.updateTodo(todoId, updateData)
       if (result.success) {

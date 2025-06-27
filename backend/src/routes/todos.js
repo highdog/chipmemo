@@ -189,6 +189,20 @@ router.post('/', [
     .optional()
     .isLength({ max: 50 })
     .withMessage('Category cannot exceed 50 characters'),
+  body('tags')
+    .optional()
+    .isArray()
+    .withMessage('Tags must be an array')
+    .custom((tags) => {
+      if (tags && tags.length > 0) {
+        for (const tag of tags) {
+          if (typeof tag !== 'string' || tag.length > 30) {
+            throw new Error('Each tag must be a string with max 30 characters');
+          }
+        }
+      }
+      return true;
+    }),
   body('noteId')
     .optional()
     .isMongoId()
@@ -363,13 +377,27 @@ router.put('/:id', [
     .isIn(['low', 'medium', 'high'])
     .withMessage('Invalid priority'),
   body('dueDate')
-    .optional()
-    .isISO8601()
-    .withMessage('Due date must be in ISO format'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true;
+      }
+      if (!new Date(value).toISOString()) {
+        throw new Error('Due date must be in ISO format');
+      }
+      return true;
+    }),
   body('startDate')
-    .optional()
-    .isISO8601()
-    .withMessage('Start date must be in ISO format'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true;
+      }
+      if (!new Date(value).toISOString()) {
+        throw new Error('Start date must be in ISO format');
+      }
+      return true;
+    }),
   body('category')
     .optional()
     .isLength({ max: 50 })
