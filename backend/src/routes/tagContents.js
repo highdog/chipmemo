@@ -284,18 +284,16 @@ router.post('/:tag/check-in', [
       return res.status(400).json({ error: 'Check-in is not enabled for this tag' });
     }
 
-    // 增加打卡次数
-    const newCheckInCount = (tagContent.checkInCount || 0) + 1;
-    
-    // 更新打卡次数
-    const updatedTagContent = await TagContent.findOneAndUpdate(
-      { userId: req.user._id, tag: tag },
-      { checkInCount: newCheckInCount },
-      { new: true, runValidators: true }
-    );
-
-    // 创建打卡笔记
+    // 先查询该标签的笔记数量来确定打卡次数
     const Note = require('../models/Note');
+    const existingNotesCount = await Note.countDocuments({
+      userId: req.user._id,
+      tags: tag
+    });
+    
+    const newCheckInCount = existingNotesCount + 1;
+    
+    // 创建打卡笔记
     const noteContent = `${tag}打卡，已打卡${newCheckInCount}次`;
     
     const note = new Note({
@@ -307,6 +305,13 @@ router.post('/:tag/check-in', [
     });
 
     await note.save();
+    
+    // 更新打卡次数
+    const updatedTagContent = await TagContent.findOneAndUpdate(
+      { userId: req.user._id, tag: tag },
+      { checkInCount: newCheckInCount },
+      { new: true, runValidators: true }
+    );
 
     res.json({
       success: true,

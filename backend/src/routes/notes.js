@@ -348,7 +348,8 @@ router.put('/:id', [
 // @access  Private
 router.delete('/:id', async (req, res) => {
   try {
-    const note = await Note.findOneAndDelete({
+    // 先查找笔记以获取标签信息
+    const note = await Note.findOne({
       _id: req.params.id,
       userId: req.user._id
     });
@@ -357,11 +358,41 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Note not found' });
     }
 
+    // 删除笔记
+    await Note.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    // 更新相关标签的打卡次数
+    const TagContent = require('../models/TagContent');
+    if (note.tags && note.tags.length > 0) {
+      for (const tag of note.tags) {
+        // 计算该标签下剩余的笔记数量
+        const remainingNotesCount = await Note.countDocuments({
+          userId: req.user._id,
+          tags: tag
+        });
+
+        // 更新或创建标签内容，设置checkInCount为剩余笔记数量
+        await TagContent.findOneAndUpdate(
+          { userId: req.user._id, tag: tag },
+          { 
+            $set: { 
+              checkInCount: remainingNotesCount
+            }
+          },
+          { upsert: false } // 只更新已存在的标签内容
+        );
+      }
+    }
+
     res.json({
       success: true,
       message: 'Note deleted successfully'
     });
   } catch (error) {
+    console.error('Error deleting note:', error);
     res.status(500).json({ error: 'Server error while deleting note' });
   }
 });

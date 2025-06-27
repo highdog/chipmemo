@@ -64,10 +64,8 @@ const CheckInList: React.FC<CheckInListProps> = ({ onTagSelect }) => {
         )
         toast.success(`打卡成功！已打卡${result.data.checkInCount}次`)
         
-        // 触发笔记列表刷新
-        window.dispatchEvent(new CustomEvent('notes-refresh', {
-          detail: { currentTag: tag }
-        }))
+        // 触发笔记列表刷新，但不传递currentTag避免跳转到标签页面
+        window.dispatchEvent(new CustomEvent('notes-refresh'))
       } else {
         toast.error(result.error || '打卡失败')
       }
@@ -84,15 +82,10 @@ const CheckInList: React.FC<CheckInListProps> = ({ onTagSelect }) => {
   }
 
   const handleTagClick = (tag: string) => {
-    console.log('✅ [CheckInList] 点击打卡标签:', tag)
-    // 触发标签搜索，类似主页中的标签点击效果
+    console.log('✅ [CheckInList] 点击打卡标签，显示标签内容:', tag)
+    // 触发标签搜索事件，在当前页面显示标签内容
     if (typeof window !== 'undefined') {
-      // 触发全局搜索事件
       window.dispatchEvent(new CustomEvent('tag-search', { detail: { tag } }))
-    }
-    // 如果有回调函数，也调用它
-    if (onTagSelect) {
-      onTagSelect(tag)
     }
   }
 
