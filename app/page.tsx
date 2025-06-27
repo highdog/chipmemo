@@ -15,7 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause, ChevronUp, ChevronDown, Hash } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
-import { TodoList } from "@/components/todo-list2"
+import { TodoList } from "@/components/todo-list"
 import { TagContent } from "@/components/tag-content"
 import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
