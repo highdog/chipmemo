@@ -25,7 +25,10 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [initialDistance, setInitialDistance] = useState(0)
   const [initialScale, setInitialScale] = useState(1)
+  const [isScaling, setIsScaling] = useState(false)
+  const [scaleCenter, setScaleCenter] = useState({ x: 0, y: 0 })
   const imageRef = useRef<HTMLImageElement>(null)
+  const scaleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setCurrentIndex(initialIndex)
@@ -33,6 +36,7 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
     setScale(1)
     setTranslateX(0)
     setTranslateY(0)
+    setIsScaling(false)
   }, [initialIndex, open])
 
   const goToPrevious = () => {
@@ -45,14 +49,23 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
 
   // 处理双击缩放
   const handleDoubleClick = () => {
-    if (scale === 1) {
-      setScale(2)
+    if (scale <= 1.1) {
+      setSmoothScale(2)
     } else {
-      setScale(1)
+      setSmoothScale(1)
       setTranslateX(0)
       setTranslateY(0)
     }
   }
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (scaleTimeoutRef.current) {
+        clearTimeout(scaleTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // 计算两点间距离
   const getDistance = (touch1: React.Touch, touch2: React.Touch) => {
@@ -62,10 +75,34 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
     )
   }
 
+  // 计算两点中心
+  const getCenter = (touch1: React.Touch, touch2: React.Touch) => {
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2
+    }
+  }
+
+  // 平滑设置缩放值
+  const setSmoothScale = (newScale: number) => {
+    if (scaleTimeoutRef.current) {
+      clearTimeout(scaleTimeoutRef.current)
+    }
+    
+    setIsScaling(true)
+    setScale(newScale)
+    
+    // 延迟重置缩放状态，给动画更多时间
+    scaleTimeoutRef.current = setTimeout(() => {
+      setIsScaling(false)
+    }, 200)
+  }
+
   // 处理触摸事件（移动端滑动和缩放）
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isMobile) return
     
+    e.preventDefault()
     const touches = e.touches
     
     if (touches.length === 1) {
@@ -91,49 +128,80 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
     } else if (touches.length === 2) {
       // 双指捏合缩放
       const distance = getDistance(touches[0], touches[1])
+      const center = getCenter(touches[0], touches[1])
+      
       setInitialDistance(distance)
       setInitialScale(scale)
+      setScaleCenter(center)
+      setIsScaling(true)
+      
+      // 阻止滑动切换
+      setTouchStart(null)
+      setTouchEnd(null)
     }
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isMobile) return
     
+    e.preventDefault()
     const touches = e.touches
     
     if (touches.length === 1) {
-      if (scale === 1) {
+      if (scale === 1 && !isScaling) {
         // 未缩放时处理滑动
         setTouchEnd(touches[0].clientX)
-      } else if (isDragging) {
+      } else if (isDragging && scale > 1.1 && !isScaling) {
         // 已缩放时处理拖拽
         const deltaX = touches[0].clientX - dragStart.x
         const deltaY = touches[0].clientY - dragStart.y
-        setTranslateX(prev => prev + deltaX)
-        setTranslateY(prev => prev + deltaY)
+        
+        // 改进的边界限制
+        const imageRect = imageRef.current?.getBoundingClientRect()
+        if (imageRect) {
+          const maxTranslateX = Math.max(0, (imageRect.width * scale - imageRect.width) / 2)
+          const maxTranslateY = Math.max(0, (imageRect.height * scale - imageRect.height) / 2)
+          
+          const newTranslateX = Math.max(-maxTranslateX, Math.min(maxTranslateX, translateX + deltaX))
+          const newTranslateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY + deltaY))
+          
+          setTranslateX(newTranslateX)
+          setTranslateY(newTranslateY)
+        }
         setDragStart({ x: touches[0].clientX, y: touches[0].clientY })
       }
     } else if (touches.length === 2 && initialDistance > 0) {
       // 双指缩放
       const distance = getDistance(touches[0], touches[1])
-      const newScale = Math.max(0.5, Math.min(4, initialScale * (distance / initialDistance)))
-      setScale(newScale)
+      const scaleRatio = distance / initialDistance
       
-      if (newScale === 1) {
+      // 使用更平滑的缩放算法
+      const rawScale = initialScale * scaleRatio
+      const newScale = Math.max(0.8, Math.min(4, rawScale))
+      
+      // 平滑设置缩放
+      setSmoothScale(newScale)
+      
+      if (newScale <= 1.1) {
         setTranslateX(0)
         setTranslateY(0)
       }
     }
   }
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isMobile) return
     
     setIsDragging(false)
     setInitialDistance(0)
     
-    // 处理滑动切换（仅在未缩放时）
-    if (scale === 1 && touchStart !== null && touchEnd !== null) {
+    // 延迟重置缩放状态
+    setTimeout(() => {
+      setIsScaling(false)
+    }, 100)
+    
+    // 处理滑动切换（仅在未缩放且未进行缩放操作时）
+    if (scale <= 1.1 && !isScaling && touchStart !== null && touchEnd !== null) {
       const distance = touchStart - touchEnd
       const isLeftSwipe = distance > 50
       const isRightSwipe = distance < -50
@@ -183,10 +251,16 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
               ref={imageRef}
               src={images[currentIndex]}
               alt={`图片 ${currentIndex + 1}`}
-              className="max-w-full max-h-full object-contain transition-transform duration-200"
+              className={cn(
+                "max-w-full max-h-full object-contain select-none",
+                isScaling ? "transition-none" : "transition-transform duration-300 ease-out"
+              )}
               style={{
-                transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
-                cursor: isMobile ? 'pointer' : 'default'
+                transform: `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`,
+                cursor: isMobile ? 'pointer' : 'default',
+                touchAction: 'none',
+                userSelect: 'none',
+                WebkitUserSelect: 'none'
               }}
               onError={(e) => {
                 console.error('图片加载失败:', images[currentIndex])
@@ -194,6 +268,7 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
               onTouchStart={isMobile ? handleTouchStart : undefined}
               onTouchMove={isMobile ? handleTouchMove : undefined}
               onTouchEnd={isMobile ? handleTouchEnd : undefined}
+              draggable={false}
             />
             
             {/* 关闭按钮 */}
