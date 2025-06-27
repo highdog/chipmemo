@@ -43,6 +43,22 @@ export interface Note {
   updatedAt: string;
 }
 
+// 系统配置相关类型
+export interface SystemConfig {
+  _id: string;
+  key: string;
+  value: any;
+  description: string;
+  category: string;
+  isEncrypted: boolean;
+  updatedBy: {
+    _id: string;
+    username: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 待办事项相关类型
 export interface Todo {
   _id: string;
@@ -557,6 +573,42 @@ class ApiClient {
   async updateUserPassword(userId: string, password: string): Promise<ApiResponse<{ message: string }>> {
     return this.put<{ message: string }>(`/admin/users/${userId}/password`, { password });
   }
+
+  // 系统配置相关
+  async getSystemConfigs(category?: string): Promise<ApiResponse<SystemConfig[]>> {
+    const params = category ? `?category=${category}` : '';
+    return this.get<SystemConfig[]>(`/admin/config${params}`);
+  }
+
+  async updateSystemConfig(key: string, data: { value: any; description?: string; category?: string }): Promise<ApiResponse<SystemConfig>> {
+    return this.put<SystemConfig>(`/admin/config/${key}`, data);
+  }
+
+  async deleteSystemConfig(key: string): Promise<ApiResponse<{ message: string }>> {
+    return this.delete<{ message: string }>(`/admin/config/${key}`);
+  }
+
+  // 图片上传
+  async uploadImage(file: File): Promise<ApiResponse<{ url: string; fileName: string; size: number; mimetype: string }>> {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const response = await fetch(`${this.baseURL}/upload/image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || '图片上传失败');
+    }
+    
+    const result = await response.json();
+    return result;
+  }
 }
 
 // 创建API客户端实例
@@ -619,6 +671,15 @@ export const adminApi = {
   deleteUser: (userId: string) => apiClient.deleteUser(userId),
   updateUser: (userId: string, data: { username?: string; email?: string; isAdmin?: boolean }) => apiClient.updateUser(userId, data),
   updateUserPassword: (userId: string, password: string) => apiClient.updateUserPassword(userId, password),
+  
+  // 系统配置
+  getSystemConfigs: (category?: string) => apiClient.getSystemConfigs(category),
+  updateSystemConfig: (key: string, data: { value: any; description?: string; category?: string }) => apiClient.updateSystemConfig(key, data),
+  deleteSystemConfig: (key: string) => apiClient.deleteSystemConfig(key),
+};
+
+export const uploadApi = {
+  uploadImage: (file: File) => apiClient.uploadImage(file),
 };
 
 export default apiClient;

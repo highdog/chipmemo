@@ -159,6 +159,24 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           {children}
         </pre>
       ),
+      // 自定义图片渲染器
+      img: ({ src, alt, ...props }: any) => (
+        <div className="mt-2 mb-2">
+          <img 
+            {...props}
+            src={src}
+            alt={alt || '笔记图片'}
+            className="rounded-md max-w-full max-h-96 object-contain border shadow-sm"
+            onError={(e) => {
+              console.error("图片加载失败:", src);
+              e.currentTarget.style.display = 'none';
+            }}
+            onLoad={(e) => {
+              console.log("图片加载成功:", src);
+            }}
+          />
+        </div>
+      ),
     };
 
 
@@ -169,7 +187,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           remarkPlugins={[remarkGfm, remarkBreaks]}
           components={components}
         >
-          {note.content}
+          {note.originalContent || note.content}
         </ReactMarkdown>
       </div>
     );
@@ -196,50 +214,33 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   // 处理字符串中的标签和搜索高亮
   const processStringWithTagsAndHighlight = (text: string) => {
     const tagRegex = /#[\w\u4e00-\u9fa5]+/g;
-    const parts = text.split(tagRegex);
-    const tags = text.match(tagRegex) || [];
+    // 移除标签文字，只保留其他内容
+    const textWithoutTags = text.replace(tagRegex, '').replace(/\s+/g, ' ').trim();
     
-    const result = [];
-    
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i]) {
-        // 处理搜索高亮
-        if (searchTerm && parts[i].toLowerCase().includes(searchTerm.toLowerCase())) {
-          const regex = new RegExp(`(${searchTerm})`, 'gi');
-          const highlightedParts = parts[i].split(regex);
-          result.push(
-            <span key={`text-${i}`}>
-              {highlightedParts.map((part, index) => 
-                regex.test(part) ? (
-                  <span key={index} className="bg-yellow-200 dark:bg-yellow-800">
-                    {part}
-                  </span>
-                ) : (
-                  part
-                )
-              )}
-            </span>
-          );
-        } else {
-          result.push(<span key={`text-${i}`}>{parts[i]}</span>);
-        }
-      }
-      
-      // 添加标签
-      if (tags[i]) {
-        result.push(
-          <span
-            key={`tag-${i}`}
-            className="text-blue-600 dark:text-blue-400 cursor-pointer hover:underline font-medium"
-            onClick={() => onTagClick && onTagClick(tags[i].substring(1))}
-          >
-            {tags[i]}
-          </span>
-        );
-      }
+    if (!textWithoutTags) {
+      return null;
     }
     
-    return result;
+    // 处理搜索高亮
+    if (searchTerm && textWithoutTags.toLowerCase().includes(searchTerm.toLowerCase())) {
+      const regex = new RegExp(`(${searchTerm})`, 'gi');
+      const highlightedParts = textWithoutTags.split(regex);
+      return (
+        <span>
+          {highlightedParts.map((part, index) => 
+            regex.test(part) ? (
+              <span key={index} className="bg-yellow-200 dark:bg-yellow-800">
+                {part}
+              </span>
+            ) : (
+              part
+            )
+          )}
+        </span>
+      );
+    }
+    
+    return textWithoutTags;
   };
   
   // 处理标签点击
@@ -380,22 +381,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
           {renderNoteContent()}
         </div>
       )}
-        {note.imageUrl && note.imageUrl.trim() !== "" && (
-          <div className="mt-2">
-            <img 
-              src={note.imageUrl} 
-              alt="笔记图片" 
-              className="rounded-md max-w-full max-h-96 object-contain border shadow-sm" 
-              onError={(e) => {
-                console.error("图片加载失败:", note.imageUrl);
-                e.currentTarget.style.display = 'none';
-              }}
-              onLoad={(e) => {
-                console.log("图片加载成功:", note.imageUrl);
-              }}
-            />
-          </div>
-        )}
+
       {/* 分割线 */}
       <div className="border-b border-border/50 my-3" />
     </div>

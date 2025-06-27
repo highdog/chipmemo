@@ -15,7 +15,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Users, FileText, CheckSquare, Calendar, Tag, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { adminApi } from '@/lib/api';
+import { adminApi, SystemConfig } from '@/lib/api';
 
 interface UserStats {
   _id: string;
@@ -74,6 +74,17 @@ export default function AdminPage() {
   const [passwordForm, setPasswordForm] = useState({ userId: '', password: '', confirmPassword: '' });
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  
+  // 系统配置相关状态
+  const [systemConfigs, setSystemConfigs] = useState<SystemConfig[]>([]);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [tencentCloudConfig, setTencentCloudConfig] = useState({
+    secretId: '',
+    secretKey: '',
+    region: 'ap-beijing',
+    bucket: '',
+    domain: ''
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
@@ -88,6 +99,7 @@ export default function AdminPage() {
     }
 
     fetchStats();
+    fetchSystemConfigs();
   }, [currentUser, router]);
 
   const fetchStats = async () => {
@@ -102,6 +114,107 @@ export default function AdminPage() {
       console.error('Error fetching admin stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSystemConfigs = async () => {
+    setConfigLoading(true);
+    try {
+      const response = await adminApi.getSystemConfigs('storage');
+      if (response.success && response.data) {
+        setSystemConfigs(response.data);
+        
+        // 解析腾讯云配置
+        const configs = response.data;
+        const newConfig = { ...tencentCloudConfig };
+        
+        configs.forEach(config => {
+          switch (config.key) {
+            case 'tencent_cloud_secret_id':
+              newConfig.secretId = config.value || '';
+              break;
+            case 'tencent_cloud_secret_key':
+              newConfig.secretKey = config.value || '';
+              break;
+            case 'tencent_cloud_region':
+              newConfig.region = config.value || 'ap-beijing';
+              break;
+            case 'tencent_cloud_bucket':
+              newConfig.bucket = config.value || '';
+              break;
+            case 'tencent_cloud_domain':
+              newConfig.domain = config.value || '';
+              break;
+          }
+        });
+        
+        setTencentCloudConfig(newConfig);
+      }
+    } catch (error) {
+      console.error('Error fetching system configs:', error);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const handleSaveTencentCloudConfig = async () => {
+    setConfigLoading(true);
+    try {
+      const configUpdates = [
+        {
+          key: 'tencent_cloud_secret_id',
+          value: tencentCloudConfig.secretId,
+          description: '腾讯云访问密钥ID',
+          category: 'storage'
+        },
+        {
+          key: 'tencent_cloud_secret_key',
+          value: tencentCloudConfig.secretKey,
+          description: '腾讯云访问密钥Key',
+          category: 'storage'
+        },
+        {
+          key: 'tencent_cloud_region',
+          value: tencentCloudConfig.region,
+          description: '腾讯云存储区域',
+          category: 'storage'
+        },
+        {
+          key: 'tencent_cloud_bucket',
+          value: tencentCloudConfig.bucket,
+          description: '腾讯云存储桶名称',
+          category: 'storage'
+        },
+        {
+          key: 'tencent_cloud_domain',
+          value: tencentCloudConfig.domain,
+          description: '腾讯云CDN域名',
+          category: 'storage'
+        }
+      ];
+
+      for (const config of configUpdates) {
+        await adminApi.updateSystemConfig(config.key, {
+          value: config.value,
+          description: config.description,
+          category: config.category
+        });
+      }
+
+      toast({
+        title: "成功",
+        description: "腾讯云配置已保存",
+      });
+      
+      fetchSystemConfigs(); // 刷新配置
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "保存腾讯云配置失败",
+        variant: "destructive",
+      });
+    } finally {
+      setConfigLoading(false);
     }
   };
 
@@ -319,8 +432,16 @@ export default function AdminPage() {
         </Card>
       </div>
 
-      {/* 用户详情表格 */}
-      <Card>
+      {/* 主要内容区域 */}
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users">用户管理</TabsTrigger>
+          <TabsTrigger value="config">系统配置</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="users" className="space-y-6">
+          {/* 用户详情表格 */}
+          <Card>
         <CardHeader>
           <CardTitle>用户数据统计</CardTitle>
           <CardDescription>
@@ -662,6 +783,133 @@ export default function AdminPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+        </TabsContent>
+        
+        <TabsContent value="config" className="space-y-6">
+          {/* 腾讯云配置 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>腾讯云存储配置</CardTitle>
+              <CardDescription>
+                配置腾讯云COS存储服务，用于笔记图片上传
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="secretId">Secret ID</Label>
+                  <Input
+                    id="secretId"
+                    type="password"
+                    value={tencentCloudConfig.secretId}
+                    onChange={(e) => setTencentCloudConfig({ ...tencentCloudConfig, secretId: e.target.value })}
+                    placeholder="请输入腾讯云Secret ID"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="secretKey">Secret Key</Label>
+                  <Input
+                    id="secretKey"
+                    type="password"
+                    value={tencentCloudConfig.secretKey}
+                    onChange={(e) => setTencentCloudConfig({ ...tencentCloudConfig, secretKey: e.target.value })}
+                    placeholder="请输入腾讯云Secret Key"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="region">存储区域</Label>
+                  <Input
+                    id="region"
+                    value={tencentCloudConfig.region}
+                    onChange={(e) => setTencentCloudConfig({ ...tencentCloudConfig, region: e.target.value })}
+                    placeholder="例如：ap-beijing"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bucket">存储桶名称</Label>
+                  <Input
+                    id="bucket"
+                    value={tencentCloudConfig.bucket}
+                    onChange={(e) => setTencentCloudConfig({ ...tencentCloudConfig, bucket: e.target.value })}
+                    placeholder="请输入存储桶名称"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="domain">CDN域名（可选）</Label>
+                  <Input
+                    id="domain"
+                    value={tencentCloudConfig.domain}
+                    onChange={(e) => setTencentCloudConfig({ ...tencentCloudConfig, domain: e.target.value })}
+                    placeholder="例如：https://your-domain.com"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={fetchSystemConfigs}
+                  disabled={configLoading}
+                >
+                  重置
+                </Button>
+                <Button 
+                  onClick={handleSaveTencentCloudConfig}
+                  disabled={configLoading}
+                >
+                  {configLoading ? '保存中...' : '保存配置'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* 配置列表 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>当前配置</CardTitle>
+              <CardDescription>
+                查看所有系统配置项
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {configLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <div>加载中...</div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>配置项</TableHead>
+                      <TableHead>描述</TableHead>
+                      <TableHead>值</TableHead>
+                      <TableHead>更新时间</TableHead>
+                      <TableHead>更新人</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {systemConfigs.map((config) => (
+                      <TableRow key={config._id}>
+                        <TableCell className="font-medium">{config.key}</TableCell>
+                        <TableCell>{config.description}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {config.key.includes('secret') || config.key.includes('key') 
+                            ? '••••••••' 
+                            : String(config.value)
+                          }
+                        </TableCell>
+                        <TableCell>{new Date(config.updatedAt).toLocaleString('zh-CN')}</TableCell>
+                        <TableCell>{config.updatedBy?.username || '未知'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

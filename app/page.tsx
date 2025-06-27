@@ -15,8 +15,9 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2, CheckCircle, Circle, Home, Sun, Moon, Plus, Edit, Save, XCircle, MoreVertical, Download, Upload, Check, Clock, Pause, ChevronUp, ChevronDown, Hash } from "lucide-react"
 // 由于NoteGroup组件已在本文件中定义,移除此导入
 // 由于组件已在本文件中定义,移除重复导入
-import TodoList from "@/components/todo-list"
+
 import { TagContent } from "@/components/tag-content"
+import { TodoList } from "@/components/todo-list"
 import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
@@ -38,7 +39,7 @@ import {
 import { formatDateShort, getDateKey, formatTime, formatDateOnly, cn, extractTags } from "@/lib/utils"
 import { format } from 'date-fns'
 import { toast } from "@/hooks/use-toast"
-import { apiClient, notesApi, schedulesApi, todosApi, type Todo as ApiTodo } from "@/lib/api"
+import { apiClient, notesApi, schedulesApi, todosApi, uploadApi, type Todo as ApiTodo } from "@/lib/api"
 import { Toaster } from "@/components/ui/toaster"
 
 // 添加缺失的类型定义
@@ -666,7 +667,7 @@ export default function NotePad() {
 
 
   // 处理图片上传
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -690,23 +691,31 @@ export default function NotePad() {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string
-      
-      // 检查Data URL大小（限制为90KB，确保不超过后端100000字符限制）
-      if (dataUrl && dataUrl.length > 90000) {
-        toast({
-          title: "上传失败",
-          description: "图片过大，请选择更小的图片或降低图片质量",
-          variant: "destructive",
-        })
-        return
-      }
-      
-      setSelectedImage(dataUrl)
-    }
-    reader.readAsDataURL(file)
+    try {
+       // 上传到腾讯云
+       const response = await uploadApi.uploadImage(file)
+       console.log('图片上传响应:', response)
+       
+       // 检查响应结构并获取正确的URL
+        const imageUrl = response.data?.url
+        if (!imageUrl) {
+          throw new Error('未获取到图片URL')
+        }
+       
+       setSelectedImage(imageUrl)
+       
+       toast({
+         title: "上传成功",
+         description: "图片已上传到云存储",
+       })
+     } catch (error) {
+       console.error('图片上传失败:', error)
+       toast({
+         title: "上传失败",
+         description: error instanceof Error ? error.message : "图片上传失败，请重试",
+         variant: "destructive",
+       })
+     }
   }
 
   // 移除已选择的图片

@@ -4,6 +4,7 @@ const Note = require('../models/Note');
 const Todo = require('../models/Todo');
 const Schedule = require('../models/Schedule');
 const TagContent = require('../models/TagContent');
+const SystemConfig = require('../models/SystemConfig');
 const { adminAuth } = require('../middleware/adminAuth');
 
 const router = express.Router();
@@ -245,6 +246,78 @@ router.put('/users/:userId/password', adminAuth, async (req, res) => {
   } catch (error) {
     console.error('Admin update password error:', error);
     res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
+// 获取系统配置
+router.get('/config', adminAuth, async (req, res) => {
+  try {
+    const { category } = req.query;
+    const filter = category ? { category } : {};
+    
+    const configs = await SystemConfig.find(filter)
+      .populate('updatedBy', 'username')
+      .sort({ category: 1, key: 1 });
+    
+    res.json({
+      success: true,
+      data: configs
+    });
+  } catch (error) {
+    console.error('Get system config error:', error);
+    res.status(500).json({ error: 'Failed to get system config' });
+  }
+});
+
+// 更新系统配置
+router.put('/config/:key', adminAuth, async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value, description, category } = req.body;
+    
+    const config = await SystemConfig.findOneAndUpdate(
+      { key },
+      {
+        value,
+        description,
+        category: category || 'general',
+        updatedBy: req.user.id
+      },
+      { 
+        new: true, 
+        upsert: true,
+        runValidators: true
+      }
+    ).populate('updatedBy', 'username');
+    
+    res.json({
+      success: true,
+      data: config
+    });
+  } catch (error) {
+    console.error('Update system config error:', error);
+    res.status(500).json({ error: 'Failed to update system config' });
+  }
+});
+
+// 删除系统配置
+router.delete('/config/:key', adminAuth, async (req, res) => {
+  try {
+    const { key } = req.params;
+    
+    const config = await SystemConfig.findOneAndDelete({ key });
+    
+    if (!config) {
+      return res.status(404).json({ error: 'Config not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Config deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete system config error:', error);
+    res.status(500).json({ error: 'Failed to delete system config' });
   }
 });
 

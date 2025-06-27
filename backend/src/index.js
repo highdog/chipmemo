@@ -11,6 +11,7 @@ const todoRoutes = require('./routes/todos');
 const tagContentRoutes = require('./routes/tagContents');
 const scheduleRoutes = require('./routes/schedules');
 const adminRoutes = require('./routes/admin');
+const uploadRoutes = require('./routes/upload');
 const errorHandler = require('./middleware/errorHandler');
 const createAdminUser = require('./scripts/createAdmin');
 
@@ -64,6 +65,7 @@ app.use('/api/todos', limiter, todoRoutes); // General limit for todos
 app.use('/api/tag-contents', limiter, tagContentRoutes); // General limit for tag contents
 app.use('/api/schedules', limiter, scheduleRoutes); // General limit for schedules
 app.use('/api/admin', authLimiter, adminRoutes); // Stricter limit for admin
+app.use('/api/upload', limiter, uploadRoutes); // General limit for uploads
 
 // Health check
 app.get('/api/health', (req, res) => {
