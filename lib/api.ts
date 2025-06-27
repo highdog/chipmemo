@@ -39,6 +39,15 @@ export interface Note {
   isArchived: boolean;
   isPinned: boolean;
   color: string;
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
+  customDate?: Date | string;
+  originalContent?: string;
   createdAt: string;
   updatedAt: string;
 }

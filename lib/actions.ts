@@ -14,6 +14,13 @@ export interface Note {
   todos?: TodoItem[];
   tags: string[];
   imageUrl?: string;
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
 }
 
 export interface TodoItem {

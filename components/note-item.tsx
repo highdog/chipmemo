@@ -310,7 +310,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const completedTodos = note.todos?.filter((todo) => todo.completed).length || 0
 
   return (
-    <div id={`note-${note.id}`} className="p-3 group hover:shadow-sm transition-shadow bg-card">
+    <div id={`note-${note.id}`} className="p-2 group hover:shadow-sm transition-shadow bg-card">
       <div className="flex justify-between items-start mb-2">
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
@@ -438,7 +438,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
       )}
 
       {/* 分割线 */}
-      <div className="border-b border-border/50 my-3" />
+      <div className="border-b border-border/50 mt-4 mb-0" />
     </div>
   )
 }

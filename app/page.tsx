@@ -80,6 +80,8 @@ interface TagContent {
   isGoalEnabled?: boolean;
   targetCount?: number;
   currentCount?: number;
+  isCheckInEnabled?: boolean;
+  checkInCount?: number;
   userId: string;
   createdAt: string;
   updatedAt: string;
@@ -843,6 +845,28 @@ export default function NotePad() {
       const totalTargetCount = enabledGoals.reduce((sum, tc) => sum + (tc.targetCount || 0), 0)
       const totalCurrentCount = enabledGoals.reduce((sum, tc) => sum + (tc.currentCount || 0), 0)
       
+      // 统计打卡相关信息
+      const enabledCheckIns = allTagContents.filter(tc => tc.isCheckInEnabled)
+      const totalCheckInCount = enabledCheckIns.reduce((sum, tc) => sum + (tc.checkInCount || 0), 0)
+      
+      // 统计打卡笔记和图片
+      const checkInNotes = notesToExport.filter(note => 
+        note.title?.includes('打卡') || note.content?.includes('打卡')
+      )
+      const checkInNotesWithImages = checkInNotes.filter(note => 
+        note.attachments && note.attachments.some(att => 
+          att.mimeType && att.mimeType.startsWith('image/')
+        )
+      )
+      const totalCheckInImages = checkInNotes.reduce((sum, note) => {
+        if (note.attachments) {
+          return sum + note.attachments.filter(att => 
+            att.mimeType && att.mimeType.startsWith('image/')
+          ).length
+        }
+        return sum
+      }, 0)
+      
       markdownContent += `数据统计:\n`
       markdownContent += `- 笔记: ${notesToExport.length} 条\n`
       markdownContent += `- 待办事项: ${allTodos.length} 条 (已完成: ${allTodos.filter(t => t.completed).length} 条)\n`
@@ -851,7 +875,12 @@ export default function NotePad() {
       markdownContent += `- 启用目标的标签: ${enabledGoals.length} 个\n`
       markdownContent += `- 总目标数量: ${totalTargetCount}\n`
       markdownContent += `- 总完成进度: ${totalCurrentCount}\n`
-      markdownContent += `- 整体完成率: ${totalTargetCount > 0 ? Math.round(totalCurrentCount / totalTargetCount * 100) : 0}%\n\n`
+      markdownContent += `- 整体完成率: ${totalTargetCount > 0 ? Math.round(totalCurrentCount / totalTargetCount * 100) : 0}%\n`
+      markdownContent += `- 启用打卡的标签: ${enabledCheckIns.length} 个\n`
+      markdownContent += `- 总打卡次数: ${totalCheckInCount}\n`
+      markdownContent += `- 打卡笔记: ${checkInNotes.length} 条\n`
+      markdownContent += `- 包含图片的打卡笔记: ${checkInNotesWithImages.length} 条\n`
+      markdownContent += `- 打卡图片总数: ${totalCheckInImages} 张\n\n`
       markdownContent += `---\n\n`
 
       // 收集所有日期并按日期组织数据
@@ -912,8 +941,51 @@ export default function NotePad() {
               markdownContent += `**标签:** ${note.tags.map((tag: string) => `#${tag}`).join(' ')}\n\n`
             }
             
+            // 检查是否为打卡笔记
+            const isCheckInNote = note.title?.includes('打卡') || note.content?.includes('打卡')
+            if (isCheckInNote) {
+              markdownContent += `🎯 **打卡笔记**\n\n`
+            }
+            
             // 添加笔记内容
             markdownContent += `${note.originalContent || note.content}\n\n`
+            
+            // 添加图片附件信息
+            if (note.attachments && note.attachments.length > 0) {
+              const images = note.attachments.filter(att => 
+                att.mimeType && att.mimeType.startsWith('image/')
+              )
+              if (images.length > 0) {
+                markdownContent += `📷 **附件图片:** ${images.length} 张\n\n`
+                images.forEach((img, imgIndex) => {
+                  markdownContent += `- 图片${imgIndex + 1}: ${img.originalName || img.filename}\n`
+                  markdownContent += `  大小: ${(img.size / 1024).toFixed(1)}KB\n`
+                  if (img.url) {
+                    markdownContent += `  链接: ${img.url}\n`
+                  }
+                  markdownContent += `\n`
+                })
+              }
+              
+              // 添加其他类型的附件
+              const otherAttachments = note.attachments.filter(att => 
+                !att.mimeType || !att.mimeType.startsWith('image/')
+              )
+              if (otherAttachments.length > 0) {
+                markdownContent += `📎 **其他附件:** ${otherAttachments.length} 个\n\n`
+                otherAttachments.forEach((att, attIndex) => {
+                  markdownContent += `- 附件${attIndex + 1}: ${att.originalName || att.filename}\n`
+                  if (att.mimeType) {
+                    markdownContent += `  类型: ${att.mimeType}\n`
+                  }
+                  markdownContent += `  大小: ${(att.size / 1024).toFixed(1)}KB\n`
+                  if (att.url) {
+                    markdownContent += `  链接: ${att.url}\n`
+                  }
+                  markdownContent += `\n`
+                })
+              }
+            }
           })
         }
         
@@ -1033,7 +1105,46 @@ export default function NotePad() {
               markdownContent += `- 完成进度: ${progress}%\n\n`
             }
             
-            if ((tagContent.content && tagContent.content.trim()) || tagContent.isGoalEnabled) {
+            // 添加打卡相关信息
+            if (tagContent.isCheckInEnabled) {
+              markdownContent += `**打卡设置:**\n\n`
+              markdownContent += `- 打卡功能: 已启用\n`
+              markdownContent += `- 总打卡次数: ${tagContent.checkInCount || 0}\n\n`
+              
+              // 获取该标签的打卡笔记
+              const checkInNotes = notesToExport.filter(note => 
+                note.tags && note.tags.includes(tag) && 
+                (note.title?.includes('打卡') || note.content?.includes('打卡'))
+              )
+              
+              if (checkInNotes.length > 0) {
+                markdownContent += `**打卡记录:** 共 ${checkInNotes.length} 条\n\n`
+                checkInNotes.forEach((note, index) => {
+                  const noteTime = new Date(note.createdAt).toLocaleString('zh-CN')
+                  markdownContent += `${index + 1}. **${noteTime}** - ${note.content}\n`
+                  
+                  // 添加图片附件信息
+                  if (note.attachments && note.attachments.length > 0) {
+                    const images = note.attachments.filter(att => 
+                      att.mimeType && att.mimeType.startsWith('image/')
+                    )
+                    if (images.length > 0) {
+                      markdownContent += `   📷 包含图片: ${images.length} 张\n`
+                      images.forEach((img, imgIndex) => {
+                        markdownContent += `   - 图片${imgIndex + 1}: ${img.originalName || img.filename} (${(img.size / 1024).toFixed(1)}KB)\n`
+                        if (img.url) {
+                          markdownContent += `     链接: ${img.url}\n`
+                        }
+                      })
+                    }
+                  }
+                  markdownContent += `\n`
+                })
+                markdownContent += `\n`
+              }
+            }
+            
+            if ((tagContent.content && tagContent.content.trim()) || tagContent.isGoalEnabled || tagContent.isCheckInEnabled) {
               markdownContent += `---\n\n`
             }
           }
