@@ -3200,7 +3200,7 @@ export default function NotePad() {
           <div className="flex items-center justify-between gap-4">
              {/* 左侧：土豆笔记标题 */}
              <div className="flex items-center">
-               <h1 className="text-xl font-bold whitespace-nowrap">土豆笔记</h1>
+               <h1 className="text-xl font-bold whitespace-nowrap">薯片笔记</h1>
              </div>
              
              {/* 中间：搜索框 */}

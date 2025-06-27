@@ -256,6 +256,90 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   PUT /api/tag-contents/:oldTag/rename
+// @desc    Rename a tag and update all related content
+// @access  Private
+router.put('/:oldTag/rename', [
+  param('oldTag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Old tag must be between 1 and 50 characters'),
+  body('newTag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('New tag must be between 1 and 50 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { oldTag } = req.params;
+    const { newTag } = req.body;
+    const Note = require('../models/Note');
+
+    // 检查新标签是否已存在
+    const existingTagContent = await TagContent.findOne({
+      userId: req.user._id,
+      tag: newTag
+    });
+
+    if (existingTagContent) {
+      return res.status(400).json({ error: '新标签名称已存在' });
+    }
+
+    // 更新标签内容
+    const tagContent = await TagContent.findOneAndUpdate(
+      { userId: req.user._id, tag: oldTag },
+      { tag: newTag },
+      { new: true }
+    );
+
+    if (!tagContent) {
+      return res.status(404).json({ error: '标签内容不存在' });
+    }
+
+    // 更新所有包含该标签的笔记
+    const notes = await Note.find({
+      userId: req.user._id,
+      tags: oldTag
+    });
+
+    for (const note of notes) {
+      // 替换标签数组中的标签
+      const updatedTags = note.tags.map(tag => tag === oldTag ? newTag : tag);
+      
+      // 替换内容中的标签
+      const updatedContent = note.content.replace(
+        new RegExp(`#${oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`, 'g'),
+        `#${newTag}`
+      );
+      
+      await Note.findByIdAndUpdate(note._id, {
+        tags: updatedTags,
+        content: updatedContent
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        oldTag,
+        newTag,
+        updatedNotesCount: notes.length,
+        tagContent: {
+          tag: tagContent.tag,
+          content: tagContent.content,
+          isGoalEnabled: tagContent.isGoalEnabled || false,
+          targetCount: tagContent.targetCount || 0,
+          currentCount: tagContent.currentCount || 0,
+          isCheckInEnabled: tagContent.isCheckInEnabled || false,
+          checkInCount: tagContent.checkInCount || 0,
+          updatedAt: tagContent.updatedAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error renaming tag:', error);
+    res.status(500).json({ error: 'Server error while renaming tag' });
+  }
+});
+
 // @route   POST /api/tag-contents/:tag/check-in
 // @desc    Check in for a tag (increment check-in count and create note)
 // @access  Private

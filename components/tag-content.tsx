@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,10 +23,16 @@ interface TagContentProps {
 
 
 export function TagContent({ tag, onSave }: TagContentProps) {
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // 标签编辑相关状态
+  const [isEditingTag, setIsEditingTag] = useState(false)
+  const [editingTagName, setEditingTagName] = useState(tag)
+  const [isRenamingTag, setIsRenamingTag] = useState(false)
   
   // 目标相关状态
   const [isGoalEnabled, setIsGoalEnabled] = useState(false)
@@ -87,6 +94,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
 
   useEffect(() => {
     loadTagContent()
+    setEditingTagName(tag)
   }, [tag])
 
   // 添加一个用于外部刷新的方法
@@ -310,6 +318,42 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     }
   }
 
+  // 处理标签重命名
+  const handleRenameTag = async () => {
+    if (!editingTagName.trim() || editingTagName === tag) {
+      setIsEditingTag(false)
+      setEditingTagName(tag)
+      return
+    }
+
+    setIsRenamingTag(true)
+    try {
+      const result = await tagContentsApi.rename(tag, editingTagName.trim())
+      if (result.success) {
+        toast.success(`标签已重命名为 "${editingTagName.trim()}"`)
+        setIsEditingTag(false)
+        
+        // 导航到新标签页面
+        router.push(`/tag/${encodeURIComponent(editingTagName.trim())}`)
+      } else {
+        toast.error(result.error || '重命名失败')
+        setEditingTagName(tag)
+      }
+    } catch (error: any) {
+      console.error('重命名失败:', error)
+      toast.error('重命名失败: ' + (error?.message || '未知错误'))
+      setEditingTagName(tag)
+    } finally {
+      setIsRenamingTag(false)
+    }
+  }
+
+  // 取消标签编辑
+  const handleCancelTagEdit = () => {
+    setIsEditingTag(false)
+    setEditingTagName(tag)
+  }
+
 
 
   // 将Markdown格式的内容转换为HTML
@@ -329,7 +373,56 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       <CardHeader className="pb-2 flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <CardTitle className="text-lg">{tag}</CardTitle>
+            {isEditingTag ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editingTagName}
+                  onChange={(e) => setEditingTagName(e.target.value)}
+                  className="text-lg font-semibold h-8 w-40"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameTag()
+                    } else if (e.key === 'Escape') {
+                      handleCancelTagEdit()
+                    }
+                  }}
+                  disabled={isRenamingTag}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRenameTag}
+                  disabled={isRenamingTag || !editingTagName.trim()}
+                >
+                  {isRenamingTag ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCancelTagEdit}
+                  disabled={isRenamingTag}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">{tag}</CardTitle>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditingTag(true)}
+                  className="h-6 w-6 p-0"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
             {/* 目标设置区域 - 移到标题右边 */}
             {isEditing && (
               <div className="flex items-center gap-3">

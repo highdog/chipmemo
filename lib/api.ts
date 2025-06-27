@@ -450,6 +450,10 @@ class ApiClient {
     return this.post<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>(`/tag-contents/${encodeURIComponent(tag)}/check-in`, {});
   }
 
+  async renameTag(oldTag: string, newTag: string): Promise<ApiResponse<{ oldTag: string; newTag: string; updatedNotesCount: number; tagContent: any }>> {
+    return this.put<{ oldTag: string; newTag: string; updatedNotesCount: number; tagContent: any }>(`/tag-contents/${encodeURIComponent(oldTag)}/rename`, { newTag });
+  }
+
   // 日程相关API
   async getSchedules(params?: {
     date?: string;
@@ -675,6 +679,7 @@ export const tagContentsApi = {
   delete: (tag: string) => apiClient.deleteTagContent(tag),
   getAll: () => apiClient.getAllTagContents(),
   checkIn: (tag: string) => apiClient.checkInTag(tag),
+  rename: (oldTag: string, newTag: string) => apiClient.renameTag(oldTag, newTag)
 };
 
 export const schedulesApi = {
