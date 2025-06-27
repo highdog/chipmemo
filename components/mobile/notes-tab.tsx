@@ -158,39 +158,30 @@ export function NotesTab({ user }: NotesTabProps) {
     if (imageUrls.length === 0) {
       return null;
     }
+
+    const handleImageClick = (index: number) => {
+      setCurrentNoteImages(imageUrls);
+      setSelectedImageIndex(index);
+      setImageViewerOpen(true);
+    };
     
     return (
       <div className="grid grid-cols-3 gap-2 mt-3 mb-2">
         {imageUrls.map((url, index) => (
-          <Dialog key={index}>
-            <DialogTrigger asChild>
-              <div className="relative cursor-pointer group">
-                <img
-                  src={url}
-                  className="w-full h-20 object-cover rounded hover:opacity-80 transition-opacity"
-                  alt={`图片 ${index + 1}`}
-                  onError={(e) => {
-                    console.error("图片加载失败:", url);
-                    e.currentTarget.src = "/placeholder-image.png";
-                  }}
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
-                  <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              </div>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] p-2">
-              <img
-                src={url}
-                className="w-full h-auto max-h-[80vh] object-contain"
-                alt={`图片 ${index + 1}`}
-                onError={(e) => {
-                  console.error("图片加载失败:", url);
-                  e.currentTarget.src = "/placeholder-image.png";
-                }}
-              />
-            </DialogContent>
-          </Dialog>
+          <div key={index} className="relative cursor-pointer group" onClick={() => handleImageClick(index)}>
+            <img
+              src={url}
+              className="w-full h-20 object-cover rounded hover:opacity-80 transition-opacity"
+              alt={`图片 ${index + 1}`}
+              onError={(e) => {
+                console.error("图片加载失败:", url);
+                e.currentTarget.src = "/placeholder-image.png";
+              }}
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+              <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </div>
         ))}
       </div>
     );

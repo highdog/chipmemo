@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -17,9 +17,22 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const [scale, setScale] = useState(1)
+  const [translateX, setTranslateX] = useState(0)
+  const [translateY, setTranslateY] = useState(0)
+  const [lastTap, setLastTap] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [initialDistance, setInitialDistance] = useState(0)
+  const [initialScale, setInitialScale] = useState(1)
+  const imageRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
     setCurrentIndex(initialIndex)
+    // 重置缩放状态
+    setScale(1)
+    setTranslateX(0)
+    setTranslateY(0)
   }, [initialIndex, open])
 
   const goToPrevious = () => {
@@ -30,28 +43,107 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
     setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
   }
 
-  // 处理触摸事件（移动端滑动）
+  // 处理双击缩放
+  const handleDoubleClick = () => {
+    if (scale === 1) {
+      setScale(2)
+    } else {
+      setScale(1)
+      setTranslateX(0)
+      setTranslateY(0)
+    }
+  }
+
+  // 计算两点间距离
+  const getDistance = (touch1: React.Touch, touch2: React.Touch) => {
+    return Math.sqrt(
+      Math.pow(touch2.clientX - touch1.clientX, 2) +
+      Math.pow(touch2.clientY - touch1.clientY, 2)
+    )
+  }
+
+  // 处理触摸事件（移动端滑动和缩放）
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null)
-    setTouchStart(e.targetTouches[0].clientX)
+    if (!isMobile) return
+    
+    const touches = e.touches
+    
+    if (touches.length === 1) {
+      // 单指触摸
+      const now = Date.now()
+      const DOUBLE_TAP_DELAY = 300
+      
+      if (now - lastTap < DOUBLE_TAP_DELAY) {
+        handleDoubleClick()
+        return
+      }
+      setLastTap(now)
+      
+      if (scale === 1) {
+        // 未缩放时处理滑动切换
+        setTouchEnd(null)
+        setTouchStart(touches[0].clientX)
+      } else {
+        // 已缩放时处理拖拽
+        setIsDragging(true)
+        setDragStart({ x: touches[0].clientX, y: touches[0].clientY })
+      }
+    } else if (touches.length === 2) {
+      // 双指捏合缩放
+      const distance = getDistance(touches[0], touches[1])
+      setInitialDistance(distance)
+      setInitialScale(scale)
+    }
   }
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX)
+    if (!isMobile) return
+    
+    const touches = e.touches
+    
+    if (touches.length === 1) {
+      if (scale === 1) {
+        // 未缩放时处理滑动
+        setTouchEnd(touches[0].clientX)
+      } else if (isDragging) {
+        // 已缩放时处理拖拽
+        const deltaX = touches[0].clientX - dragStart.x
+        const deltaY = touches[0].clientY - dragStart.y
+        setTranslateX(prev => prev + deltaX)
+        setTranslateY(prev => prev + deltaY)
+        setDragStart({ x: touches[0].clientX, y: touches[0].clientY })
+      }
+    } else if (touches.length === 2 && initialDistance > 0) {
+      // 双指缩放
+      const distance = getDistance(touches[0], touches[1])
+      const newScale = Math.max(0.5, Math.min(4, initialScale * (distance / initialDistance)))
+      setScale(newScale)
+      
+      if (newScale === 1) {
+        setTranslateX(0)
+        setTranslateY(0)
+      }
+    }
   }
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return
+    if (!isMobile) return
     
-    const distance = touchStart - touchEnd
-    const isLeftSwipe = distance > 50
-    const isRightSwipe = distance < -50
+    setIsDragging(false)
+    setInitialDistance(0)
+    
+    // 处理滑动切换（仅在未缩放时）
+    if (scale === 1 && touchStart !== null && touchEnd !== null) {
+      const distance = touchStart - touchEnd
+      const isLeftSwipe = distance > 50
+      const isRightSwipe = distance < -50
 
-    if (isLeftSwipe && images.length > 1) {
-      goToNext()
-    }
-    if (isRightSwipe && images.length > 1) {
-      goToPrevious()
+      if (isLeftSwipe && images.length > 1) {
+        goToNext()
+      }
+      if (isRightSwipe && images.length > 1) {
+        goToPrevious()
+      }
     }
   }
 
@@ -84,54 +176,81 @@ export function ImageViewer({ images, initialIndex, open, onOpenChange, isMobile
         />
         <DialogPrimitive.Content
           className="fixed left-[50%] top-[50%] z-50 w-full h-full translate-x-[-50%] translate-y-[-50%] focus:outline-none"
-          onTouchStart={isMobile ? handleTouchStart : undefined}
-          onTouchMove={isMobile ? handleTouchMove : undefined}
-          onTouchEnd={isMobile ? handleTouchEnd : undefined}
         >
           <div className="relative w-full h-full flex items-center justify-center p-4">
             {/* 图片 */}
             <img
+              ref={imageRef}
               src={images[currentIndex]}
               alt={`图片 ${currentIndex + 1}`}
-              className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
+              className="max-w-full max-h-full object-contain transition-transform duration-200"
+              style={{
+                transform: `scale(${scale}) translate(${translateX}px, ${translateY}px)`,
+                cursor: isMobile ? 'pointer' : 'default'
+              }}
               onError={(e) => {
                 console.error('图片加载失败:', images[currentIndex])
               }}
+              onTouchStart={isMobile ? handleTouchStart : undefined}
+              onTouchMove={isMobile ? handleTouchMove : undefined}
+              onTouchEnd={isMobile ? handleTouchEnd : undefined}
             />
             
-            {/* 网页端：关闭按钮和左右切换按钮 */}
-            {!isMobile && (
+            {/* 关闭按钮 */}
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute right-4 top-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors z-20"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            
+            {/* 左右切换按钮 - 仅在非移动端显示 */}
+            {!isMobile && images.length > 1 && (
               <>
                 <button
-                  onClick={() => onOpenChange(false)}
-                  className="absolute right-4 top-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors z-10"
+                  onClick={goToPrevious}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors z-10"
                 >
-                  <X className="h-4 w-4" />
+                  <ChevronLeft className="h-6 w-6" />
                 </button>
-                {images.length > 1 && (
-                  <>
-                    <button
-                      onClick={goToPrevious}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </button>
-                    <button
-                      onClick={goToNext}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                  </>
-                )}
+                <button
+                  onClick={goToNext}
+                  className="absolute right-16 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-colors z-10"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
               </>
             )}
             
-            {/* 图片计数器 */}
-            {images.length > 1 && (
+            {/* 图片计数器 - 非移动端 */}
+            {!isMobile && images.length > 1 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
                 {currentIndex + 1} / {images.length}
+              </div>
+            )}
+            
+            {/* 小点指示器 - 移动端 */}
+            {isMobile && images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                {images.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentIndex(index)}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all duration-200",
+                      index === currentIndex
+                        ? "bg-white scale-125"
+                        : "bg-white/50 hover:bg-white/70"
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* 缩放提示 - 移动端 */}
+            {isMobile && scale > 1 && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                {Math.round(scale * 100)}%
               </div>
             )}
           </div>
