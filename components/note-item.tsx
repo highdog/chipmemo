@@ -133,12 +133,20 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     return content.replace(/!\[.*?\]\(.*?\)/g, '').trim();
   };
 
-  // 渲染笔记内容（不含图片）
+  // 从内容中移除标签文字（支持中文标签）
+  const removeTagsFromContent = (content: string): string => {
+    // 匹配 #标签 格式，支持中文、英文、数字、下划线
+    return content.replace(/#[\u4e00-\u9fa5\w]+/g, '').replace(/\s+/g, ' ').trim();
+  };
+
+  // 渲染笔记内容（不含图片和标签）
   const renderNoteContent = () => {
     const contentWithoutImages = removeImagesFromContent(note.originalContent || note.content);
+    const contentWithoutTags = removeTagsFromContent(contentWithoutImages);
     
     if (searchTerm) {
-      const highlightedContent = highlightTags(contentWithoutImages)
+      // 不再高亮标签，因为标签已被移除
+      const content = contentWithoutTags
       return (
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -184,7 +192,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             ),
           }}
         >
-          {highlightedContent}
+          {content}
         </ReactMarkdown>
       )
     } else {
@@ -233,7 +241,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             ),
           }}
         >
-          {contentWithoutImages}
+          {contentWithoutTags}
         </ReactMarkdown>
       )
     }
@@ -346,6 +354,32 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
                 <Trash2 className="h-3 w-3" />
               </Button>
             </>
+          )}
+          
+          {/* 标签显示 */}
+          {note.tags && note.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {note.tags.slice(0, 3).map((tag, index) => (
+                <Badge 
+                  key={index} 
+                  variant="secondary" 
+                  className="text-xs cursor-pointer hover:bg-secondary/80"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onTagClick) {
+                      onTagClick(tag)
+                    }
+                  }}
+                >
+                  #{tag}
+                </Badge>
+              ))}
+              {note.tags.length > 3 && (
+                <Badge variant="outline" className="text-xs">
+                  +{note.tags.length - 3}
+                </Badge>
+              )}
+            </div>
           )}
           
           {isEditing && (

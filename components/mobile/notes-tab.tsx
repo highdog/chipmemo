@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TabsContent } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, X } from "lucide-react"
+import { Plus, Search, Edit, Trash2, X, Image, ZoomIn } from "lucide-react"
 import { 
   addNote,
   deleteNote,
@@ -20,6 +20,7 @@ import {
 import { formatDateShort, getDateKey, cn, extractTags } from "@/lib/utils"
 import { NotesTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
+import { uploadApi } from "@/lib/api"
 
 // 提取标签并清理内容的函数
 const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
@@ -44,6 +45,9 @@ export function NotesTab({ user }: NotesTabProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const [imageDialogOpen, setImageDialogOpen] = useState(false)
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -132,9 +136,136 @@ export function NotesTab({ user }: NotesTabProps) {
 
   const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes])
 
+  // 从内容中提取图片URL
+  const extractImageUrls = (content: string): string[] => {
+    const imageRegex = /!\[.*?\]\((.*?)\)/g;
+    const urls: string[] = [];
+    let match;
+    
+    while ((match = imageRegex.exec(content)) !== null) {
+      urls.push(match[1]);
+    }
+    
+    return urls;
+  };
+
+  // 渲染图片缩略图组件
+  const renderImageThumbnails = (note: Note) => {
+    const imageUrls = extractImageUrls(note.originalContent || note.content);
+    
+    if (imageUrls.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="grid grid-cols-3 gap-2 mt-3 mb-2">
+        {imageUrls.map((url, index) => (
+          <Dialog key={index}>
+            <DialogTrigger asChild>
+              <div className="relative cursor-pointer group">
+                <img
+                  src={url}
+                  className="w-full h-20 object-cover rounded hover:opacity-80 transition-opacity"
+                  alt={`图片 ${index + 1}`}
+                  onError={(e) => {
+                    console.error("图片加载失败:", url);
+                    e.currentTarget.src = "/placeholder-image.png";
+                  }}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                  <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </div>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] p-2">
+              <img
+                src={url}
+                className="w-full h-auto max-h-[80vh] object-contain"
+                alt={`图片 ${index + 1}`}
+                onError={(e) => {
+                  console.error("图片加载失败:", url);
+                  e.currentTarget.src = "/placeholder-image.png";
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        ))}
+      </div>
+    );
+  };
+
+  // 处理图片上传
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    // 检查图片数量限制
+    if (selectedImages.length + files.length > 10) {
+      toast({
+        title: "图片数量超限",
+        description: "最多只能上传10张图片",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        // 检查文件类型
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`${file.name} 不是图片文件`)
+        }
+        
+        // 检查文件大小（5MB限制）
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`${file.name} 文件大小超过5MB`)
+        }
+
+        const response = await uploadApi.uploadImage(file)
+        console.log('图片上传响应:', response)
+        
+        // 获取图片URL
+        const imageUrl = response.data?.url
+        if (!imageUrl) {
+          throw new Error(`${file.name} 未获取到图片URL`)
+        }
+
+        return imageUrl
+      })
+
+      const uploadedUrls = await Promise.all(uploadPromises)
+      setSelectedImages(prev => [...prev, ...uploadedUrls])
+      
+      toast({
+        title: "上传成功",
+        description: `${uploadedUrls.length}张图片已上传到云存储`,
+      })
+    } catch (error) {
+      console.error('图片上传失败:', error)
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "图片上传失败，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      // 清空input值，允许重复选择相同文件
+      e.target.value = ''
+    }
+  }
+
+  // 移除单张图片
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // 清空所有图片
+  const handleClearAllImages = () => {
+    setSelectedImages([])
+  }
+
   // 添加笔记
   const handleAddNote = async () => {
-    if (!newNote.trim()) return
+    if (!newNote.trim() && selectedImages.length === 0) return
     
     setIsAddingNote(true)
     try {
@@ -149,9 +280,13 @@ export function NotesTab({ user }: NotesTabProps) {
         }
       }
       
-      const result = await addNote(finalContent, new Date().toISOString())
+      // 将多张图片转换为单个图片URL字符串（用于兼容现有API）
+      const imageUrl = selectedImages.length > 0 ? selectedImages.join('\n') : undefined
+      
+      const result = await addNote(finalContent, new Date().toISOString(), imageUrl)
       if (result.success) {
         setNewNote("")
+        setSelectedImages([]) // 清除已选择的图片
         setIsDialogOpen(false)
         
         // 如果有搜索词，重新搜索；否则重新加载
@@ -259,10 +394,92 @@ export function NotesTab({ user }: NotesTabProps) {
                   className="min-h-[120px] resize-none"
                   autoFocus
                 />
+                
+                {/* 图片上传区域 */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="mobile-image-upload" className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild>
+                        <span>
+                          <Image className="h-4 w-4 mr-2" />
+                          添加图片
+                        </span>
+                      </Button>
+                    </label>
+                    <input
+                      id="mobile-image-upload"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    {selectedImages.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearAllImages}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        清空图片 ({selectedImages.length})
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* 图片预览 - 缩略图模式 */}
+                  {selectedImages.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {selectedImages.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <div className="relative cursor-pointer">
+                                <img
+                                  src={imageUrl}
+                                  alt={`预览图片${index + 1}`}
+                                  className="w-full h-20 object-cover rounded hover:opacity-80 transition-opacity"
+                                  onError={(e) => {
+                                    console.error("图片加载失败:", imageUrl);
+                                    e.currentTarget.src = "/placeholder-image.png";
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[90vh] p-2">
+                              <img
+                                src={imageUrl}
+                                alt={`预览图片${index + 1}`}
+                                className="w-full h-auto max-h-[80vh] object-contain"
+                                onError={(e) => {
+                                  console.error("图片加载失败:", imageUrl);
+                                  e.currentTarget.src = "/placeholder-image.png";
+                                }}
+                              />
+                            </DialogContent>
+                          </Dialog>
+                          
+                          {/* 单张图片删除按钮 */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-red-500 text-white hover:bg-red-600 rounded-full"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleAddNote} 
-                    disabled={isAddingNote || !newNote.trim()}
+                    disabled={isAddingNote || (!newNote.trim() && selectedImages.length === 0)}
                     className="flex-1"
                   >
                     {isAddingNote ? "添加中..." : "添加"}
@@ -272,6 +489,7 @@ export function NotesTab({ user }: NotesTabProps) {
                     onClick={() => {
                       setIsDialogOpen(false)
                       setNewNote("")
+                      setSelectedImages([])
                     }}
                   >
                     取消
@@ -398,6 +616,9 @@ export function NotesTab({ user }: NotesTabProps) {
                             {contentWithoutTags}
                           </div>
                         </div>
+                        
+                        {/* 图片缩略图区域 */}
+                        {renderImageThumbnails(note)}
                         
                         {/* 分割线 */}
                         <div className="border-b border-border/50 my-3" />
