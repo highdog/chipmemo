@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { TabsContent } from "@/components/ui/tabs"
+import { TabsContent, Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Target, Calendar } from "lucide-react"
+import { Plus, Target, Calendar, Zap, Loader2 } from "lucide-react"
 import { tagContentsApi, apiClient } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { GoalsTabProps } from "./types"
@@ -33,8 +33,21 @@ interface Goal {
   currentCount: number
 }
 
+interface CheckInTag {
+  _id: string
+  tag: string
+  content: string
+  updatedAt: string
+  isCheckInEnabled?: boolean
+  checkInCount?: number
+}
+
 export function GoalsTab({ user }: GoalsTabProps) {
   const toast = showToast
+  
+  // Tab状态
+  const [activeTab, setActiveTab] = useState("goals")
+  
   // 目标相关状态
   const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -47,6 +60,12 @@ export function GoalsTab({ user }: GoalsTabProps) {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [showGoalDialog, setShowGoalDialog] = useState(false)
   const [checkedBoxes, setCheckedBoxes] = useState<boolean[]>([])
+  
+  // 打卡相关状态
+  const [checkInTags, setCheckInTags] = useState<CheckInTag[]>([])
+  const [checkInLoading, setCheckInLoading] = useState(true)
+  const [checkInError, setCheckInError] = useState<string | null>(null)
+  const [checkingInTags, setCheckingInTags] = useState<Set<string>>(new Set())
 
   // 加载目标数据
   const loadGoals = useCallback(async () => {
@@ -81,11 +100,92 @@ export function GoalsTab({ user }: GoalsTabProps) {
     }
   }, [user, toast])
 
+  // 加载打卡标签数据
+  const loadCheckInTags = useCallback(async () => {
+    try {
+      setCheckInLoading(true)
+      const response = await tagContentsApi.getAll()
+      
+      if (response && response.data) {
+        const checkInData = response.data.filter((item: CheckInTag) => item.isCheckInEnabled)
+        setCheckInTags(checkInData)
+        setCheckInError(null)
+      } else {
+        setCheckInError('数据格式错误')
+      }
+    } catch (err: any) {
+      setCheckInError(err.message || '获取数据失败')
+    } finally {
+      setCheckInLoading(false)
+    }
+  }, [])
+
+  // 处理打卡
+  const handleCheckIn = async (tag: string) => {
+    try {
+      setCheckingInTags(prev => new Set([...prev, tag]))
+      
+      const response = await tagContentsApi.checkIn(tag)
+      
+      if (response.success) {
+        toast({ title: '打卡成功！', description: `已为 #${tag} 创建打卡笔记` })
+        
+        // 更新本地状态
+        setCheckInTags(prev => 
+          prev.map(item => 
+            item.tag === tag 
+              ? { ...item, checkInCount: (item.checkInCount || 0) + 1 }
+              : item
+          )
+        )
+        
+        // 触发笔记刷新事件
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('notes-refresh'))
+        }
+      } else {
+        toast({ title: '打卡失败', description: '请稍后重试', variant: 'destructive' })
+      }
+    } catch (error: any) {
+      toast({ title: '打卡失败', description: error.message || '请稍后重试', variant: 'destructive' })
+    } finally {
+      setCheckingInTags(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(tag)
+        return newSet
+      })
+    }
+  }
+
+  // 处理标签点击
+  const handleTagClick = (tag: string) => {
+    // 触发标签搜索事件，在当前页面显示标签内容
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tag-search', { detail: { tag } }))
+    }
+  }
+
   useEffect(() => {
     if (user) {
       loadGoals()
+      loadCheckInTags()
     }
-  }, [user, loadGoals])
+  }, [user, loadGoals, loadCheckInTags])
+
+  // 监听打卡列表刷新事件
+  useEffect(() => {
+    const handleCheckInRefresh = () => {
+      setCheckInLoading(true)
+      loadCheckInTags()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('checkin-refresh', handleCheckInRefresh)
+      return () => {
+        window.removeEventListener('checkin-refresh', handleCheckInRefresh)
+      }
+    }
+  }, [loadCheckInTags])
 
   // 添加目标
   const handleAddGoal = async () => {
@@ -248,21 +348,36 @@ export function GoalsTab({ user }: GoalsTabProps) {
   return (
     <TabsContent value="goals" className="h-full m-0 p-4 overflow-y-auto">
       <div className="space-y-4">
-        {/* 顶部操作栏 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium">我的目标</h2>
-            <span className="text-sm text-muted-foreground">({goals.length})</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowGoalInput(!showGoalInput)}
-            className="shrink-0"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        {/* Tab 切换 */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="goals" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              目标
+            </TabsTrigger>
+            <TabsTrigger value="checkin" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              打卡
+            </TabsTrigger>
+          </TabsList>
+
+          {/* 目标 Tab 内容 */}
+          <TabsContent value="goals" className="space-y-4 mt-4">
+            {/* 顶部操作栏 */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium">我的目标</h2>
+                <span className="text-sm text-muted-foreground">({goals.length})</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowGoalInput(!showGoalInput)}
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
 
         {/* 添加目标输入区域 */}
         {showGoalInput && (
@@ -462,6 +577,74 @@ export function GoalsTab({ user }: GoalsTabProps) {
             })}
           </div>
         )}
+          </TabsContent>
+
+          {/* 打卡 Tab 内容 */}
+          <TabsContent value="checkin" className="space-y-4 mt-4">
+            {/* 顶部标题 */}
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium">打卡列表</h2>
+              <span className="text-sm text-muted-foreground">({checkInTags.length})</span>
+            </div>
+
+            {/* 打卡列表内容 */}
+            {checkInLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">加载中...</span>
+              </div>
+            ) : checkInError ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>{checkInError}</p>
+              </div>
+            ) : checkInTags.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>暂无打卡标签</p>
+                <p className="text-sm">创建标签内容并启用打卡功能后，即可在此处打卡</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {checkInTags.map((tag) => (
+                  <Card key={tag._id} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        <Badge 
+                          variant="secondary" 
+                          className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                          onClick={() => handleTagClick(tag.tag)}
+                        >
+                          #{tag.tag}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          已打卡 {tag.checkInCount || 0} 次
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleCheckIn(tag.tag)}
+                        disabled={checkingInTags.has(tag.tag)}
+                        className="shrink-0"
+                      >
+                        {checkingInTags.has(tag.tag) ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            打卡中
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="h-4 w-4 mr-1" />
+                            打卡
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </TabsContent>
   )
