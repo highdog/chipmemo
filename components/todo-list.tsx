@@ -7,8 +7,459 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Save, XCircle, CheckSquare, Clock, CheckCircle, Edit, Info, Trash2, MoreVertical, ChevronUp, ChevronDown, Hash, X, Check } from "lucide-react"
+import { Loader2, Plus, Save, XCircle, CheckSquare, Clock, CheckCircle, Edit, Info, Trash2, MoreVertical, ChevronUp, ChevronDown, Hash, X, Check, GripVertical } from "lucide-react"
 import { apiClient } from "@/lib/api"
+import { type Todo } from "@/components/mobile/types"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+// 可拖拽的TodoItem组件
+function SortableTodoItem({ 
+  todo, 
+  priorityIndex, 
+  editingTodo, 
+  editContent, 
+  editStartDate, 
+  editDueDate, 
+  menuOpenTodo, 
+  orderSelectTodo, 
+  allTodos,
+  onToggleTodo, 
+  onEditTodo, 
+  onSaveEdit, 
+  onCancelEdit, 
+  onShowTodoDetail, 
+  onUpdateTodo, 
+  onDeleteTodo, 
+  onLoadTodos,
+  setEditContent,
+  setEditStartDate,
+  setEditDueDate,
+  setMenuOpenTodo,
+  setOrderSelectTodo,
+  getPriorityTextColor
+}: {
+  todo: Todo;
+  priorityIndex: number;
+  editingTodo: string | null;
+  editContent: string;
+  editStartDate: string;
+  editDueDate: string;
+  menuOpenTodo: string | null;
+  orderSelectTodo: string | null;
+  allTodos: Todo[];
+  onToggleTodo: (id: string) => void;
+  onEditTodo: (todo: Todo) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onShowTodoDetail: (todo: Todo) => void;
+  onUpdateTodo: (id: string, updates: Partial<Todo>) => void;
+  onDeleteTodo: (id: string) => void;
+  onLoadTodos: () => Promise<void>;
+  setEditContent: (content: string) => void;
+  setEditStartDate: (date: string) => void;
+  setEditDueDate: (date: string) => void;
+  setMenuOpenTodo: (id: string | null) => void;
+  setOrderSelectTodo: (id: string | null) => void;
+  getPriorityTextColor: (priority?: string) => string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: todo.id || (todo as any)._id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+
+
+  const handleDeleteTodo = async (todoId: string) => {
+    try {
+      await onDeleteTodo(todoId)
+      toast({
+        title: "成功",
+        description: "Todo已删除",
+      })
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "删除失败",
+        variant: "destructive",
+      })
+    }
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "p-2 rounded border bg-card hover:bg-accent/50 transition-colors",
+        todo.priority === 'high' && "border-l-4 border-l-red-500",
+        todo.priority === 'medium' && "border-l-4 border-l-yellow-500",
+        todo.priority === 'low' && "border-l-4 border-l-gray-400",
+        isDragging && "shadow-lg z-50"
+      )}
+    >
+      {editingTodo === todo.id ? (
+        // 编辑模式
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={todo.completed}
+              onCheckedChange={() => onToggleTodo(todo.id || (todo as any)._id)}
+              className="mt-0.5"
+            />
+            <Input
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="flex-1 text-sm"
+              placeholder="编辑todo内容"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 flex-1">
+              <label className="text-xs text-gray-600 whitespace-nowrap">起始日期:</label>
+              <Input
+                type="date"
+                value={editStartDate}
+                onChange={(e) => setEditStartDate(e.target.value)}
+                className="flex-1 text-xs"
+                placeholder="年/月/日"
+              />
+            </div>
+            <div className="flex items-center space-x-1 flex-1">
+              <label className="text-xs text-gray-600 whitespace-nowrap">截止日期:</label>
+              <Input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                className="flex-1 text-xs"
+                placeholder="年/月/日"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onCancelEdit}
+              className="h-6 px-2"
+            >
+              <XCircle className="h-3 w-3" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={onSaveEdit}
+              className="h-6 px-2"
+            >
+              <Save className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        // 显示模式
+        <div className="flex items-start space-x-2 p-2 rounded transition-colors">
+          <div className="flex flex-col items-center">
+            <Checkbox
+              id={todo.id || (todo as any)._id}
+              checked={todo.completed}
+              onCheckedChange={() => onToggleTodo(todo.id || (todo as any)._id)}
+              className="mt-0.5"
+            />
+            <div className="text-xs text-muted-foreground mt-1 font-mono">
+              #{priorityIndex}
+            </div>
+          </div>
+          <div 
+            className="flex-1 cursor-grab active:cursor-grabbing hover:bg-accent/50 p-1 rounded transition-colors"
+            {...attributes}
+            {...listeners}
+          >
+            <label
+              className={cn(
+                "text-sm block p-1 rounded",
+                todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority)
+              )}
+            >
+              {todo.content || todo.text}
+              {/* 标签跟在文字后面 */}
+              {(todo.tags && todo.tags.length > 0) && (
+                <span className="ml-2">
+                  {todo.tags.map((tag: string, index: number) => (
+                                 <span
+                                   key={index}
+                                   className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                                 >
+                                   #{tag}
+                                 </span>
+                               ))}
+                </span>
+              )}
+            </label>
+            {/* 显示日期信息 */}
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {todo.startDate && todo.dueDate ? (
+                <span>
+                  {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')} - {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
+                </span>
+              ) : todo.startDate ? (
+                <span>起始: {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
+              ) : todo.dueDate ? (
+                <span>截止: {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="relative">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  const newState = menuOpenTodo === (todo.id || (todo as any)._id) ? null : (todo.id || (todo as any)._id)
+                  setMenuOpenTodo(newState)
+                }}
+                className="h-6 w-6 p-0"
+              >
+                <MoreVertical className="h-3 w-3" />
+              </Button>
+              {menuOpenTodo === (todo.id || (todo as any)._id) && (
+                <div className="todo-menu absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[120px]">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onShowTodoDetail(todo)
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <Info className="h-3 w-3 mr-1" />
+                    查看详情
+                  </Button>
+                  <div className="border-t my-1"></div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onEditTodo(todo)
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <Edit className="h-3 w-3 mr-1" />
+                    编辑
+                  </Button>
+                  <div className="border-t my-1"></div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        const result = await apiClient.reorderTodo(todo.id || (todo as any)._id, 'up')
+                        if (!result.error) {
+                          await onLoadTodos()
+                          toast({
+                            title: "成功",
+                            description: "Todo已上移",
+                          })
+                        } else {
+                          toast({
+                            title: "错误",
+                            description: result.error || "上移失败",
+                            variant: "destructive",
+                          })
+                        }
+                      } catch (error) {
+                        toast({
+                          title: "错误",
+                          description: "上移失败",
+                          variant: "destructive",
+                        })
+                      }
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <ChevronUp className="h-3 w-3 mr-1" />
+                    上移
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        const result = await apiClient.reorderTodo(todo.id || (todo as any)._id, 'down')
+                        if (!result.error) {
+                          await onLoadTodos()
+                          toast({
+                            title: "成功",
+                            description: "Todo已下移",
+                          })
+                        } else {
+                          toast({
+                            title: "错误",
+                            description: result.error || "下移失败",
+                            variant: "destructive",
+                          })
+                        }
+                      } catch (error) {
+                        toast({
+                          title: "错误",
+                          description: "下移失败",
+                          variant: "destructive",
+                        })
+                      }
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <ChevronDown className="h-3 w-3 mr-1" />
+                    下移
+                  </Button>
+                  <div className="border-t my-1"></div>
+                  <div className="px-2 py-1 text-xs text-muted-foreground">序号</div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setOrderSelectTodo(orderSelectTodo === (todo.id || (todo as any)._id) ? null : (todo.id || (todo as any)._id))
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <Hash className="h-3 w-3 mr-1" />
+                    选择序号
+                  </Button>
+                  {orderSelectTodo === (todo.id || (todo as any)._id) && (() => {
+                    const samePriorityTodos = allTodos.filter(t => 
+                      t.priority === todo.priority && t.completed === todo.completed
+                    ).sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0))
+                    const currentIndex = samePriorityTodos.findIndex(t => (t.id || (t as any)._id) === (todo.id || (todo as any)._id)) + 1
+                    
+                    return (
+                      <div className="px-2 py-1 max-h-32 overflow-y-auto">
+                        {Array.from({ length: samePriorityTodos.length }, (_, i) => i + 1).map(orderNum => (
+                          <Button
+                            key={orderNum}
+                            size="sm"
+                            variant="ghost"
+                            onClick={async () => {
+                              try {
+                                const result = await apiClient.setTodoOrder(todo.id || (todo as any)._id, orderNum)
+                                if (!result.error) {
+                                  await onLoadTodos()
+                                  toast({
+                                    title: "成功",
+                                    description: `序号已设置为 ${orderNum}`,
+                                  })
+                                } else {
+                                  toast({
+                                    title: "错误",
+                                    description: result.error || "设置序号失败",
+                                    variant: "destructive",
+                                  })
+                                }
+                              } catch (error) {
+                                toast({
+                                  title: "错误",
+                                  description: "设置序号失败",
+                                  variant: "destructive",
+                                })
+                              }
+                              setOrderSelectTodo(null)
+                              setMenuOpenTodo(null)
+                            }}
+                            className={`w-full justify-start h-6 px-2 text-xs ${
+                              currentIndex === orderNum ? 'bg-accent' : ''
+                            }`}
+                          >
+                            #{orderNum}
+                          </Button>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                  <div className="border-t my-1"></div>
+                  <div className="px-2 py-1 text-xs text-muted-foreground">优先级</div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdateTodo(todo.id || (todo as any)._id, { priority: 'high' })
+                      setMenuOpenTodo(null)
+                    }}
+                    className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'high' ? 'bg-accent' : ''}`}
+                  >
+                    高优先级
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdateTodo(todo.id || (todo as any)._id, { priority: 'medium' })
+                      setMenuOpenTodo(null)
+                    }}
+                    className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'medium' || !todo.priority ? 'bg-accent' : ''}`}
+                  >
+                    中优先级
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdateTodo(todo.id || (todo as any)._id, { priority: 'low' })
+                      setMenuOpenTodo(null)
+                    }}
+                    className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'low' ? 'bg-accent' : ''}`}
+                  >
+                    低优先级
+                  </Button>
+                  <div className="border-t my-1"></div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      handleDeleteTodo(todo.id || (todo as any)._id)
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    删除
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // TodoList Component
 export const TodoList = React.memo(function TodoList({ 
@@ -49,25 +500,68 @@ export const TodoList = React.memo(function TodoList({
   const [newTodoContent, setNewTodoContent] = useState('')
   const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium')
 
+  // 拖拽传感器配置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // 处理拖拽结束事件
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const activeIndex = displayTodos.findIndex((todo: any) => (todo.id || todo._id) === active.id)
+    const overIndex = displayTodos.findIndex((todo: any) => (todo.id || todo._id) === over.id)
+
+    if (activeIndex !== -1 && overIndex !== -1) {
+      // 重新排列本地数组
+      const newTodos = arrayMove(displayTodos, activeIndex, overIndex)
+      
+      try {
+        // 调用后端API更新顺序
+        const activeTodo = displayTodos[activeIndex]
+        const targetOrder = overIndex + 1
+        
+        const result = await apiClient.setTodoOrder(activeTodo.id || (activeTodo as any)._id, targetOrder)
+        if (!result.error) {
+          await onLoadTodos()
+          toast({
+            title: "成功",
+            description: "Todo顺序已更新",
+          })
+        } else {
+          toast({
+            title: "错误",
+            description: result.error || "更新顺序失败",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "错误",
+          description: "更新顺序失败",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
   const selectedDateObj = new Date(selectedDate)
   
   // 获取所有todos并根据日期范围过滤
-  const allTodos: Array<{
-    id: string;
-    content: string;
-    completed: boolean;
-    tags: string[];
-    dueDate?: string;
-    startDate?: string;
-    priority: 'low' | 'medium' | 'high';
-    order?: number;
-  }> = Object.values(todosByDate)
+  const allTodos = Object.values(todosByDate)
     .flat()
     .filter((todo, index, self) => 
       // 去重
-      self.findIndex(t => t.id === todo.id) === index
+      self.findIndex(t => (t.id || (t as any)._id) === (todo.id || (todo as any)._id)) === index
     )
-    .filter(todo => {
+    .filter((todo) => {
       const hasStartDate = todo.startDate
       const hasDueDate = todo.dueDate
       
@@ -93,7 +587,7 @@ export const TodoList = React.memo(function TodoList({
     })
 
   // 获取所有标签
-  const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap(todo => todo.tags))), [allTodos])
+  const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap((todo) => todo.tags || []))), [allTodos])
 
   // 根据优先级获取文字颜色
   const getPriorityTextColor = (priority?: string) => {
@@ -135,7 +629,7 @@ export const TodoList = React.memo(function TodoList({
       // 其他模式：正常筛选
       filtered = selectedTag === 'all' 
         ? allTodos 
-        : allTodos.filter(todo => todo.tags.includes(selectedTag))
+        : allTodos.filter((todo) => (todo.tags || []).includes(selectedTag))
     }
     
     // 按优先级排序：高 > 中 > 低，然后按完成状态排序
@@ -154,8 +648,8 @@ export const TodoList = React.memo(function TodoList({
       }
       
       // 同优先级内按order字段排序
-      const aOrder = a.order || 0
-      const bOrder = b.order || 0
+      const aOrder = (a as any).order || 0
+      const bOrder = (b as any).order || 0
       return aOrder - bOrder
     })
   }, [selectedTag, allTodos])
@@ -186,8 +680,8 @@ export const TodoList = React.memo(function TodoList({
 
   const handleEditTodo = (todo: any) => {
     // handleEditTodo被调用
-    setEditingTodo(todo.id)
-    setEditContent(todo.content)
+    setEditingTodo(todo.id || (todo as any)._id)
+    setEditContent(todo.content || todo.text)
     setEditStartDate(todo.startDate || '')
     setEditDueDate(todo.dueDate || '')
   }
@@ -518,354 +1012,61 @@ export const TodoList = React.memo(function TodoList({
                   </p>
                 </div>
               )}
-              {displayTodos.map((todo, index) => {
-                // 计算当前todo在其优先级组内的序号
-                const samePriorityTodos = allTodos.filter(t => 
-                  t.priority === todo.priority && t.completed === todo.completed
-                ).sort((a, b) => (a.order || 0) - (b.order || 0))
-                const priorityIndex = samePriorityTodos.findIndex(t => t.id === todo.id) + 1
-                
-                return (
-                <div
-                  key={todo.id}
-                  className={cn(
-                    "p-2 rounded border bg-card hover:bg-accent/50 transition-colors",
-                    todo.priority === 'high' && "border-l-4 border-l-red-500",
-                    todo.priority === 'medium' && "border-l-4 border-l-yellow-500",
-                    todo.priority === 'low' && "border-l-4 border-l-gray-400",
-                    selectedTag === 'focus' && "ring-2 ring-orange-200 dark:ring-orange-800 bg-orange-50/50 dark:bg-orange-950/10"
-                  )}
+              
+              {/* 拖拽上下文 */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={displayTodos.map(todo => todo.id || (todo as any)._id).filter(Boolean)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  {editingTodo === todo.id ? (
-                    // 编辑模式
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          checked={todo.completed}
-                          onCheckedChange={() => handleToggleTodo(todo.id)}
-                          className="mt-0.5"
-                        />
-                        <Input
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          className="flex-1 text-sm"
-                          placeholder="编辑todo内容"
-                        />
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1 flex-1">
-                          <label className="text-xs text-gray-600 whitespace-nowrap">起始日期:</label>
-                          <Input
-                            type="date"
-                            value={editStartDate}
-                            onChange={(e) => setEditStartDate(e.target.value)}
-                            className="flex-1 text-xs"
-                            placeholder="年/月/日"
-                          />
-                        </div>
-                        <div className="flex items-center space-x-1 flex-1">
-                          <label className="text-xs text-gray-600 whitespace-nowrap">截止日期:</label>
-                          <Input
-                            type="date"
-                            value={editDueDate}
-                            onChange={(e) => setEditDueDate(e.target.value)}
-                            className="flex-1 text-xs"
-                            placeholder="年/月/日"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end space-x-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCancelEdit}
-                          className="h-6 px-2"
-                        >
-                          <XCircle className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveEdit}
-                          className="h-6 px-2"
-                        >
-                          <Save className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    // 显示模式
-                    <div className="flex items-start space-x-2">
-                      <div className="flex flex-col items-center">
-                        <Checkbox
-                          id={todo.id}
-                          checked={todo.completed}
-                          onCheckedChange={() => handleToggleTodo(todo.id)}
-                          className="mt-0.5"
-                        />
-                        <div className="text-xs text-muted-foreground mt-1 font-mono">
-                          #{priorityIndex}
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <label
-                          className={cn(
-                             "text-sm block cursor-pointer hover:bg-accent/50 p-1 rounded transition-colors",
-                             todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority)
-                           )}
-                          onClick={() => onShowTodoDetail({
-                            id: todo.id,
-                            content: todo.content,
-                            completed: todo.completed,
-                            tags: todo.tags,
-                            startDate: todo.startDate,
-                            dueDate: todo.dueDate,
-                            priority: todo.priority
-                          })}
-                        >
-                          {todo.content}
-                          {/* 标签跟在文字后面 */}
-                          {todo.tags.length > 0 && (
-                            <span className="ml-2">
-                              {todo.tags.map((tag, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
-                                >
-                                  #{tag}
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </label>
-                        {/* 显示日期信息 */}
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {todo.startDate && todo.dueDate ? (
-                            <span>
-                              {new Date(todo.startDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')} - {new Date(todo.dueDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
-                            </span>
-                          ) : todo.startDate ? (
-                            <span>起始: {new Date(todo.startDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
-                          ) : todo.dueDate ? (
-                            <span>截止: {new Date(todo.dueDate).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            // 三个小点按钮被点击
-                            const newState = menuOpenTodo === todo.id ? null : todo.id
-                            // 设置菜单状态
-                            setMenuOpenTodo(newState)
-                          }}
-                          className="h-6 w-6 p-0"
-                        >
-                          <MoreVertical className="h-3 w-3" />
-                        </Button>
-                        {menuOpenTodo === todo.id && (
-                          <div className="todo-menu absolute right-0 top-6 bg-background border rounded-md shadow-lg z-10 min-w-[120px]">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                // 编辑按钮被点击
-                                handleEditTodo(todo)
-                                setMenuOpenTodo(null)
-                              }}
-                              className="w-full justify-start h-8 px-2 text-xs"
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              编辑
-                            </Button>
-                            <div className="border-t my-1"></div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={async () => {
-                                try {
-                                  const result = await apiClient.reorderTodo(todo.id, 'up')
-                                  if (!result.error) {
-                                    await onLoadTodos()
-                                    toast({
-                                      title: "成功",
-                                      description: "Todo已上移",
-                                    })
-                                  } else {
-                                    toast({
-                                      title: "错误",
-                                      description: result.error || "上移失败",
-                                      variant: "destructive",
-                                    })
-                                  }
-                                } catch (error) {
-                                  toast({
-                                    title: "错误",
-                                    description: "上移失败",
-                                    variant: "destructive",
-                                  })
-                                }
-                                setMenuOpenTodo(null)
-                              }}
-                              className="w-full justify-start h-8 px-2 text-xs"
-                            >
-                              <ChevronUp className="h-3 w-3 mr-1" />
-                              上移
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={async () => {
-                                try {
-                                  const result = await apiClient.reorderTodo(todo.id, 'down')
-                                  if (!result.error) {
-                                    await onLoadTodos()
-                                    toast({
-                                      title: "成功",
-                                      description: "Todo已下移",
-                                    })
-                                  } else {
-                                    toast({
-                                      title: "错误",
-                                      description: result.error || "下移失败",
-                                      variant: "destructive",
-                                    })
-                                  }
-                                } catch (error) {
-                                  toast({
-                                    title: "错误",
-                                    description: "下移失败",
-                                    variant: "destructive",
-                                  })
-                                }
-                                setMenuOpenTodo(null)
-                              }}
-                              className="w-full justify-start h-8 px-2 text-xs"
-                            >
-                              <ChevronDown className="h-3 w-3 mr-1" />
-                              下移
-                            </Button>
-                            <div className="border-t my-1"></div>
-                            <div className="px-2 py-1 text-xs text-muted-foreground">序号</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setOrderSelectTodo(orderSelectTodo === todo.id ? null : todo.id)
-                              }}
-                              className="w-full justify-start h-8 px-2 text-xs"
-                            >
-                              <Hash className="h-3 w-3 mr-1" />
-                              选择序号
-                            </Button>
-                            {orderSelectTodo === todo.id && (() => {
-                              // 计算同优先级组内的todos数量
-                              const samePriorityTodos = allTodos.filter(t => 
-                                t.priority === todo.priority && t.completed === todo.completed
-                              ).sort((a, b) => (a.order || 0) - (b.order || 0))
-                              const currentIndex = samePriorityTodos.findIndex(t => t.id === todo.id) + 1
-                              
-                              return (
-                                <div className="px-2 py-1 max-h-32 overflow-y-auto">
-                                  {Array.from({ length: samePriorityTodos.length }, (_, i) => i + 1).map(orderNum => (
-                                    <Button
-                                      key={orderNum}
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={async () => {
-                                        try {
-                                          const result = await apiClient.setTodoOrder(todo.id, orderNum)
-                                          if (!result.error) {
-                                            await onLoadTodos()
-                                            toast({
-                                              title: "成功",
-                                              description: `序号已设置为 ${orderNum}`,
-                                            })
-                                          } else {
-                                            toast({
-                                              title: "错误",
-                                              description: result.error || "设置序号失败",
-                                              variant: "destructive",
-                                            })
-                                          }
-                                        } catch (error) {
-                                          toast({
-                                            title: "错误",
-                                            description: "设置序号失败",
-                                            variant: "destructive",
-                                          })
-                                        }
-                                        setOrderSelectTodo(null)
-                                        setMenuOpenTodo(null)
-                                      }}
-                                      className={`w-full justify-start h-6 px-2 text-xs ${
-                                        currentIndex === orderNum ? 'bg-accent' : ''
-                                      }`}
-                                    >
-                                      #{orderNum}
-                                    </Button>
-                                  ))}
-                                </div>
-                              )
-                            })()}
-                            <div className="border-t my-1"></div>
-                            <div className="px-2 py-1 text-xs text-muted-foreground">优先级</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                onUpdateTodo(todo.id, { priority: 'high' })
-                                setMenuOpenTodo(null)
-                              }}
-                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'high' ? 'bg-accent' : ''}`}
-                            >
-                              高优先级
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                onUpdateTodo(todo.id, { priority: 'medium' })
-                                setMenuOpenTodo(null)
-                              }}
-                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'medium' || !todo.priority ? 'bg-accent' : ''}`}
-                            >
-                              中优先级
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                onUpdateTodo(todo.id, { priority: 'low' })
-                                setMenuOpenTodo(null)
-                              }}
-                              className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'low' ? 'bg-accent' : ''}`}
-                            >
-                              低优先级
-                            </Button>
-                            <div className="border-t my-1"></div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                // 删除按钮被点击
-                                handleDeleteTodo(todo.id)
-                                setMenuOpenTodo(null)
-                              }}
-                              className="w-full justify-start h-8 px-2 text-xs text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" />
-                              删除
-                            </Button>
-                          </div>
+                  {displayTodos.map((todo, index) => {
+                    // 计算当前todo在其优先级组内的序号
+                    const samePriorityTodos = allTodos.filter(t => 
+                      t.priority === todo.priority && t.completed === todo.completed
+                    ).sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0))
+                    const priorityIndex = samePriorityTodos.findIndex(t => (t.id || (t as any)._id) === (todo.id || (todo as any)._id)) + 1
+                    
+                    return (
+                      <div
+                        key={todo.id || (todo as any)._id}
+                        className={cn(
+                          selectedTag === 'focus' && "ring-2 ring-orange-200 dark:ring-orange-800 bg-orange-50/50 dark:bg-orange-950/10"
                         )}
+                      >
+                        <SortableTodoItem
+                          todo={todo as any}
+                          priorityIndex={priorityIndex}
+                          editingTodo={editingTodo}
+                          editContent={editContent}
+                          editStartDate={editStartDate}
+                          editDueDate={editDueDate}
+                          menuOpenTodo={menuOpenTodo}
+                          orderSelectTodo={orderSelectTodo}
+                          allTodos={allTodos as any}
+                          onToggleTodo={handleToggleTodo}
+                          onEditTodo={handleEditTodo}
+                          onSaveEdit={handleSaveEdit}
+                          onCancelEdit={handleCancelEdit}
+                          onShowTodoDetail={onShowTodoDetail as any}
+                          onUpdateTodo={onUpdateTodo}
+                          onDeleteTodo={onDeleteTodo}
+                          onLoadTodos={onLoadTodos}
+                          setEditContent={setEditContent}
+                          setEditStartDate={setEditStartDate}
+                          setEditDueDate={setEditDueDate}
+                          setMenuOpenTodo={setMenuOpenTodo}
+                          setOrderSelectTodo={setOrderSelectTodo}
+                          getPriorityTextColor={getPriorityTextColor}
+                        />
                       </div>
-                    </div>
-                  )}
-                </div>
-                )
-              })}
+                    )
+                  })}
+                </SortableContext>
+              </DndContext>
             </div>
           ) : (
             <div className="text-center py-4 text-sm text-muted-foreground">
@@ -908,9 +1109,9 @@ export const TodoList = React.memo(function TodoList({
             {/* 按标签分列的Todo内容 */}
              <div className="flex-1 overflow-hidden p-2">
                {allTags.length > 0 ? (
-                 <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `repeat(${allTags.filter(tag => allTodos.filter(todo => todo.tags.includes(tag) && todo.tags[0] === tag).length > 0).length}, 1fr)` }}>
+                 <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `repeat(${allTags.filter(tag => allTodos.filter(todo => (todo.tags || []).includes(tag) && (todo.tags || [])[0] === tag).length > 0).length}, 1fr)` }}>
                   {allTags.map((tag) => {
-                      const tagTodos = allTodos.filter(todo => todo.tags.includes(tag) && todo.tags[0] === tag)
+                      const tagTodos = allTodos.filter(todo => (todo.tags || []).includes(tag) && (todo.tags || [])[0] === tag)
                      if (tagTodos.length === 0) return null
                      return (
                        <div key={tag} className="border rounded-lg p-2 flex flex-col">
@@ -921,19 +1122,19 @@ export const TodoList = React.memo(function TodoList({
                           </span>
                         </div>
                         <div className="flex-1 overflow-y-auto">
-                           {tagTodos.map((todo, index) => {
+                           {tagTodos.map((todo: any, index) => {
                              // 计算当前todo在其优先级组内的序号
                               const samePriorityTodos = allTodos.filter(t => 
                                 t.priority === todo.priority && t.completed === todo.completed
-                              ).sort((a, b) => (a.order || 0) - (b.order || 0))
-                              const priorityIndex = samePriorityTodos.findIndex(t => t.id === todo.id) + 1
+                              ).sort((a, b) => ((a as any).order || 0) - ((b as any).order || 0))
+                              const priorityIndex = samePriorityTodos.findIndex(t => (t.id || (t as any)._id) === (todo.id || (todo as any)._id)) + 1
                              
                              return (
-                             <div key={todo.id}>
+                             <div key={todo.id || (todo as any)._id}>
                                <div
                                   className="p-2 hover:bg-accent/50 transition-colors cursor-pointer relative"
                                  onClick={() => {
-                                   const newState = menuOpenTodo === todo.id ? null : todo.id
+                                   const newState = menuOpenTodo === (todo.id || (todo as any)._id) ? null : (todo.id || (todo as any)._id)
                                    setMenuOpenTodo(newState)
                                  }}
                                >
@@ -985,7 +1186,7 @@ export const TodoList = React.memo(function TodoList({
                                        onClick={async (e) => {
                                          e.stopPropagation()
                                          try {
-                                           const result = await apiClient.reorderTodo(todo.id, 'up')
+                                           const result = await apiClient.reorderTodo(todo.id || (todo as any)._id, 'up')
                                            if (!result.error) {
                                              await onLoadTodos()
                                              toast({
@@ -1019,7 +1220,7 @@ export const TodoList = React.memo(function TodoList({
                                        onClick={async (e) => {
                                          e.stopPropagation()
                                          try {
-                                           const result = await apiClient.reorderTodo(todo.id, 'down')
+                                           const result = await apiClient.reorderTodo(todo.id || (todo as any)._id, 'down')
                                            if (!result.error) {
                                              await onLoadTodos()
                                              toast({
@@ -1065,7 +1266,7 @@ export const TodoList = React.memo(function TodoList({
                                        variant="ghost"
                                        onClick={(e) => {
                                          e.stopPropagation()
-                                         handleToggleTodo(todo.id)
+                                         handleToggleTodo(todo.id || (todo as any)._id)
                                          setMenuOpenTodo(null)
                                        }}
                                        className="w-full justify-start h-8 px-3 text-xs"

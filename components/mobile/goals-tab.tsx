@@ -107,8 +107,8 @@ export function GoalsTab({ user }: GoalsTabProps) {
       const response = await tagContentsApi.getAll()
       
       if (response && response.data) {
-        const checkInData = response.data.filter((item: CheckInTag) => item.isCheckInEnabled)
-        setCheckInTags(checkInData)
+        const checkInData = response.data.filter((item: any) => item.isCheckInEnabled)
+        setCheckInTags(checkInData as any)
         setCheckInError(null)
       } else {
         setCheckInError('数据格式错误')
