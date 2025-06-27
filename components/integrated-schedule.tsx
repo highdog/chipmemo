@@ -3,10 +3,15 @@
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, X, Check, Calendar, Edit3 } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Textarea } from '@/components/ui/textarea'
+import { Plus, X, Check, Calendar, Edit3, CalendarIcon } from 'lucide-react'
 import { format, differenceInDays, isAfter, isToday, startOfDay, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { schedulesApi } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 interface ScheduleItem {
   id: string
@@ -29,10 +34,12 @@ interface IntegratedScheduleProps {
 
 const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate }) => {
   const [allSchedules, setAllSchedules] = useState<IntegratedScheduleItem[]>([])
-  const [isAdding, setIsAdding] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [newSchedule, setNewSchedule] = useState({
     title: '',
-    time: '',
+    time: '09:00',
+    date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
     type: 'event' as ScheduleItem['type']
   })
@@ -161,14 +168,13 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
   }, [selectedDate, allSchedules])
 
   const handleAddSchedule = async () => {
-    if (!newSchedule.title.trim() || !newSchedule.time.trim()) return
+    if (!newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()) return
 
     try {
-      const dateKey = format(selectedDate, 'yyyy-MM-dd')
       const response = await schedulesApi.create({
         title: newSchedule.title.trim(),
         time: newSchedule.time,
-        date: dateKey,
+        date: newSchedule.date,
         description: newSchedule.description.trim() || undefined,
         type: newSchedule.type
       })
@@ -177,8 +183,15 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
         // 触发自定义事件通知其他组件
         window.dispatchEvent(new CustomEvent('scheduleUpdated'))
         
-        setNewSchedule({ title: '', time: '', description: '', type: 'event' })
-        setIsAdding(false)
+        // 关闭弹框并重置表单
+        setIsDialogOpen(false)
+        setNewSchedule({ 
+          title: '', 
+          time: '09:00', 
+          date: format(new Date(), 'yyyy-MM-dd'), 
+          description: '', 
+          type: 'event' 
+        })
       }
     } catch (error) {
       console.error('添加日程失败:', error)
@@ -203,19 +216,21 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
     setNewSchedule({
       title: schedule.title,
       time: schedule.time,
+      date: schedule.date,
       description: schedule.description || '',
       type: schedule.type
     })
-    setIsAdding(false)
+    setIsEditDialogOpen(true)
   }
 
   const handleUpdateSchedule = async () => {
-    if (!editingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim()) return
+    if (!editingSchedule || !newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()) return
 
     try {
       const response = await schedulesApi.update(editingSchedule.id, {
         title: newSchedule.title.trim(),
         time: newSchedule.time,
+        date: newSchedule.date,
         description: newSchedule.description.trim() || undefined,
         type: newSchedule.type
       })
@@ -224,8 +239,9 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
         // 触发自定义事件通知其他组件
         window.dispatchEvent(new CustomEvent('scheduleUpdated'))
         
-        setNewSchedule({ title: '', time: '', description: '', type: 'event' })
+        setNewSchedule({ title: '', time: '09:00', date: format(new Date(), 'yyyy-MM-dd'), description: '', type: 'event' })
         setEditingSchedule(null)
+        setIsEditDialogOpen(false)
       }
     } catch (error) {
       console.error('更新日程失败:', error)
@@ -234,8 +250,8 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
 
   const handleCancelEdit = () => {
     setEditingSchedule(null)
-    setNewSchedule({ title: '', time: '', description: '', type: 'event' })
-    setIsAdding(false)
+    setNewSchedule({ title: '', time: '09:00', date: format(new Date(), 'yyyy-MM-dd'), description: '', type: 'event' })
+    setIsEditDialogOpen(false)
   }
 
   const getScheduleTypeColor = (type: string) => {
@@ -255,64 +271,276 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
     <div className="mt-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-medium text-sm">日程安排</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsAdding(true)}
-          className="h-6 w-6 p-0"
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open)
+          if (open) {
+            // 打开添加日程弹框时重置状态
+            setNewSchedule({ title: '', time: '09:00', date: format(new Date(), 'yyyy-MM-dd'), description: '', type: 'event' })
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">添加日程</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">日程标题</label>
+                <Input
+                  placeholder="请输入日程标题"
+                  value={newSchedule.title}
+                  onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">日期</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newSchedule.date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newSchedule.date ? format(new Date(newSchedule.date), 'yyyy年MM月dd日', { locale: zhCN }) : "选择日期"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={newSchedule.date ? new Date(newSchedule.date) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setNewSchedule(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }))
+                        }
+                      }}
+                      locale={zhCN}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">时间</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={newSchedule.time.split(':')[0] || '09'}
+                    onChange={(e) => {
+                      const minutes = newSchedule.time.split(':')[1] || '00'
+                      setNewSchedule(prev => ({ ...prev, time: `${e.target.value}:${minutes}` }))
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const hour = i.toString().padStart(2, '0')
+                      return <option key={hour} value={hour}>{hour}时</option>
+                    })}
+                  </select>
+                  <select
+                    value={newSchedule.time.split(':')[1] || '00'}
+                    onChange={(e) => {
+                      const hour = newSchedule.time.split(':')[0] || '09'
+                      setNewSchedule(prev => ({ ...prev, time: `${hour}:${e.target.value}` }))
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {Array.from({ length: 60 }, (_, i) => {
+                      const minute = i.toString().padStart(2, '0')
+                      return <option key={minute} value={minute}>{minute}分</option>
+                    })}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">描述（可选）</label>
+                <Textarea
+                  placeholder="请输入日程描述"
+                  value={newSchedule.description}
+                  onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsDialogOpen(false)
+                    setNewSchedule({ 
+                      title: '', 
+                      time: '09:00', 
+                      date: format(new Date(), 'yyyy-MM-dd'), 
+                      description: '', 
+                      type: 'event' 
+                    })
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={handleAddSchedule}
+                  disabled={!newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  添加日程
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* 编辑日程弹框 */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            // 关闭编辑弹框时重置状态
+            setEditingSchedule(null)
+            setNewSchedule({ title: '', time: '09:00', date: format(new Date(), 'yyyy-MM-dd'), description: '', type: 'event' })
+          }
+        }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-semibold">编辑日程</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">日程标题</label>
+                  <Input
+                    placeholder="请输入日程标题"
+                    value={newSchedule.title}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-1 block">选择日期</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !newSchedule.date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {newSchedule.date ? format(new Date(newSchedule.date), 'yyyy年MM月dd日') : "选择日期"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={newSchedule.date ? new Date(newSchedule.date) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            setNewSchedule(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }))
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-1 block">选择时间</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={newSchedule.time.split(':')[0] || '09'}
+                      onChange={(e) => {
+                        const minutes = newSchedule.time.split(':')[1] || '00'
+                        setNewSchedule(prev => ({ ...prev, time: `${e.target.value}:${minutes}` }))
+                      }}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const hour = i.toString().padStart(2, '0')
+                        return <option key={hour} value={hour}>{hour}时</option>
+                      })}
+                    </select>
+                    <select
+                      value={newSchedule.time.split(':')[1] || '00'}
+                      onChange={(e) => {
+                        const hour = newSchedule.time.split(':')[0] || '09'
+                        setNewSchedule(prev => ({ ...prev, time: `${hour}:${e.target.value}` }))
+                      }}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {Array.from({ length: 60 }, (_, i) => {
+                        const minute = i.toString().padStart(2, '0')
+                        return <option key={minute} value={minute}>{minute}分</option>
+                      })}
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-1 block">描述（可选）</label>
+                  <Textarea
+                    placeholder="请输入日程描述"
+                    value={newSchedule.description}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditDialogOpen(false)
+                    setEditingSchedule(null)
+                    setNewSchedule({ 
+                      title: '', 
+                      time: '', 
+                      date: format(new Date(), 'yyyy-MM-dd'), 
+                      description: '', 
+                      type: 'event' 
+                    })
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                   onClick={handleUpdateSchedule}
+                   disabled={!newSchedule.title.trim() || !newSchedule.time.trim() || !newSchedule.date.trim()}
+                   className="bg-blue-600 hover:bg-blue-700 text-white"
+                 >
+                   更新日程
+                 </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
       
       <div ref={scheduleListRef} className="space-y-1 max-h-64 overflow-y-auto">
         {/* 顶部空白区域 */}
         <div className="h-8"></div>
-        {/* 添加/编辑日程表单 */}
-        {(isAdding || editingSchedule) && (
-          <div className="space-y-2 p-2 border rounded-md bg-muted/50">
-            <Input
-              placeholder="日程标题"
-              value={newSchedule.title}
-              onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
-              className="text-xs h-7"
-            />
-            <Input
-              type="time"
-              step="600"
-              value={newSchedule.time}
-              onChange={(e) => setNewSchedule(prev => ({ ...prev, time: e.target.value }))}
-              className="text-xs h-7"
-            />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                onClick={editingSchedule ? handleUpdateSchedule : handleAddSchedule}
-                className="h-6 px-2 text-xs"
-                disabled={!newSchedule.title.trim() || !newSchedule.time.trim()}
-              >
-                <Check className="h-3 w-3 mr-1" />
-                {editingSchedule ? '更新' : '添加'}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelEdit}
-                className="h-6 px-2 text-xs"
-              >
-                <X className="h-3 w-3 mr-1" />
-                取消
-              </Button>
-            </div>
-          </div>
-        )}
+
 
         {/* 日程列表 */}
         {loading ? (
           <div className="text-center py-4 text-sm text-muted-foreground">
             加载中...
           </div>
-        ) : allSchedules.length === 0 && !isAdding ? (
+        ) : allSchedules.length === 0 ? (
           <div className="text-center py-4 text-sm text-muted-foreground">
             暂无日程安排
           </div>
