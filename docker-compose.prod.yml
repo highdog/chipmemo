@@ -72,7 +72,7 @@ services:
           memory: 256M
           cpus: '0.25'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3001/api/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -112,7 +112,7 @@ services:
           memory: 256M
           cpus: '0.25'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -130,10 +130,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ./nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./logs/nginx:/var/log/nginx
     depends_on:
       frontend:
