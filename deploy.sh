@@ -124,12 +124,12 @@ setup_environment() {
         # 替换默认值
         if [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS
-            sed -i '' "s/password123/$db_password/g" .env
-            sed -i '' "s/your-super-secret-jwt-key-change-this-in-production/$jwt_secret/g" .env
+            sed -i '' "s|password123|$db_password|g" .env
+            sed -i '' "s|your-super-secret-jwt-key-change-this-in-production|$jwt_secret|g" .env
         else
             # Linux
-            sed -i "s/password123/$db_password/g" .env
-            sed -i "s/your-super-secret-jwt-key-change-this-in-production/$jwt_secret/g" .env
+            sed -i "s|password123|$db_password|g" .env
+            sed -i "s|your-super-secret-jwt-key-change-this-in-production|$jwt_secret|g" .env
         fi
         
         if [ "$env_type" = "prod" ]; then
