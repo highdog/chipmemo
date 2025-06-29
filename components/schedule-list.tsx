@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Calendar } from '@/components/ui/calendar'
+import { SimpleCalendar } from '@/components/ui/simple-calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Plus, X, Edit2, Calendar as CalendarIcon } from 'lucide-react'
 import { format } from 'date-fns'
@@ -249,15 +249,13 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ selectedDate }) => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newSchedule.date ? new Date(newSchedule.date) : undefined}
-                    onSelect={(date) => {
+                  <SimpleCalendar
+                    value={newSchedule.date ? new Date(newSchedule.date) : null}
+                    onChange={(date) => {
                       if (date) {
                         setNewSchedule(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }))
                       }
                     }}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>

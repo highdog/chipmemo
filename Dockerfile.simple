@@ -1,0 +1,65 @@
+# 简化版一体化 Dockerfile
+# 用于快速测试和概念验证
+
+FROM node:18-bullseye
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    supervisor \
+    nginx \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 MongoDB
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add - \
+    && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list \
+    && apt-get update \
+    && apt-get install -y mongodb-org \
+    && rm -rf /var/lib/apt/lists/*
+
+# 配置 pnpm
+RUN npm install -g pnpm
+
+# 创建必要的目录
+RUN mkdir -p /data/db /var/log/mongodb /var/log/supervisor /var/log/nginx
+RUN chown -R mongodb:mongodb /data/db /var/log/mongodb
+RUN touch /var/log/mongodb/mongod.log
+RUN chown mongodb:mongodb /var/log/mongodb/mongod.log
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制整个项目
+COPY . .
+
+# 安装前端依赖并构建
+RUN npm install --legacy-peer-deps
+# 设置构建时环境变量
+ENV NEXT_PUBLIC_API_URL=/api
+RUN npm run build
+
+# 安装后端依赖
+WORKDIR /app/backend
+RUN npm ci --omit=dev --legacy-peer-deps
+
+# 回到根目录
+WORKDIR /app
+
+# 复制配置文件
+COPY docker-configs/nginx-default /etc/nginx/sites-available/default
+COPY docker-configs/mongod.conf /etc/mongod.conf
+COPY docker-configs/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN mkdir -p /docker-entrypoint-initdb.d
+COPY docker-configs/init-mongo.js /docker-entrypoint-initdb.d/init-mongo.js
+COPY docker-configs/start.sh /start.sh
+
+# 设置执行权限
+RUN chmod +x /start.sh
+
+# 暴露端口
+EXPOSE 80 3000 3001 27017
+
+# 启动脚本
+CMD ["/start.sh"]

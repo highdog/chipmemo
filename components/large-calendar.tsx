@@ -78,7 +78,12 @@ const LargeCalendar: React.FC<LargeCalendarProps> = ({ isOpen, onClose, selected
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+          <DialogTitle className="text-center">
+            <span className="text-lg font-semibold">
+              {format(currentMonth, 'yyyy年M月', { locale: zhCN })}
+            </span>
+          </DialogTitle>
+          <div className="flex items-center justify-center gap-2 mt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -86,9 +91,6 @@ const LargeCalendar: React.FC<LargeCalendarProps> = ({ isOpen, onClose, selected
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-lg font-semibold">
-              {format(currentMonth, 'yyyy年M月', { locale: zhCN })}
-            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -96,7 +98,7 @@ const LargeCalendar: React.FC<LargeCalendarProps> = ({ isOpen, onClose, selected
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-          </DialogTitle>
+          </div>
         </DialogHeader>
         
         <div className="grid grid-cols-7 gap-1 p-4">

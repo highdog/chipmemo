@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/lib/auth-context"
-import { Calendar } from "@/components/ui/calendar"
+import { SimpleCalendar } from "@/components/ui/simple-calendar"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { MarkdownEditor } from "@/components/markdown-editor"
@@ -448,7 +448,7 @@ export default function NotePad() {
   }
 
   // 处理日历日期选择
-  const handleDateSelect = (selectedDate: Date | undefined) => {
+  const handleDateSelect = (selectedDate: Date | null) => {
     if (selectedDate) {
       // 保留当前时间，只更新日期部分
       const currentTime = new Date()
@@ -817,7 +817,7 @@ export default function NotePad() {
       
       // 获取所有标签的固定内容和目标设置
       const tagContentsResponse = await tagContentsApi.getAll()
-      let allTagContents: Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number }> = []
+      let allTagContents: Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }> = []
       console.log('🔍 [导出调试] 标签固定内容API响应:', tagContentsResponse)
       if (tagContentsResponse.success && tagContentsResponse.data) {
         allTagContents = tagContentsResponse.data
@@ -3385,27 +3385,31 @@ export default function NotePad() {
             <div className="hidden md:flex md:flex-col w-1/4 bg-background border-r">
               {/* 日历区域 - 固定不滚动 */}
               <div className="p-4 border-b">
-                <div className="relative">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    className="rounded-md border"
-                    modifiers={{
-                      hasSchedule: (date) => {
-                        const dateKey = format(date, 'yyyy-MM-dd')
-                        return schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-sm">日历</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsLargeCalendarOpen(true)}
+                      title="展开大日历"
+                      className="h-6 px-2 text-xs"
+                    >
+                      展开
+                    </Button>
+                  </div>
+                  <SimpleCalendar
+                    value={date}
+                    onChange={(selectedDate) => {
+                      if (selectedDate) {
+                        handleDateSelect(selectedDate)
                       }
                     }}
-                    modifiersClassNames={{
-                      hasSchedule: "relative after:absolute after:bottom-1 after:left-1/2 after:transform after:-translate-x-1/2 after:w-1 after:h-1 after:bg-blue-500 after:rounded-full after:content-['']"
-                    }}
-                  />
-                  {/* 月份点击区域覆盖层 */}
-                  <div 
-                    className="absolute top-2 left-2 right-2 h-8 cursor-pointer z-10 hover:bg-muted/20 rounded transition-colors"
-                    onClick={() => setIsLargeCalendarOpen(true)}
-                    title="点击查看大日历"
+                    className="rounded-md"
+                    hasScheduleDates={Object.keys(schedulesByDate)
+                      .filter(dateKey => schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0)
+                      .map(dateKey => new Date(dateKey))
+                    }
                   />
                 </div>
               </div>
