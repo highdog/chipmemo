@@ -12,7 +12,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import { Plus, Tag, Trash2 } from "lucide-react"
 import { todosApi, notesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import { Todo, TagContent, TodoTabProps } from "./types"
+import { Todo, TagContent } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
 
 // 提取标签和清理内容的函数
@@ -29,7 +29,14 @@ const extractTagsAndCleanContent = (content: string): { cleanContent: string; ta
   return { cleanContent, tags }
 }
 
-export function TodoTab({ user }: TodoTabProps) {
+interface TodoTabProps {
+  user: any;
+  theme?: string;
+  triggerAdd?: boolean;
+  onAddTriggered?: () => void;
+}
+
+export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: TodoTabProps) {
   const toast = showToast
   // 待办相关状态
   const [todos, setTodos] = useState<Todo[]>([])
@@ -73,6 +80,14 @@ export function TodoTab({ user }: TodoTabProps) {
       loadTodos()
     }
   }, [user, loadTodos])
+
+  // 监听外部触发的添加操作
+  useEffect(() => {
+    if (triggerAdd) {
+      setIsDialogOpen(true)
+      onAddTriggered?.()
+    }
+  }, [triggerAdd, onAddTriggered])
 
   // 计算标签内容
   const tagContents = useMemo(() => {
@@ -247,15 +262,8 @@ export function TodoTab({ user }: TodoTabProps) {
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium">我的待办</h2>
-            <span className="text-sm text-muted-foreground">({todos.length})</span>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="shrink-0">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
             <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>
                 <DialogTitle>添加待办事项</DialogTitle>

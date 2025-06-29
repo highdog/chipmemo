@@ -12,11 +12,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Clock } from "lucide-react"
 import { schedulesApi } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import { Schedule, ScheduleTabProps } from "./types"
+import { Schedule } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
 import { startOfDay, differenceInDays, isToday, format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns"
 
-export function ScheduleTab({ user, activeTab }: ScheduleTabProps) {
+interface ScheduleTabProps {
+  user: any;
+  theme?: string;
+  activeTab: string;
+  triggerAdd?: boolean;
+  onAddTriggered?: () => void;
+}
+
+export function ScheduleTab({ user, theme, activeTab, triggerAdd = false, onAddTriggered }: ScheduleTabProps) {
   const toast = showToast
   // 日程相关状态
   const [schedules, setSchedules] = useState<Schedule[]>([])  
@@ -127,6 +135,14 @@ export function ScheduleTab({ user, activeTab }: ScheduleTabProps) {
     }
   }, [user, loadSchedules])
 
+  // 监听外部触发的添加操作
+  useEffect(() => {
+    if (triggerAdd) {
+      setIsDialogOpen(true)
+      onAddTriggered?.()
+    }
+  }, [triggerAdd, onAddTriggered])
+
   // 当切换到日程tab时，自动定位到当天或下一个有日程的日期
   useEffect(() => {
     if (activeTab === 'schedule' && schedules.length > 0) {
@@ -225,19 +241,9 @@ export function ScheduleTab({ user, activeTab }: ScheduleTabProps) {
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium">我的日程</h2>
             <span className="text-sm text-muted-foreground">({schedules.length})</span>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
             <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>
                 <DialogTitle>添加日程</DialogTitle>

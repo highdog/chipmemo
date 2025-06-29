@@ -39,6 +39,9 @@ function SimpleCalendar({
           const weekdays = ['日', '一', '二', '三', '四', '五', '六']
           return weekdays[date.getDay()]
         }}
+        formatDay={(locale, date) => {
+          return date.getDate().toString()
+        }}
         tileClassName={({ date, view }) => {
           if (view === 'month') {
             const hasSchedule = hasScheduleDates.some(scheduleDate => 
@@ -114,6 +117,7 @@ function SimpleCalendar({
         
         .react-calendar-custom .react-calendar__month-view__weekdays__weekday {
           padding: 0.25rem;
+          border-bottom: none;
         }
         
         .react-calendar-custom .react-calendar__month-view__days__day {

@@ -366,7 +366,6 @@ export function GoalsTab({ user }: GoalsTabProps) {
             {/* 顶部操作栏 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-medium">我的目标</h2>
                 <span className="text-sm text-muted-foreground">({goals.length})</span>
               </div>
               <Button
@@ -583,7 +582,6 @@ export function GoalsTab({ user }: GoalsTabProps) {
           <TabsContent value="checkin" className="space-y-4 mt-4">
             {/* 顶部标题 */}
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-medium">打卡列表</h2>
               <span className="text-sm text-muted-foreground">({checkInTags.length})</span>
             </div>
 

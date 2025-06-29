@@ -16,12 +16,12 @@ import {
   getNotes,
   searchNotesByTag,
   searchNotes,
-  type Note
+  type Note as ActionNote
 } from "@/lib/actions"
 import { formatDateShort, getDateKey, cn, extractTags } from "@/lib/utils"
-import { NotesTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
 import { uploadApi } from "@/lib/api"
+import { Note } from "./types"
 
 // 提取标签并清理内容的函数
 const extractTagsAndCleanContent = (content: string): { cleanContent: string; tags: string[] } => {
@@ -37,7 +37,14 @@ const extractTagsAndCleanContent = (content: string): { cleanContent: string; ta
   return { cleanContent, tags }
 }
 
-export function NotesTab({ user }: NotesTabProps) {
+interface NotesTabProps {
+  user?: any;
+  theme?: string;
+  triggerAdd?: boolean;
+  onAddTriggered?: () => void;
+}
+
+export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: NotesTabProps) {
   const toast = showToast
   // 笔记相关状态
   const [notes, setNotes] = useState<Note[]>([])
@@ -65,10 +72,26 @@ export function NotesTab({ user }: NotesTabProps) {
       const response = await getNotes(page, NOTES_PER_PAGE)
       const newNotes = response.notes || []
       
+      // 转换ActionNote到Note类型
+      const convertedNotes: Note[] = newNotes.map((actionNote: ActionNote) => ({
+        _id: actionNote.id,
+        title: actionNote.title,
+        content: actionNote.content,
+        originalContent: actionNote.originalContent || actionNote.content,
+        date: actionNote.date,
+        tags: actionNote.tags,
+        imageUrl: actionNote.imageUrl,
+        images: actionNote.imageUrl ? [actionNote.imageUrl] : [],
+        userId: '',
+        createdAt: actionNote.createdAt,
+        updatedAt: actionNote.createdAt,
+        attachments: actionNote.attachments
+      }))
+      
       if (append) {
-        setNotes(prev => [...prev, ...newNotes])
+        setNotes(prev => [...prev, ...convertedNotes])
       } else {
-        setNotes(newNotes)
+        setNotes(convertedNotes)
       }
       
       setHasMore(newNotes.length === NOTES_PER_PAGE)
@@ -93,6 +116,14 @@ export function NotesTab({ user }: NotesTabProps) {
       loadNotes()
     }
   }, [user]) // 移除loadNotes依赖，避免无限循环
+
+  // 监听外部触发的添加操作
+  useEffect(() => {
+    if (triggerAdd) {
+      setIsDialogOpen(true)
+      onAddTriggered?.()
+    }
+  }, [triggerAdd, onAddTriggered])
   
   // 清理定时器
   useEffect(() => {
@@ -333,7 +364,22 @@ export function NotesTab({ user }: NotesTabProps) {
     try {
       const searchResult = await searchNotesByTag(trimmedTag, 1, 1000)
       if (searchResult && searchResult.notes) {
-        setNotes(searchResult.notes)
+        // 转换ActionNote到Note类型
+        const convertedNotes: Note[] = searchResult.notes.map((actionNote: ActionNote) => ({
+          _id: actionNote.id,
+          title: actionNote.title,
+          content: actionNote.content,
+          originalContent: actionNote.originalContent || actionNote.content,
+          date: actionNote.date,
+          tags: actionNote.tags,
+          imageUrl: actionNote.imageUrl,
+          images: actionNote.imageUrl ? [actionNote.imageUrl] : [],
+          userId: '',
+          createdAt: actionNote.createdAt,
+          updatedAt: actionNote.createdAt,
+          attachments: actionNote.attachments
+        }))
+        setNotes(convertedNotes)
         setHasMore(false) // 搜索结果不支持分页
         toast({
           title: "标签搜索",
@@ -362,19 +408,8 @@ export function NotesTab({ user }: NotesTabProps) {
         {/* 顶部操作栏 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium">我的笔记</h2>
-            <span className="text-sm text-muted-foreground">({notes.length})</span>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
             <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>
                 <DialogTitle>添加笔记</DialogTitle>
@@ -535,7 +570,7 @@ export function NotesTab({ user }: NotesTabProps) {
                 {/* 日期标题 - 粘性定位 */}
                 <div className="sticky top-[-1rem] z-10 bg-background border-b border-border/40 flex items-center py-3 -mx-4 px-4 mb-2">
                   <h3 className="text-lg font-semibold text-foreground">{formatDateShort(new Date(dateKey))}</h3>
-                  <div className="ml-3 text-sm text-muted-foreground">{dayNotes.length} 条笔记</div>
+  
                 </div>
 
                 {/* 该日期下的所有笔记 */}
@@ -548,9 +583,9 @@ export function NotesTab({ user }: NotesTabProps) {
                     
                     return (
                       <div 
-                        key={note.id} 
+                        key={note._id} 
                         className="cursor-pointer"
-                        onClick={() => setSelectedNoteId(selectedNoteId === note.id ? null : note.id)}
+                        onClick={() => setSelectedNoteId(selectedNoteId === note._id ? null : note._id)}
                       >
                         {/* 笔记头部 - 时间在左边，删除按钮和标签在右边 */}
                         <div className="flex items-center justify-between mb-2">
@@ -561,13 +596,13 @@ export function NotesTab({ user }: NotesTabProps) {
                             })}
                           </div>
                           <div className="flex items-center gap-2">
-                            {selectedNoteId === note.id && (
+                            {selectedNoteId === note._id && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleDeleteNote(note.id)
+                                  handleDeleteNote(note._id)
                                 }}
                                 className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
                                 title="删除笔记"

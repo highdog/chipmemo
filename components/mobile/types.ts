@@ -73,3 +73,24 @@ export interface ScheduleTabProps extends MobileTabProps {
 
 export interface TodoTabProps extends MobileTabProps {
 }
+
+export interface Note {
+  _id: string;
+  title: string;
+  content: string;
+  originalContent?: string;
+  date: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
+  imageUrl?: string;
+  images?: string[];
+  attachments?: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+  }>;
+}
