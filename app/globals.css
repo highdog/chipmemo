@@ -20,6 +20,52 @@ body {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;  /* Chrome, Safari and Opera */
   }
+  
+  /* 鼠标悬停时显示滚动条 - 使用overlay方式避免挤压内容 */
+  .scrollbar-hover {
+    /* 默认隐藏滚动条 */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 0;
+    background: transparent;
+  }
+  
+  /* 悬停时显示滚动条 - 使用overlay模式 */
+  .scrollbar-hover:hover {
+    scrollbar-width: thin; /* Firefox */
+    -ms-overflow-style: auto; /* IE and Edge */
+  }
+  
+  .scrollbar-hover:hover::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+    position: absolute; /* 使滚动条浮动在内容上方 */
+  }
+  
+  .scrollbar-hover:hover::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    margin: 2px; /* 添加边距避免贴边 */
+  }
+  
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.4);
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    border: 1px solid transparent; /* 添加透明边框增加视觉分离 */
+  }
+  
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.7);
+  }
+  
+  /* 确保滚动条不占用布局空间 */
+  .scrollbar-hover:hover::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @layer base {

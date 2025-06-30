@@ -238,7 +238,7 @@ function SortableTodoItem({
                                    key={index}
                                    className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
                                  >
-                                   #{tag}
+                                   {tag}
                                  </span>
                                ))}
                 </span>
@@ -736,7 +736,7 @@ export const TodoList = React.memo(function TodoList({
   return (
     <div className="flex flex-col h-full">
       {/* 固定的标题和标签筛选区域 */}
-      <div className="p-2 border-b bg-background">
+      <div className="p-2 bg-background">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <h3 
@@ -906,26 +906,30 @@ export const TodoList = React.memo(function TodoList({
             >
               专注
             </button>
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(tag)}
-                className={cn(
-                  "px-2 py-1 text-xs rounded border transition-colors",
-                  selectedTag === tag 
-                    ? "bg-primary text-primary-foreground border-primary" 
-                    : "bg-background text-muted-foreground border-border hover:bg-accent"
-                )}
-              >
-                #{tag}
-              </button>
-            ))}
+            {allTags.map((tag) => {
+              // 计算该标签的todo数量
+              const tagTodoCount = allTodos.filter(todo => (todo.tags || []).includes(tag)).length
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className={cn(
+                    "px-2 py-1 text-xs rounded border transition-colors",
+                    selectedTag === tag 
+                      ? "bg-primary text-primary-foreground border-primary" 
+                      : "bg-background text-muted-foreground border-border hover:bg-accent"
+                  )}
+                >
+                  {tag} ({tagTodoCount})
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
 
       {/* 可滚动的Todo列表区域 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-hover">
         <div className="p-2">
           {/* 添加新Todo按钮 - 仅在选择了特定标签时显示，但不包括专注模式 */}
           {selectedTag !== 'all' && selectedTag !== 'focus' && (
@@ -936,7 +940,7 @@ export const TodoList = React.memo(function TodoList({
                 variant="outline"
               >
                 <Plus className="h-3 w-3 mr-1" />
-                添加 #{selectedTag} 标签的Todo
+                添加 {selectedTag} 标签的Todo
               </Button>
               
               {/* 新建todo区域 - 紧跟在按钮下面 */}
@@ -945,7 +949,7 @@ export const TodoList = React.memo(function TodoList({
                   <Input
                     value={newTodoContent}
                     onChange={(e) => setNewTodoContent(e.target.value)}
-                    placeholder={`输入 #${newTodoTag} 标签的todo内容...`}
+                    placeholder={`输入 ${newTodoTag} 标签的todo内容...`}
                     className="text-sm h-8 mb-2"
                     onKeyDown={async (e) => {
                       // 禁用回车键添加功能，只允许多行输入
@@ -1235,7 +1239,7 @@ export const TodoList = React.memo(function TodoList({
                      return (
                        <div key={tag} className="border rounded-lg p-2 flex flex-col">
                         <div className="flex items-center justify-between mb-3 pb-2 border-b">
-                          <h3 className="font-medium text-sm">#{tag}</h3>
+                          <h3 className="font-medium text-sm">{tag}</h3>
                           <span className="text-xs text-muted-foreground">
                             {tagTodos.filter(t => t.completed).length}/{tagTodos.length}
                           </span>
