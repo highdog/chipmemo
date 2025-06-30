@@ -587,7 +587,7 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate, o
                   <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
                     <span className={`text-sm font-medium ${
                       isPast ? 'text-gray-400 dark:text-gray-500' : 
-                      isToday ? 'text-green-600 dark:text-green-400' : 
+                      isToday ? 'text-black dark:text-white' : 
                       'text-foreground'
                     }`}>
                       {format(new Date(schedule.date), 'MM-dd')} {schedule.time}
@@ -624,7 +624,7 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate, o
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                   isPast ? 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800/20' :
                   schedule.isToday 
-                    ? 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20' 
+                    ? 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/20' 
                     : 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/20'
                 }`}>
                   {schedule.displayDate}

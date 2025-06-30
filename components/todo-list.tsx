@@ -784,7 +784,12 @@ export const TodoList = React.memo(function TodoList({
                     />
                     <TagSuggestion
                       inputValue={newTodoContent}
-                      onTagSelect={setNewTodoContent}
+                      onTagSelect={(newValue) => {
+                        setNewTodoContent(newValue)
+                        if (tagInputRef.current) {
+                          tagInputRef.current.focus()
+                        }
+                      }}
                       inputRef={tagInputRef}
                     />
                   </div>

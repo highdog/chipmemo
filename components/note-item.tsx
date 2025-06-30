@@ -370,9 +370,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
                       onTagClick(tag)
                     }
                   }}
-                >
-                  #{tag}
-                </Badge>
+                >                  <Tag className="h-3 w-3 mr-1" />                  {tag}                </Badge>
               ))}
               {note.tags.length > 3 && (
                 <Badge variant="outline" className="text-xs">

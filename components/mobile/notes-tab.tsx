@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ImageViewer } from "@/components/image-viewer"
 import { TabsContent } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, X, Image, ZoomIn } from "lucide-react"
+import { Plus, Search, Edit, Trash2, X, Image, ZoomIn, Tag } from "lucide-react"
 import { 
   addNote,
   deleteNote,
@@ -622,9 +622,7 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
                                       e.stopPropagation()
                                       handleTagClick(tag)
                                     }}
-                                  >
-                                    #{tag}
-                                  </Badge>
+                                  >                                    <Tag className="h-3 w-3 mr-1" />                                    {tag}                                  </Badge>
                                 ))}
                                 {tags.length > 3 && (
                                   <Badge variant="outline" className="text-xs">

@@ -22,6 +22,7 @@ import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
 import { SearchBar } from "@/components/search-bar"
+import { TagSuggestion } from "@/components/tag-suggestion"
 
 import IntegratedSchedule from "@/components/integrated-schedule"
 import GoalsList from "@/components/goals-list"
@@ -3581,7 +3582,8 @@ export default function NotePad() {
               {/* 输入区域 - 放在最上面 - 标签搜索时隐藏 */}
               {!searchTerm.startsWith('#') && (
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 relative z-10">
-                <div className="mb-2 flex items-center justify-end">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">笔记</h3>
                   {/* 添加按钮 */}
                   <Button onClick={handleAddNote} disabled={isMainButtonDisabled} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (
@@ -3605,7 +3607,17 @@ export default function NotePad() {
                       className="flex-1 min-h-[80px] resize-none font-mono text-sm"
                       disabled={isAdding}
                     />
-
+                    <TagSuggestion
+                      inputValue={inputValue}
+                      onTagSelect={(newValue) => {
+                        setInputValue(newValue)
+                        if (textareaRef.current) {
+                          textareaRef.current.focus()
+                        }
+                      }}
+                      inputRef={textareaRef}
+                      disabled={isAdding}
+                    />
                   </div>
                   
                   {/* 图片上传和预览区域 */}
@@ -3900,9 +3912,7 @@ export default function NotePad() {
                         <span
                           key={index}
                           className="inline-flex items-center px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        >
-                          #{tag}
-                        </span>
+                        >                          <Tag className="h-3 w-3 mr-1" />                          {tag}                        </span>
                       ))}
                     </div>
                   </div>
