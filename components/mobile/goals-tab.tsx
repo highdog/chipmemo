@@ -127,17 +127,11 @@ export function GoalsTab({ user }: GoalsTabProps) {
       
       const response = await tagContentsApi.checkIn(tag)
       
-      if (response.success) {
-        toast({ title: '打卡成功！', description: `已为 #${tag} 创建打卡笔记` })
+      if (response.success && response.data) {
+        toast({ title: '打卡成功！', description: `已为 #${tag} 创建打卡笔记，当前已打卡${response.data.checkInCount}次` })
         
-        // 更新本地状态
-        setCheckInTags(prev => 
-          prev.map(item => 
-            item.tag === tag 
-              ? { ...item, checkInCount: (item.checkInCount || 0) + 1 }
-              : item
-          )
-        )
+        // 重新加载打卡数据以确保数据同步
+        await loadCheckInTags()
         
         // 触发笔记刷新事件
         if (typeof window !== 'undefined') {
@@ -147,6 +141,7 @@ export function GoalsTab({ user }: GoalsTabProps) {
         toast({ title: '打卡失败', description: '请稍后重试', variant: 'destructive' })
       }
     } catch (error: any) {
+      console.error('打卡失败:', error)
       toast({ title: '打卡失败', description: error.message || '请稍后重试', variant: 'destructive' })
     } finally {
       setCheckingInTags(prev => {
@@ -186,6 +181,20 @@ export function GoalsTab({ user }: GoalsTabProps) {
       }
     }
   }, [loadCheckInTags])
+
+  // 监听目标列表刷新事件
+  useEffect(() => {
+    const handleGoalsRefresh = () => {
+      loadGoals()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('goals-list-refresh', handleGoalsRefresh)
+      return () => {
+        window.removeEventListener('goals-list-refresh', handleGoalsRefresh)
+      }
+    }
+  }, [loadGoals])
 
   // 添加目标
   const handleAddGoal = async () => {
@@ -248,7 +257,7 @@ export function GoalsTab({ user }: GoalsTabProps) {
       // 如果是勾选（进度+1），自动创建笔记
       if (!wasChecked) {
         const noteTitle = `${selectedGoal.tag} 目标进度 +1`
-        const noteContent = `完成了 #${selectedGoal.tag} 标签的一个目标项目，当前进度：${newCurrentCount}/${selectedGoal.targetCount}`
+        const noteContent = `完成了 ${selectedGoal.tag.replace('#', '')} 的一个目标进度，当前进度：${newCurrentCount}/${selectedGoal.targetCount}`
         
         const noteData = {
           title: noteTitle,
@@ -280,6 +289,9 @@ export function GoalsTab({ user }: GoalsTabProps) {
       
       // 触发目标列表刷新
       window.dispatchEvent(new CustomEvent('goals-list-refresh'))
+      
+      // 重新加载目标数据以确保数据同步
+      await loadGoals()
       
     } catch (error: any) {
       console.error('更新进度失败:', error)
@@ -427,7 +439,13 @@ export function GoalsTab({ user }: GoalsTabProps) {
         )}
         
         {/* 目标进度弹框 */}
-        <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
+        <Dialog open={showGoalDialog} onOpenChange={(open) => {
+          setShowGoalDialog(open)
+          // 弹框关闭时重新加载目标数据以确保列表显示最新状态
+          if (!open) {
+            loadGoals()
+          }
+        }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">

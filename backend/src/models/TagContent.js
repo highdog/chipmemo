@@ -9,7 +9,7 @@ const tagContentSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: [true, 'Content is required'],
+    required: false,
     maxlength: [100000, 'Content cannot exceed 100000 characters']
   },
   userId: {

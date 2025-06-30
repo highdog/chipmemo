@@ -67,7 +67,7 @@ router.get('/:tag', [
 // @access  Private
 router.put('/:tag', [
   param('tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Tag must be between 1 and 50 characters'),
-  body('content').isString().isLength({ min: 1, max: 100000 }).withMessage('Content must be between 1 and 100000 characters'),
+  body('content').isString().isLength({ min: 0, max: 100000 }).withMessage('Content must be between 0 and 100000 characters'),
   body('isGoalEnabled').optional().isBoolean().withMessage('isGoalEnabled must be a boolean'),
   body('targetCount').optional().isInt({ min: 0 }).withMessage('targetCount must be a non-negative integer'),
   body('currentCount').optional().isInt({ min: 0 }).withMessage('currentCount must be a non-negative integer'),
@@ -368,16 +368,17 @@ router.post('/:tag/check-in', [
       return res.status(400).json({ error: 'Check-in is not enabled for this tag' });
     }
 
-    // 先查询该标签的笔记数量来确定打卡次数
-    const Note = require('../models/Note');
-    const existingNotesCount = await Note.countDocuments({
-      userId: req.user._id,
-      tags: tag
-    });
+    // 先增加打卡次数
+    const updatedTagContent = await TagContent.findOneAndUpdate(
+      { userId: req.user._id, tag: tag },
+      { $inc: { checkInCount: 1 } },
+      { new: true, runValidators: true }
+    );
     
-    const newCheckInCount = existingNotesCount + 1;
+    const newCheckInCount = updatedTagContent.checkInCount;
     
     // 创建打卡笔记
+    const Note = require('../models/Note');
     const noteContent = `${tag}打卡，已打卡${newCheckInCount}次`;
     
     const note = new Note({
@@ -389,13 +390,6 @@ router.post('/:tag/check-in', [
     });
 
     await note.save();
-    
-    // 更新打卡次数
-    const updatedTagContent = await TagContent.findOneAndUpdate(
-      { userId: req.user._id, tag: tag },
-      { checkInCount: newCheckInCount },
-      { new: true, runValidators: true }
-    );
 
     res.json({
       success: true,
