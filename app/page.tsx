@@ -3385,38 +3385,24 @@ export default function NotePad() {
             <div className="hidden md:flex md:flex-col w-1/4 bg-background border-r">
               {/* 日历区域 - 固定不滚动 */}
               <div className="p-4 border-b">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-sm">日历</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsLargeCalendarOpen(true)}
-                      title="展开大日历"
-                      className="h-6 px-2 text-xs"
-                    >
-                      展开
-                    </Button>
-                  </div>
-                  <SimpleCalendar
-                    value={date}
-                    onChange={(selectedDate) => {
-                      if (selectedDate) {
-                        handleDateSelect(selectedDate)
-                      }
-                    }}
-                    className="rounded-md"
-                    hasScheduleDates={Object.keys(schedulesByDate)
-                      .filter(dateKey => schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0)
-                      .map(dateKey => new Date(dateKey))
+                <SimpleCalendar
+                  value={date}
+                  onChange={(selectedDate) => {
+                    if (selectedDate) {
+                      handleDateSelect(selectedDate)
                     }
-                  />
-                </div>
+                  }}
+                  className="rounded-md"
+                  hasScheduleDates={Object.keys(schedulesByDate)
+                    .filter(dateKey => schedulesByDate[dateKey] && schedulesByDate[dateKey].length > 0)
+                    .map(dateKey => new Date(dateKey))
+                  }
+                />
               </div>
               
               {/* 整合日程区域 - 固定不滚动 */}
               <div className="p-4 border-b">
-                <IntegratedSchedule selectedDate={date} />
+                <IntegratedSchedule selectedDate={date} onTitleClick={() => setIsLargeCalendarOpen(true)} />
               </div>
               
               {/* 目标和打卡区域 */}

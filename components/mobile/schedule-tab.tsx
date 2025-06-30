@@ -237,12 +237,9 @@ export function ScheduleTab({ user, theme, activeTab, triggerAdd = false, onAddT
   return (
     <TabsContent value="schedule" className="h-full m-0 flex flex-col">
       {/* 固定顶部区域 */}
-      <div className="flex-shrink-0 p-4 space-y-4 border-b">
+      <div className="flex-shrink-0 p-4 space-y-2 border-b">
         {/* 顶部操作栏 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">({schedules.length})</span>
-          </div>
+        <div className="flex items-center justify-end">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent className="sm:max-w-md fixed top-36 left-1/2 transform -translate-x-1/2">
               <DialogHeader>

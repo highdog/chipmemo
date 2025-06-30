@@ -30,9 +30,10 @@ interface IntegratedScheduleItem extends ScheduleItem {
 
 interface IntegratedScheduleProps {
   selectedDate: Date
+  onTitleClick?: () => void
 }
 
-const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate }) => {
+const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate, onTitleClick }) => {
   const [allSchedules, setAllSchedules] = useState<IntegratedScheduleItem[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -294,7 +295,13 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-sm">日程安排</h3>
+        <h3 
+          className="font-medium text-sm cursor-pointer hover:text-blue-600 transition-colors" 
+          onClick={onTitleClick}
+          title="点击展开大日历"
+        >
+          日程安排
+        </h3>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open)
           if (open) {
@@ -549,7 +556,7 @@ const IntegratedSchedule: React.FC<IntegratedScheduleProps> = ({ selectedDate })
         </Dialog>
       </div>
       
-      <div ref={scheduleListRef} className="space-y-1 max-h-64 overflow-y-auto">
+      <div ref={scheduleListRef} className="space-y-1 max-h-64 overflow-y-auto scrollbar-hide">
         {/* 顶部空白区域 */}
         <div className="h-8"></div>
 
