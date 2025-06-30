@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
 import { TagSuggestion } from "@/components/tag-suggestion"
 import { Loader2, Plus, Save, XCircle, CheckSquare, Clock, CheckCircle, Edit, Info, Trash2, MoreVertical, ChevronUp, ChevronDown, Hash, X, Check, GripVertical } from "lucide-react"
 import { apiClient } from "@/lib/api"
@@ -397,6 +399,7 @@ export const TodoList = React.memo(function TodoList({
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
+  const [selectedPriority, setSelectedPriority] = useState<'high' | 'medium' | 'low'>('high')
   const [editingTodo, setEditingTodo] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
@@ -499,8 +502,18 @@ export const TodoList = React.memo(function TodoList({
       }
     })
 
-  // 获取所有标签
-  const allTags = useMemo(() => Array.from(new Set(allTodos.flatMap((todo) => todo.tags || []))), [allTodos])
+  // 获取所有标签，按照标签对应的todo数量排序（数量多的在前面）
+  const allTags = useMemo(() => {
+    const tagSet = new Set(allTodos.flatMap((todo) => todo.tags || []))
+    const tagsArray = Array.from(tagSet)
+    
+    // 计算每个标签的todo数量并排序
+    return tagsArray.sort((a, b) => {
+      const countA = allTodos.filter(todo => (todo.tags || []).includes(a)).length
+      const countB = allTodos.filter(todo => (todo.tags || []).includes(b)).length
+      return countB - countA // 降序排列，数量多的在前面
+    })
+  }, [allTodos])
 
   // 根据优先级和序号获取文字颜色
   const getPriorityTextColor = (priority?: string, priorityIndex?: number) => {
@@ -549,8 +562,9 @@ export const TodoList = React.memo(function TodoList({
     } else {
       // 其他模式：正常筛选
       if (selectedTag === 'all') {
-        // all列表不显示无优先级的待办事项
-        filtered = allTodos.filter((todo) => todo.priority && todo.priority !== 'none')
+        // all列表根据优先级筛选
+        // 显示指定优先级的待办事项
+        filtered = allTodos.filter((todo) => todo.priority === selectedPriority)
       } else {
         // 标签列表显示所有匹配标签的待办事项，包括无优先级的
         filtered = allTodos.filter((todo) => (todo.tags || []).includes(selectedTag))
@@ -577,7 +591,7 @@ export const TodoList = React.memo(function TodoList({
       const bOrder = (b as any).order || 0
       return aOrder - bOrder
     })
-  }, [selectedTag, allTodos])
+  }, [selectedTag, selectedPriority, allTodos])
 
   const loadTodos = async () => {
     setIsLoading(true)
@@ -678,6 +692,12 @@ export const TodoList = React.memo(function TodoList({
       // 提取所有标签
       while ((match = tagRegex.exec(content)) !== null) {
         tags.push(match[1])
+      }
+      
+      // 验证：如果优先级为'none'且没有标签，则不能提交
+      if (newTodoPriority === 'none' && tags.length === 0) {
+        toast({ title: "优先级为无时，必须添加至少一个标签", variant: "destructive" })
+        return
       }
       
       // 移除标签，保留纯文本内容
@@ -871,7 +891,7 @@ export const TodoList = React.memo(function TodoList({
                 </Button>
                 <Button
                   onClick={handleAddTodo}
-                  disabled={!newTodoContent.trim()}
+                  disabled={!newTodoContent.trim() || (newTodoPriority === 'none' && !/#[^\s#]+/.test(newTodoContent))}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   添加Todo
@@ -885,7 +905,21 @@ export const TodoList = React.memo(function TodoList({
         <div className="mb-3">
           <div className="flex flex-wrap gap-1">
             <button
-              onClick={() => setSelectedTag('all')}
+              onClick={() => {
+                setSelectedTag('all')
+                // 智能选择优先级：如果高优先级数量为0，则选择中优先级；如果中优先级也为0，则选择低优先级
+                const highCount = allTodos.filter(todo => todo.priority === 'high').length
+                const mediumCount = allTodos.filter(todo => todo.priority === 'medium').length
+                const lowCount = allTodos.filter(todo => todo.priority === 'low').length
+                
+                if (highCount > 0) {
+                  setSelectedPriority('high')
+                } else if (mediumCount > 0) {
+                  setSelectedPriority('medium')
+                } else {
+                  setSelectedPriority('low')
+                }
+              }}
               className={cn(
                 "px-2 py-1 text-xs rounded border transition-colors",
                 selectedTag === 'all' 
@@ -896,7 +930,10 @@ export const TodoList = React.memo(function TodoList({
               All
             </button>
             <button
-              onClick={() => setSelectedTag('focus')}
+              onClick={() => {
+                setSelectedTag('focus')
+                setSelectedPriority('high')
+              }}
               className={cn(
                 "px-2 py-1 text-xs rounded border transition-colors",
                 selectedTag === 'focus' 
@@ -912,19 +949,61 @@ export const TodoList = React.memo(function TodoList({
               return (
                 <button
                   key={tag}
-                  onClick={() => setSelectedTag(tag)}
+                  onClick={() => {
+                    setSelectedTag(tag)
+                    setSelectedPriority('high')
+                  }}
                   className={cn(
-                    "px-2 py-1 text-xs rounded border transition-colors",
+                    "px-2 py-1 text-xs rounded border transition-colors flex items-center gap-1",
                     selectedTag === tag 
                       ? "bg-primary text-primary-foreground border-primary" 
                       : "bg-background text-muted-foreground border-border hover:bg-accent"
                   )}
                 >
-                  {tag} ({tagTodoCount})
+                  <span>{tag}</span>
+                  <span className={cn(
+                    "text-xs font-medium",
+                    selectedTag === tag 
+                      ? "text-primary-foreground/80" 
+                      : "text-blue-500"
+                  )}>
+                    {tagTodoCount}
+                  </span>
                 </button>
               )
             })}
           </div>
+          
+          {/* 优先级筛选 - 仅在选择all标签时显示 */}
+          {selectedTag === 'all' && (
+            <>
+              <Separator className="my-2" />
+              <div className="mt-2">
+              <Tabs value={selectedPriority} onValueChange={(value) => setSelectedPriority(value as 'high' | 'medium' | 'low')} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="high" className="text-xs flex items-center gap-1">
+                    <span>高</span>
+                    <span className="text-xs font-medium text-red-500">
+                      {allTodos.filter(todo => todo.priority === 'high').length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="medium" className="text-xs flex items-center gap-1">
+                    <span>中</span>
+                    <span className="text-xs font-medium text-yellow-500">
+                      {allTodos.filter(todo => todo.priority === 'medium').length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="low" className="text-xs flex items-center gap-1">
+                    <span>低</span>
+                    <span className="text-xs font-medium text-green-500">
+                      {allTodos.filter(todo => todo.priority === 'low').length}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

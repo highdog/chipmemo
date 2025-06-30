@@ -113,7 +113,10 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
       }
     ]
     
-    Object.entries(tagCounts).forEach(([tag, count]) => {
+    // 将标签按照数量排序（数量多的在前面）
+    const sortedTagEntries = Object.entries(tagCounts).sort(([, countA], [, countB]) => countB - countA)
+    
+    sortedTagEntries.forEach(([tag, count]) => {
       contents.push({ 
         _id: `tag-${tag}`,
         tag: tag,
@@ -155,6 +158,13 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
     try {
       // 解析输入内容中的标签
       const { cleanContent, tags } = extractTagsAndCleanContent(newTodo.trim())
+      
+      // 验证：如果优先级为'none'且没有标签，则不能提交
+      if (newTodoPriority === 'none' && tags.length === 0) {
+        toast({ title: "优先级为无时，必须添加至少一个标签", variant: "destructive" })
+        setIsAddingTodo(false)
+        return
+      }
       
       await todosApi.create({
         text: cleanContent,
@@ -329,7 +339,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleAddTodo} 
-                    disabled={isAddingTodo || !newTodo.trim()}
+                    disabled={isAddingTodo || !newTodo.trim() || (newTodoPriority === 'none' && !/#[^\s#]+/.test(newTodo))}
                     className="flex-1"
                   >
                     {isAddingTodo ? "添加中..." : "添加"}

@@ -15,6 +15,7 @@ import remarkBreaks from 'remark-breaks'
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { ImageViewer } from "@/components/image-viewer"
+import { extractTags } from "@/lib/utils"
 
 interface NoteItemProps {
   note: Note
@@ -31,7 +32,6 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editContent, setEditContent] = useState('')
-  const [editTags, setEditTags] = useState<string[]>([])
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
@@ -77,7 +77,6 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   // 开始编辑笔记
   const handleEdit = () => {
     setEditContent(note.originalContent || note.content)
-    setEditTags([...note.tags])
     setIsEditing(true)
   }
 
@@ -87,7 +86,9 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     
     setIsSaving(true)
     try {
-      await onUpdate(note.id, editContent, editTags)
+      // 从内容中提取标签
+      const extractedTags = extractTags(editContent)
+      await onUpdate(note.id, editContent, extractedTags)
       setIsEditing(false)
       toast({
         title: "保存成功",
@@ -108,14 +109,9 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const handleCancel = () => {
     setIsEditing(false)
     setEditContent('')
-    setEditTags([])
   }
 
-  // 处理标签输入
-  const handleTagsChange = (value: string) => {
-    const tags = value.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
-    setEditTags(tags)
-  }
+
 
   // 从内容中提取图片URL
   const extractImageUrls = (content: string): string[] => {
@@ -411,13 +407,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             className="min-h-[100px] resize-none"
-            placeholder="编辑笔记内容..."
-          />
-          <Input
-            value={editTags.join(', ')}
-            onChange={(e) => handleTagsChange(e.target.value)}
-            placeholder="标签（用逗号分隔）"
-            className="text-sm"
+            placeholder="编辑笔记内容... (使用 #标签名 格式添加标签)"
           />
         </div>
       ) : (
