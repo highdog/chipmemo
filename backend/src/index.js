@@ -52,7 +52,12 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://192.168.3.66:3000',
-    process.env.FRONTEND_URL
+    'http://159.75.182.217',
+    'https://159.75.182.217',
+    'http://159.75.182.217:3000',
+    'https://159.75.182.217:3000',
+    process.env.FRONTEND_URL,
+    process.env.CORS_ORIGIN
   ].filter(Boolean),
   credentials: true
 }));
