@@ -9,7 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Pencil, Save, X, Target, Loader2, Zap } from "lucide-react"
+import { Pencil, Save, X, Target, Loader2, Zap, Bold, Italic, Link, Code, Heading1, Heading2, Heading3, List } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import { toast } from "sonner"
 import { tagContentsApi, apiClient } from "@/lib/api"
 import NoteHeatmap from "@/components/note-heatmap"
@@ -98,6 +101,301 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   }, [tag])
 
   // 添加一个用于外部刷新的方法
+  
+  // 键盘快捷键处理函数
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = e.currentTarget
+    const { selectionStart, selectionEnd, value } = textarea
+    const selectedText = value.substring(selectionStart, selectionEnd)
+    
+    // Ctrl/Cmd + B: 加粗
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault()
+      const newText = selectedText ? `**${selectedText}**` : '**粗体文本**'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setContent(newContent)
+      
+      // 设置光标位置
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 2, selectionStart + 2 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 2, selectionStart + 8)
+        }
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + I: 斜体
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault()
+      const newText = selectedText ? `*${selectedText}*` : '*斜体文本*'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setContent(newContent)
+      
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 1 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 5)
+        }
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + K: 链接
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault()
+      const linkText = selectedText || '链接文本'
+      const newText = `[${linkText}](url)`
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setContent(newContent)
+      
+      setTimeout(() => {
+        const urlStart = selectionStart + linkText.length + 3
+        textarea.setSelectionRange(urlStart, urlStart + 3)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + 1-6: 标题级别
+    if ((e.ctrlKey || e.metaKey) && /^[1-6]$/.test(e.key)) {
+      e.preventDefault()
+      const level = parseInt(e.key)
+      const hashes = '#'.repeat(level)
+      
+      // 找到当前行的开始位置
+      const lines = value.split('\n')
+      let currentLineStart = 0
+      let currentLineIndex = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (currentLineStart + lines[i].length >= selectionStart) {
+          currentLineIndex = i
+          break
+        }
+        currentLineStart += lines[i].length + 1
+      }
+      
+      const currentLine = lines[currentLineIndex]
+      // 移除现有的标题标记
+      const cleanLine = currentLine.replace(/^#+\s*/, '')
+      const newLine = `${hashes} ${cleanLine}`
+      
+      lines[currentLineIndex] = newLine
+      const newContent = lines.join('\n')
+      setContent(newContent)
+      
+      setTimeout(() => {
+        const newPosition = currentLineStart + newLine.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + L: 无序列表
+    if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+      e.preventDefault()
+      const lines = value.split('\n')
+      let currentLineStart = 0
+      let currentLineIndex = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (currentLineStart + lines[i].length >= selectionStart) {
+          currentLineIndex = i
+          break
+        }
+        currentLineStart += lines[i].length + 1
+      }
+      
+      const currentLine = lines[currentLineIndex]
+      const newLine = currentLine.startsWith('- ') ? currentLine.substring(2) : `- ${currentLine}`
+      
+      lines[currentLineIndex] = newLine
+      const newContent = lines.join('\n')
+      setContent(newContent)
+      
+      setTimeout(() => {
+        const newPosition = currentLineStart + newLine.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + Shift + L: 有序列表
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+      e.preventDefault()
+      const lines = value.split('\n')
+      let currentLineStart = 0
+      let currentLineIndex = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (currentLineStart + lines[i].length >= selectionStart) {
+          currentLineIndex = i
+          break
+        }
+        currentLineStart += lines[i].length + 1
+      }
+      
+      const currentLine = lines[currentLineIndex]
+      const orderMatch = currentLine.match(/^(\d+)\. /)
+      const newLine = orderMatch ? currentLine.replace(/^\d+\. /, '') : `1. ${currentLine}`
+      
+      lines[currentLineIndex] = newLine
+      const newContent = lines.join('\n')
+      setContent(newContent)
+      
+      setTimeout(() => {
+        const newPosition = currentLineStart + newLine.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + E: 代码块
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault()
+      const newText = selectedText ? `\`${selectedText}\`` : '`代码`'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setContent(newContent)
+      
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 1 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 3)
+        }
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + Shift + E: 代码块（多行）
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+      e.preventDefault()
+      const newText = selectedText ? `\`\`\`\n${selectedText}\n\`\`\`` : '```\n代码块\n```'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setContent(newContent)
+      
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 4, selectionStart + 4 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 4, selectionStart + 7)
+        }
+      }, 0)
+      return
+    }
+  }
+
+  // 工具栏按钮处理函数
+  const handleToolbarAction = (action: string) => {
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    if (!textarea) return
+
+    const selectionStart = textarea.selectionStart
+    const selectionEnd = textarea.selectionEnd
+    const selectedText = content.substring(selectionStart, selectionEnd)
+    const value = content
+
+    let newText = ''
+    let newContent = ''
+    let newSelectionStart = selectionStart
+    let newSelectionEnd = selectionEnd
+
+    switch (action) {
+      case 'bold':
+        newText = selectedText ? `**${selectedText}**` : '**粗体文本**'
+        newContent = value.substring(0, selectionStart) + newText + value.substring(selectionEnd)
+        newSelectionStart = selectionStart + 2
+        newSelectionEnd = selectedText ? selectionStart + 2 + selectedText.length : selectionStart + 6
+        break
+      case 'italic':
+        newText = selectedText ? `*${selectedText}*` : '*斜体文本*'
+        newContent = value.substring(0, selectionStart) + newText + value.substring(selectionEnd)
+        newSelectionStart = selectionStart + 1
+        newSelectionEnd = selectedText ? selectionStart + 1 + selectedText.length : selectionStart + 5
+        break
+      case 'link':
+        newText = selectedText ? `[${selectedText}](url)` : '[链接文本](url)'
+        newContent = value.substring(0, selectionStart) + newText + value.substring(selectionEnd)
+        newSelectionStart = selectedText ? selectionStart + selectedText.length + 3 : selectionStart + 7
+        newSelectionEnd = selectedText ? selectionStart + selectedText.length + 6 : selectionStart + 10
+        break
+      case 'code':
+        newText = selectedText ? `\`${selectedText}\`` : '`代码`'
+        newContent = value.substring(0, selectionStart) + newText + value.substring(selectionEnd)
+        newSelectionStart = selectionStart + 1
+        newSelectionEnd = selectedText ? selectionStart + 1 + selectedText.length : selectionStart + 3
+        break
+      case 'h1':
+      case 'h2':
+      case 'h3':
+        const level = action.charAt(1)
+        const hashes = '#'.repeat(parseInt(level))
+        const lines = value.split('\n')
+        let currentLineStart = 0
+        let currentLineIndex = 0
+        
+        for (let i = 0; i < lines.length; i++) {
+          if (currentLineStart + lines[i].length >= selectionStart) {
+            currentLineIndex = i
+            break
+          }
+          currentLineStart += lines[i].length + 1
+        }
+        
+        const currentLine = lines[currentLineIndex]
+        const headerMatch = currentLine.match(/^#+\s*/)
+        const newLine = headerMatch ? currentLine.replace(/^#+\s*/, `${hashes} `) : `${hashes} ${currentLine}`
+        
+        lines[currentLineIndex] = newLine
+        newContent = lines.join('\n')
+        newSelectionStart = currentLineStart + hashes.length + 1
+        newSelectionEnd = newSelectionStart
+        break
+      case 'list':
+        const listLines = value.split('\n')
+        let listLineStart = 0
+        let listLineIndex = 0
+        
+        for (let i = 0; i < listLines.length; i++) {
+          if (listLineStart + listLines[i].length >= selectionStart) {
+            listLineIndex = i
+            break
+          }
+          listLineStart += listLines[i].length + 1
+        }
+        
+        const listLine = listLines[listLineIndex]
+        const newListLine = listLine.startsWith('- ') ? listLine.substring(2) : `- ${listLine}`
+        
+        listLines[listLineIndex] = newListLine
+        newContent = listLines.join('\n')
+        newSelectionStart = listLineStart + newListLine.length
+        newSelectionEnd = newSelectionStart
+        break
+      default:
+        return
+    }
+
+    setContent(newContent)
+    
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(newSelectionStart, newSelectionEnd)
+    }, 0)
+  }
+
   useEffect(() => {
     const handleTagUpdate = () => {
       loadTagContent()
@@ -356,17 +654,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
 
 
 
-  // 将Markdown格式的内容转换为HTML
-  const renderMarkdown = (text: string) => {
-    // 简单的Markdown转换，实际项目中可以使用专业的Markdown库
-    return text
-      .replace(/^# (.*)$/gm, '<h1 class="text-2xl font-bold mb-2">$1</h1>')
-      .replace(/^## (.*)$/gm, '<h2 class="text-xl font-bold mb-2">$1</h2>')
-      .replace(/^### (.*)$/gm, '<h3 class="text-lg font-bold mb-2">$1</h3>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br />')
-  }
+
 
   return (
     <Card className="h-full flex flex-col">
@@ -560,9 +848,87 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       <CardContent className="flex-1 flex flex-col">
         {isEditing ? (
           <div className="flex-1 flex flex-col gap-4">
+            {/* Markdown工具栏 */}
+            <div className="flex items-center gap-1 p-2 bg-muted/30 rounded border">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('bold')}
+                className="h-8 w-8 p-0"
+                title="加粗 (Ctrl/Cmd + B)"
+              >
+                <Bold className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('italic')}
+                className="h-8 w-8 p-0"
+                title="斜体 (Ctrl/Cmd + I)"
+              >
+                <Italic className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('link')}
+                className="h-8 w-8 p-0"
+                title="链接 (Ctrl/Cmd + K)"
+              >
+                <Link className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('code')}
+                className="h-8 w-8 p-0"
+                title="代码 (Ctrl/Cmd + E)"
+              >
+                <Code className="h-4 w-4" />
+              </Button>
+              <Separator orientation="vertical" className="h-6 mx-1" />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('h1')}
+                className="h-8 w-8 p-0"
+                title="一级标题 (Ctrl/Cmd + 1)"
+              >
+                <Heading1 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('h2')}
+                className="h-8 w-8 p-0"
+                title="二级标题 (Ctrl/Cmd + 2)"
+              >
+                <Heading2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('h3')}
+                className="h-8 w-8 p-0"
+                title="三级标题 (Ctrl/Cmd + 3)"
+              >
+                <Heading3 className="h-4 w-4" />
+              </Button>
+              <Separator orientation="vertical" className="h-6 mx-1" />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleToolbarAction('list')}
+                className="h-8 w-8 p-0"
+                title="列表 (Ctrl/Cmd + L)"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onKeyDown={handleKeyDown}
               className="flex-1 font-mono text-sm resize-none"
               placeholder={`输入关于 #${tag} 标签的描述内容...`}
               disabled={isLoading}
@@ -570,10 +936,54 @@ export function TagContent({ tag, onSave }: TagContentProps) {
           </div>
         ) : (
           <div className="flex-1 flex flex-col gap-4">
-            <div 
-              className="prose prose-sm max-w-none flex-1 overflow-y-auto" 
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} 
-            />
+            <div className="prose prose-sm max-w-none flex-1 overflow-y-auto">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-base font-medium mb-1">{children}</h3>,
+                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                  li: ({ children }) => <li className="text-sm">{children}</li>,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-border pl-4 italic text-muted-foreground mb-2">
+                      {children}
+                    </blockquote>
+                  ),
+                  code: ({ children, className }) => {
+                    const isInline = !className
+                    if (isInline) {
+                      return (
+                        <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">
+                          {children}
+                        </code>
+                      )
+                    }
+                    return (
+                      <pre className="bg-muted p-3 rounded-md overflow-x-auto mb-2">
+                        <code className="text-sm font-mono">{children}</code>
+                      </pre>
+                    )
+                  },
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  em: ({ children }) => <em className="italic">{children}</em>,
+                  a: ({ href, children }) => (
+                    <a 
+                      href={href} 
+                      className="text-primary hover:underline" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      {children}
+                    </a>
+                  ),
+                }}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
             
             {/* 目标进度勾选框区域 */}
             {isGoalEnabled && targetCount > 0 && (

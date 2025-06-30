@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -102,14 +102,9 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
     }
   }, [])
 
-  console.log('🎨 [GoalsList] 渲染组件，当前状态:', {
-    loading,
-    error,
-    goalsCount: goals.length,
-    goals: goals.map(g => ({ tag: g.tag, isGoalEnabled: g.isGoalEnabled }))
-  })
+  // 移除频繁的渲染日志以避免输入卡顿
 
-  const handleGoalClick = (tag: string) => {
+  const handleGoalClick = useCallback((tag: string) => {
     console.log('🎯 [GoalsList] 点击目标标签:', tag)
     // 触发标签搜索，类似主页中的标签点击效果
     if (typeof window !== 'undefined') {
@@ -120,7 +115,7 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
     if (onTagSelect) {
       onTagSelect(tag)
     }
-  }
+  }, [onTagSelect])
 
   if (loading) {
     console.log('⏳ [GoalsList] 显示加载状态')
@@ -189,4 +184,4 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
   )
 }
 
-export default GoalsList
+export default memo(GoalsList)

@@ -507,7 +507,7 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleAddNote} 
-                    disabled={isAddingNote || (!newNote.trim() && selectedImages.length === 0)}
+                    disabled={isAddingNote}
                     className="flex-1"
                   >
                     {isAddingNote ? "添加中..." : "添加"}

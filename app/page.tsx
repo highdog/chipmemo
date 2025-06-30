@@ -236,9 +236,7 @@ export default function NotePad() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   // 移除重复的认证状态，直接使用AuthContext的状态
-  const [inputMode, setInputMode] = useState<'note' | 'todo'>('note')
-  const [todoDueDate, setTodoDueDate] = useState('')
-  const [todoStartDate, setTodoStartDate] = useState('')
+
   const [todosByDate, setTodosByDate] = useState<Record<string, Array<{
     id: string; 
     content: string; 
@@ -267,9 +265,8 @@ export default function NotePad() {
   
   // Memoized button disabled states to optimize performance
   const isMainButtonDisabled = useMemo(() => {
-    const isInputEmpty = !inputValue.trim()
-    return isAdding || (isInputEmpty && (inputMode === 'note' && selectedImages.length === 0))
-  }, [inputValue, isAdding, inputMode, selectedImages])
+    return isAdding
+  }, [isAdding])
   
   const isSearchButtonDisabled = useMemo(() => {
     const isInputEmpty = !inputValue.trim()
@@ -2740,34 +2737,7 @@ export default function NotePad() {
 
     setIsAdding(true)
     try {
-      if (inputMode === 'todo') {
-        // Todo模式：添加到TodoList
-        const { cleanContent, tags } = extractTagsAndCleanContent(inputValue.trim())
-        
-        // 调用后端API创建todo
-        const todoResult = await apiClient.createTodo({
-          text: cleanContent,
-          tags,
-          dueDate: todoDueDate || undefined
-        })
-        
-        if (!todoResult.error) {
-          // 重新加载todos数据以确保同步
-          await loadTodosData()
-          
-          setInputValue('')
-          setTodoDueDate('')
-          setTodoStartDate('')
-          
-          toast({
-            title: "成功",
-            description: "Todo已添加并保存到服务器",
-          })
-        } else {
-          throw new Error(todoResult.error || '创建Todo失败')
-        }
-      } else {
-        // 笔记模式：原有逻辑
+        // 笔记逻辑
         let noteContent = inputValue
         
         // 如果是标签搜索模式，自动添加当前标签
@@ -2833,11 +2803,10 @@ export default function NotePad() {
             variant: "destructive",
           })
         }
-      }
     } catch (error) {
       toast({
         title: "添加失败",
-        description: inputMode === 'todo' ? "添加Todo失败" : "网络错误，请重试",
+        description: "网络错误，请重试",
         variant: "destructive",
       })
     } finally {
@@ -3131,6 +3100,151 @@ export default function NotePad() {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault()
       handleAddNote()
+      return
+    }
+    
+    // Markdown快捷键支持
+    const textarea = e.currentTarget as HTMLTextAreaElement
+    const { selectionStart, selectionEnd, value } = textarea
+    const selectedText = value.substring(selectionStart, selectionEnd)
+    
+    // Ctrl/Cmd + B: 加粗
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault()
+      const newText = selectedText ? `**${selectedText}**` : '**粗体文本**'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setInputValue(newContent)
+      
+      // 设置光标位置
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 2, selectionStart + 2 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 2, selectionStart + 8)
+        }
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + I: 斜体
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault()
+      const newText = selectedText ? `*${selectedText}*` : '*斜体文本*'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setInputValue(newContent)
+      
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 1 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 5)
+        }
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + K: 链接
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault()
+      const linkText = selectedText || '链接文本'
+      const newText = `[${linkText}](url)`
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setInputValue(newContent)
+      
+      setTimeout(() => {
+        const urlStart = selectionStart + linkText.length + 3
+        textarea.setSelectionRange(urlStart, urlStart + 3)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + 1-6: 标题级别
+    if ((e.ctrlKey || e.metaKey) && /^[1-6]$/.test(e.key)) {
+      e.preventDefault()
+      const level = parseInt(e.key)
+      const hashes = '#'.repeat(level)
+      
+      // 找到当前行的开始位置
+      const lines = value.split('\n')
+      let currentLineStart = 0
+      let currentLineIndex = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (currentLineStart + lines[i].length >= selectionStart) {
+          currentLineIndex = i
+          break
+        }
+        currentLineStart += lines[i].length + 1
+      }
+      
+      const currentLine = lines[currentLineIndex]
+      // 移除现有的标题标记
+      const cleanLine = currentLine.replace(/^#+\s*/, '')
+      const newLine = `${hashes} ${cleanLine}`
+      
+      lines[currentLineIndex] = newLine
+      const newContent = lines.join('\n')
+      setInputValue(newContent)
+      
+      setTimeout(() => {
+        const newPosition = currentLineStart + newLine.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + L: 无序列表
+    if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+      e.preventDefault()
+      const lines = value.split('\n')
+      let currentLineStart = 0
+      let currentLineIndex = 0
+      
+      for (let i = 0; i < lines.length; i++) {
+        if (currentLineStart + lines[i].length >= selectionStart) {
+          currentLineIndex = i
+          break
+        }
+        currentLineStart += lines[i].length + 1
+      }
+      
+      const currentLine = lines[currentLineIndex]
+      const newLine = currentLine.startsWith('- ') ? currentLine.substring(2) : `- ${currentLine}`
+      
+      lines[currentLineIndex] = newLine
+      const newContent = lines.join('\n')
+      setInputValue(newContent)
+      
+      setTimeout(() => {
+        const newPosition = currentLineStart + newLine.length
+        textarea.setSelectionRange(newPosition, newPosition)
+      }, 0)
+      return
+    }
+    
+    // Ctrl/Cmd + E: 代码块
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault()
+      const newText = selectedText ? `\`${selectedText}\`` : '`代码`'
+      const beforeText = value.substring(0, selectionStart)
+      const afterText = value.substring(selectionEnd)
+      const newContent = beforeText + newText + afterText
+      setInputValue(newContent)
+      
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 1 + selectedText.length)
+        } else {
+          textarea.setSelectionRange(selectionStart + 1, selectionStart + 3)
+        }
+      }, 0)
+      return
     }
   }, [handleAddNote])
 
@@ -3467,35 +3581,16 @@ export default function NotePad() {
               {/* 输入区域 - 放在最上面 - 标签搜索时隐藏 */}
               {!searchTerm.startsWith('#') && (
               <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3 relative z-10">
-                <div className="mb-2 flex items-center justify-between">
-                  {/* 模式切换按钮 */}
-                  <div className="flex items-center gap-1 bg-muted rounded-md p-1">
-                    <Button
-                      variant={inputMode === 'note' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setInputMode('note')}
-                      className="h-6 px-2 text-xs"
-                    >
-                      笔记
-                    </Button>
-                    <Button
-                      variant={inputMode === 'todo' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setInputMode('todo')}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Todo
-                    </Button>
-                  </div>
-                  {/* 添加按钮移到这里 */}
+                <div className="mb-2 flex items-center justify-end">
+                  {/* 添加按钮 */}
                   <Button onClick={handleAddNote} disabled={isMainButtonDisabled} size="sm" className="h-7 px-3 text-xs">
                     {isAdding ? (
                       <>
                         <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                        <span className="text-xs">{inputMode === 'todo' ? 'Todo添加中' : '保存中'}</span>
+                        <span className="text-xs">保存中</span>
                       </>
                     ) : (
-                      <span className="text-xs">{inputMode === 'todo' ? '添加Todo' : '添加笔记'}</span>
+                      <span className="text-xs">添加笔记</span>
                     )}
                   </Button>
                 </div>
@@ -3506,44 +3601,15 @@ export default function NotePad() {
                       value={inputValue}
                       onChange={handleInputChange}
                       onKeyDown={handleKeyDown}
-                      placeholder={inputMode === 'note' ? "输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)" : "输入新Todo... (使用 #标签)"}
+                      placeholder="输入新笔记... (支持Markdown格式，使用 #学习 #工作 等标签)"
                       className="flex-1 min-h-[80px] resize-none font-mono text-sm"
                       disabled={isAdding}
                     />
 
                   </div>
                   
-                  {/* Todo模式下显示起始日期和截止日期输入框 */}
-                  {inputMode === 'todo' && (
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2 flex-1">
-                        <label className="text-sm text-gray-600 whitespace-nowrap">起始日期:</label>
-                        <Input
-                          type="date"
-                          value={todoStartDate}
-                          onChange={(e) => setTodoStartDate(e.target.value)}
-                          placeholder="年/月/日"
-                          className="text-sm flex-1"
-                          disabled={isAdding}
-                        />
-                      </div>
-                      <div className="flex items-center space-x-2 flex-1">
-                        <label className="text-sm text-gray-600 whitespace-nowrap">截止日期:</label>
-                        <Input
-                          type="date"
-                          value={todoDueDate}
-                          onChange={(e) => setTodoDueDate(e.target.value)}
-                          placeholder="年/月/日"
-                          className="text-sm flex-1"
-                          disabled={isAdding}
-                        />
-                      </div>
-                    </div>
-                  )}
-            
-                  {/* 图片上传和预览区域 - 仅在笔记模式下显示 */}
-                  {inputMode === 'note' && (
-                    <>
+                  {/* 图片上传和预览区域 */}
+                  <>
                       <div className="flex items-center space-x-2">
                         <label htmlFor="image-upload" className="cursor-pointer">
                           <div className="flex items-center space-x-1 text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -3573,6 +3639,7 @@ export default function NotePad() {
                         )}
                       </div>
                       
+
                       {/* 图片预览 - 缩略图模式 */}
                       {selectedImages.length > 0 && (
                         <div className="mt-2">
@@ -3617,7 +3684,6 @@ export default function NotePad() {
                         </div>
                       )}
                     </>
-                  )}
                 </div>
               </div>
               )}
@@ -3655,7 +3721,7 @@ export default function NotePad() {
                          />
                         <Button 
                           onClick={handleTagAddNote} 
-                          disabled={isTagNoteAdding || (!tagNoteInput.trim() && tagProgressInput === 0)} 
+                          disabled={isTagNoteAdding} 
                           size="sm" 
                           className="h-[60px] px-4"
                         >
