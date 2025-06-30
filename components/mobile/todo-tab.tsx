@@ -41,7 +41,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
   // 待办相关状态
   const [todos, setTodos] = useState<Todo[]>([])
   const [newTodo, setNewTodo] = useState("")
-  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high' | 'none'>('medium')
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [selectedTag, setSelectedTag] = useState("All")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -138,11 +138,11 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
       )
     }
     
-    // 根据优先级排序：high > medium > low
-    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 }
+    // 根据优先级排序：high > medium > low > none
+    const priorityOrder: Record<'high' | 'medium' | 'low' | 'none', number> = { 'high': 4, 'medium': 3, 'low': 2, 'none': 1 }
     return filtered.sort((a, b) => {
-      const aPriority = priorityOrder[a.priority] || 0
-      const bPriority = priorityOrder[b.priority] || 0
+      const aPriority = priorityOrder[a.priority || 'medium'] || 3
+      const bPriority = priorityOrder[b.priority || 'medium'] || 3
       return bPriority - aPriority
     })
   }, [todos, selectedTag])
@@ -251,6 +251,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
       case 'high': return 'border-red-500 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500'
       case 'medium': return 'border-yellow-500 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500'
       case 'low': return 'border-green-500 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
+      case 'none': return 'border-gray-300 data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400'
       default: return 'border-gray-300 data-[state=checked]:bg-gray-500 data-[state=checked]:border-gray-500'
     }
   }
@@ -311,6 +312,17 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                       )}
                     >
                       高
+                    </Button>
+                    <Button
+                      variant={newTodoPriority === 'none' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('none')}
+                      className={cn(
+                        "flex-1",
+                        newTodoPriority === 'none' && "bg-gray-500 hover:bg-gray-600 text-white"
+                      )}
+                    >
+                      无
                     </Button>
                   </div>
                 </div>
@@ -374,7 +386,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
                       "mt-1 border-2",
-                      getPriorityCheckboxColor(todo.priority)
+                      getPriorityCheckboxColor(todo.priority || 'medium')
                     )}
                   />
                   

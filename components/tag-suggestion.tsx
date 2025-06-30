@@ -161,6 +161,12 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
   // 点击外部关闭建议
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // 检查点击的元素是否是标签建议项
+      const target = event.target as Element
+      if (target.closest('[data-tag-suggestion]')) {
+        return // 如果点击的是标签建议项，不关闭
+      }
+      
       if (
         suggestionsRef.current &&
         !suggestionsRef.current.contains(event.target as Node) &&
@@ -172,8 +178,8 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
   // 渲染标签建议下拉列表
@@ -192,6 +198,7 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
           {suggestions.map((tag, index) => (
             <div
               key={tag}
+              data-tag-suggestion
               className={`flex items-center gap-2 px-3 py-2 transition-colors ${
                 tag === '暂无标签' 
                   ? 'text-muted-foreground cursor-default' 
@@ -199,7 +206,11 @@ export function TagSuggestion({ inputValue, onTagSelect, inputRef, disabled = fa
                       index === selectedIndex ? 'bg-accent' : ''
                     }`
               }`}
-              onClick={() => handleSuggestionClick(tag)}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleSuggestionClick(tag)
+              }}
             >
               <Hash className="h-3 w-3 text-muted-foreground" />
               <span className="text-sm">{tag}</span>

@@ -7,6 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { TagSuggestion } from "@/components/tag-suggestion"
 import { Loader2, Plus, Save, XCircle, CheckSquare, Clock, CheckCircle, Edit, Info, Trash2, MoreVertical, ChevronUp, ChevronDown, Hash, X, Check, GripVertical } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { type Todo } from "@/components/mobile/types"
@@ -125,6 +127,8 @@ function SortableTodoItem({
         return 'border-yellow-500 border-2 data-[state=checked]:border-yellow-500'
       case 'low':
         return 'border-gray-400 border-2 data-[state=checked]:border-gray-400'
+      case 'none':
+        return 'border-gray-300 border-2 data-[state=checked]:border-gray-300'
       default:
         return 'border-gray-300 border-2 data-[state=checked]:border-gray-300'
     }
@@ -329,6 +333,17 @@ function SortableTodoItem({
                   >
                     低优先级
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdateTodo(todo.id || (todo as any)._id, { priority: 'none' })
+                      setMenuOpenTodo(null)
+                    }}
+                    className={`w-full justify-start h-8 px-2 text-xs ${todo.priority === 'none' ? 'bg-accent' : ''}`}
+                  >
+                    无优先级
+                  </Button>
                   <div className="border-t my-1"></div>
                   <Button
                     size="sm"
@@ -360,6 +375,7 @@ export const TodoList = React.memo(function TodoList({
   onUpdateTodo,
   onDeleteTodo,
   onLoadTodos,
+  onAddTodo,
   onShowTodoDetail
 }: { 
   selectedDate: Date;
@@ -370,13 +386,14 @@ export const TodoList = React.memo(function TodoList({
     tags: string[];
     dueDate?: string;
     startDate?: string;
-    priority: 'low' | 'medium' | 'high';
+    priority?: 'low' | 'medium' | 'high' | 'none';
   }>>;
   onToggleTodo: (todoId: string) => void;
-  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high'; tags?: string[] }) => void;
+  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
-  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority: 'low' | 'medium' | 'high' }) => void;
+  onAddTodo: (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
+  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none' }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -390,7 +407,11 @@ export const TodoList = React.memo(function TodoList({
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
   const [newTodoTag, setNewTodoTag] = useState<string | null>(null)
   const [newTodoContent, setNewTodoContent] = useState('')
-  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium')
+  const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high' | 'none'>('medium')
+  const [newTodoStartDate, setNewTodoStartDate] = useState('')
+  const [newTodoDueDate, setNewTodoDueDate] = useState('')
+  const [isAddTodoDialogOpen, setIsAddTodoDialogOpen] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   // 拖拽传感器配置
   const sensors = useSensors(
@@ -493,6 +514,8 @@ export const TodoList = React.memo(function TodoList({
           : 'text-gray-400 dark:text-gray-600'
       case 'low':
         return 'text-gray-400 dark:text-gray-600' // 低优先级：浅灰色
+      case 'none':
+        return 'text-gray-300 dark:text-gray-700' // 无优先级：更浅的灰色
       default:
         // 默认为中优先级逻辑
         return priorityIndex === 1 
@@ -513,8 +536,8 @@ export const TodoList = React.memo(function TodoList({
         return []
       }
       
-      // 按优先级排序：高 > 中 > 低
-      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      // 按优先级排序：高 > 中 > 低 > 无
+      const priorityOrder: Record<'high' | 'medium' | 'low' | 'none', number> = { high: 4, medium: 3, low: 2, none: 1 }
       const sortedTodos = incompleteTodos.sort((a, b) => {
         const aPriority = a.priority ? priorityOrder[a.priority] || 2 : 2
         const bPriority = b.priority ? priorityOrder[b.priority] || 2 : 2
@@ -525,9 +548,13 @@ export const TodoList = React.memo(function TodoList({
       return [sortedTodos[0]]
     } else {
       // 其他模式：正常筛选
-      filtered = selectedTag === 'all' 
-        ? allTodos 
-        : allTodos.filter((todo) => (todo.tags || []).includes(selectedTag))
+      if (selectedTag === 'all') {
+        // all列表不显示无优先级的待办事项
+        filtered = allTodos.filter((todo) => todo.priority && todo.priority !== 'none')
+      } else {
+        // 标签列表显示所有匹配标签的待办事项，包括无优先级的
+        filtered = allTodos.filter((todo) => (todo.tags || []).includes(selectedTag))
+      }
     }
     
     // 按优先级排序：高 > 中 > 低，然后按完成状态排序
@@ -537,10 +564,10 @@ export const TodoList = React.memo(function TodoList({
         return a.completed ? 1 : -1
       }
       
-      // 然后按优先级排序：高 > 中 > 低
-      const priorityOrder = { high: 3, medium: 2, low: 1 }
-      const aPriority = a.priority ? priorityOrder[a.priority] || 2 : 2 // 默认为中优先级
-      const bPriority = b.priority ? priorityOrder[b.priority] || 2 : 2 // 默认为中优先级
+      // 然后按优先级排序：高 > 中 > 低 > 无优先级
+      const priorityOrder = { high: 4, medium: 3, low: 2, none: 1 }
+      const aPriority = a.priority ? priorityOrder[a.priority] || 3 : 3 // 默认为中优先级
+      const bPriority = b.priority ? priorityOrder[b.priority] || 3 : 3 // 默认为中优先级
       if (aPriority !== bPriority) {
         return bPriority - aPriority
       }
@@ -638,6 +665,46 @@ export const TodoList = React.memo(function TodoList({
     }
   }
 
+  const handleAddTodo = async () => {
+    if (!newTodoContent.trim()) return
+    
+    try {
+      // 从内容中提取标签和纯文本
+      const content = newTodoContent.trim()
+      const tagRegex = /#([^\s#]+)/g
+      const tags: string[] = []
+      let match
+      
+      // 提取所有标签
+      while ((match = tagRegex.exec(content)) !== null) {
+        tags.push(match[1])
+      }
+      
+      // 移除标签，保留纯文本内容
+      const pureContent = content.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim()
+      
+      await onAddTodo({
+        content: pureContent,
+        priority: newTodoPriority,
+        startDate: newTodoStartDate || undefined,
+        dueDate: newTodoDueDate || undefined,
+        tags: tags
+      })
+      
+      // 重置表单
+      setNewTodoContent('')
+      setNewTodoPriority('medium')
+      setNewTodoStartDate('')
+      setNewTodoDueDate('')
+      setIsAddTodoDialogOpen(false)
+      
+      toast({ title: "Todo添加成功" })
+    } catch (error) {
+      console.error('添加todo失败:', error)
+      toast({ title: "添加Todo失败", variant: "destructive" })
+    }
+  }
+
 
 
   useEffect(() => {
@@ -671,16 +738,142 @@ export const TodoList = React.memo(function TodoList({
       {/* 固定的标题和标签筛选区域 */}
       <div className="p-2 border-b bg-background">
         <div className="flex items-center justify-between mb-3">
-          <h3 
-            className="font-medium text-sm cursor-pointer hover:text-primary transition-colors"
-            onClick={() => setIsLargeTodoListOpen(true)}
-            title="点击查看大的Todo列表"
-          >
-            Todo 列表
-          </h3>
-          <div className="text-xs text-muted-foreground">
-            {completedCount}/{totalCount}
+          <div className="flex items-center gap-2">
+            <h3 
+              className="font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+              onClick={() => setIsLargeTodoListOpen(true)}
+              title="点击查看大的Todo列表"
+            >
+              Todo 列表
+            </h3>
+            <div className="text-xs text-muted-foreground">
+              {totalCount - completedCount}
+            </div>
           </div>
+          <Dialog open={isAddTodoDialogOpen} onOpenChange={(open) => {
+            setIsAddTodoDialogOpen(open)
+            if (open) {
+              setNewTodoContent('')
+              setNewTodoPriority('medium')
+              setNewTodoStartDate('')
+              setNewTodoDueDate('')
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold">添加Todo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Todo内容</label>
+                  <div className="relative">
+                    <Input
+                      ref={tagInputRef}
+                      placeholder="请输入Todo内容，用#开头可添加标签"
+                      value={newTodoContent}
+                      onChange={(e) => setNewTodoContent(e.target.value)}
+                    />
+                    <TagSuggestion
+                      inputValue={newTodoContent}
+                      onTagSelect={setNewTodoContent}
+                      inputRef={tagInputRef}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">优先级</label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={newTodoPriority === 'low' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('low')}
+                      className={newTodoPriority === 'low' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+                    >
+                      低
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={newTodoPriority === 'medium' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('medium')}
+                      className={newTodoPriority === 'medium' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''}
+                    >
+                      中
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={newTodoPriority === 'high' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('high')}
+                      className={newTodoPriority === 'high' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                    >
+                      高
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={newTodoPriority === 'none' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewTodoPriority('none')}
+                      className={newTodoPriority === 'none' ? 'bg-gray-600 hover:bg-gray-700 text-white' : ''}
+                    >
+                      无
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">开始日期</label>
+                  <Input
+                    type="date"
+                    value={newTodoStartDate}
+                    onChange={(e) => setNewTodoStartDate(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">截止日期</label>
+                  <Input
+                    type="date"
+                    value={newTodoDueDate}
+                    onChange={(e) => setNewTodoDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddTodoDialogOpen(false)
+                    setNewTodoContent('')
+                    setNewTodoPriority('medium')
+                    setNewTodoStartDate('')
+                    setNewTodoDueDate('')
+                  }}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={handleAddTodo}
+                  disabled={!newTodoContent.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  添加Todo
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* 标签筛选区域 */}
@@ -834,6 +1027,17 @@ export const TodoList = React.memo(function TodoList({
                         )}
                       >
                         低
+                      </button>
+                      <button
+                        onClick={() => setNewTodoPriority('none')}
+                        className={cn(
+                          "px-2 py-1 text-xs rounded border transition-colors",
+                          newTodoPriority === 'none'
+                            ? "bg-gray-400 text-white border-gray-400"
+                            : "bg-background text-muted-foreground border-border hover:bg-accent"
+                        )}
+                      >
+                        无
                       </button>
                     </div>
                   </div>

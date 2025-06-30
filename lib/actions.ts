@@ -27,7 +27,7 @@ export interface TodoItem {
   id: string;
   content: string;
   completed: boolean;
-  priority?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high' | 'none';
   tags?: string[];
   dueDate?: string;
   startDate?: string;
@@ -405,7 +405,7 @@ export const todoActions = {
   // 创建todo
   async createTodo(data: {
     text: string;
-    priority?: 'low' | 'medium' | 'high';
+    priority?: 'low' | 'medium' | 'high' | 'none';
     dueDate?: string;
     category?: string;
   }) {
@@ -430,7 +430,7 @@ export const todoActions = {
     data: {
       text?: string;
       completed?: boolean;
-      priority?: 'low' | 'medium' | 'high';
+      priority?: 'low' | 'medium' | 'high' | 'none';
       dueDate?: string;
       category?: string;
     }

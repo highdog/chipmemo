@@ -61,7 +61,7 @@ interface Todo {
   _id: string;
   text: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high' | 'none';
   dueDate?: string;
   userId: string;
   createdAt: string;
@@ -246,7 +246,7 @@ export default function NotePad() {
     tags: string[];
     dueDate?: string;
     startDate?: string;
-    priority: 'low' | 'medium' | 'high';
+    priority?: 'low' | 'medium' | 'high' | 'none';
     order?: number;
   }>>>({})
 
@@ -2995,7 +2995,7 @@ export default function NotePad() {
     }
   }
 
-  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high'; tags?: string[] }) => {
+  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => {
     try {
       // 调用后端API更新todo
       const updateData: any = {}
@@ -3078,6 +3078,40 @@ export default function NotePad() {
         description: "删除Todo失败",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleAddTodo = async (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => {
+    try {
+      // 调用后端API创建todo
+      const result = await todosApi.create({
+        text: todo.content,
+        priority: todo.priority,
+        dueDate: todo.dueDate ? new Date(todo.dueDate).toISOString() : undefined,
+        tags: todo.tags
+      })
+      
+      if (result.success) {
+        // 重新加载todos数据以确保同步
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "Todo已添加",
+        })
+      } else {
+        toast({
+          title: "添加失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "添加Todo失败",
+        variant: "destructive",
+      })
+      throw error // 重新抛出错误以便上层捕获
     }
   }
 
@@ -3274,7 +3308,7 @@ export default function NotePad() {
           tags: string[];
           dueDate?: string;
           startDate?: string;
-          priority: 'low' | 'medium' | 'high';
+          priority?: 'low' | 'medium' | 'high' | 'none';
           order?: number;
         }>> = {}
         
@@ -3752,6 +3786,7 @@ export default function NotePad() {
                     onUpdateTodo={handleUpdateTodo}
                     onDeleteTodo={handleDeleteTodo}
                     onLoadTodos={loadTodosData}
+                    onAddTodo={handleAddTodo}
                     onShowTodoDetail={setSelectedTodoDetail}
                   />
                 </div>

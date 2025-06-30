@@ -15,7 +15,7 @@ router.get('/', [
   query('date').optional().isISO8601().withMessage('Date must be in ISO format'),
   query('completed').optional().isBoolean().withMessage('Completed must be a boolean'),
   query('category').optional().isString().withMessage('Category must be a string'),
-  query('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority'),
+  query('priority').optional().isIn(['low', 'medium', 'high', 'none']).withMessage('Invalid priority'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
 ], async (req, res) => {
@@ -179,7 +179,7 @@ router.post('/', [
     .withMessage('Todo text cannot exceed 500 characters'),
   body('priority')
     .optional()
-    .isIn(['low', 'medium', 'high'])
+    .isIn(['low', 'medium', 'high', 'none'])
     .withMessage('Invalid priority'),
   body('dueDate')
     .optional()
@@ -272,7 +272,7 @@ router.post('/batch', [
     .withMessage('Todo text cannot exceed 500 characters'),
   body('todos.*.priority')
     .optional()
-    .isIn(['low', 'medium', 'high'])
+    .isIn(['low', 'medium', 'high', 'none'])
     .withMessage('Invalid priority'),
   body('todos.*.dueDate')
     .optional()
@@ -304,7 +304,7 @@ router.post('/batch', [
       high: 0
     };
 
-    for (const priority of ['low', 'medium', 'high']) {
+    for (const priority of ['low', 'medium', 'high', 'none']) {
       const maxOrderTodo = await Todo.findOne({
         userId: req.user._id,
         priority: priority,
@@ -374,7 +374,7 @@ router.put('/:id', [
     .withMessage('Completed must be a boolean'),
   body('priority')
     .optional()
-    .isIn(['low', 'medium', 'high'])
+    .isIn(['low', 'medium', 'high', 'none'])
     .withMessage('Invalid priority'),
   body('dueDate')
     .optional({ nullable: true })

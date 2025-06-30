@@ -16,7 +16,7 @@ export interface Todo {
   _id: string;
   text: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high' | 'none';
   dueDate?: string;
   userId: string;
   createdAt: string;
