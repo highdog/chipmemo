@@ -382,20 +382,27 @@ export const TodoList = React.memo(function TodoList({
 }: { 
   selectedDate: Date;
   todosByDate: Record<string, Array<{ 
-    id: string; 
-    content: string; 
+    id: string;
+    _id: string;
+    content: string;
+    text: string;
     completed: boolean;
     tags: string[];
     dueDate?: string;
     startDate?: string;
     priority?: 'low' | 'medium' | 'high' | 'none';
+    order?: number;
+    userId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    subtodos?: any[];
   }>>;
   onToggleTodo: (todoId: string) => void;
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
   onAddTodo: (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
-  onShowTodoDetail: (todo: { id: string; content: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none' }) => void;
+  onShowTodoDetail: (todo: { id: string; _id: string; content: string; text: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; order?: number; userId?: string; createdAt?: string; updatedAt?: string; subtodos?: any[]; }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')

@@ -58,7 +58,24 @@ const todoSchema = new mongoose.Schema({
       type: Date,
       default: null
     }
-  }
+  },
+  // 子待办事项
+  subtodos: [{
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [300, 'Subtodo text cannot exceed 300 characters']
+    },
+    completed: {
+      type: Boolean,
+      default: false
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });

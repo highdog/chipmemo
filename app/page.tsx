@@ -65,14 +65,27 @@ interface Todo {
   completed: boolean;
   priority?: 'low' | 'medium' | 'high' | 'none';
   dueDate?: string;
+  startDate?: string;
   userId: string;
+  noteId?: string;
+  category?: string;
+  tags?: string[];
+  order?: number;
+  reminder?: {
+    enabled: boolean;
+    datetime?: string;
+  };
+  subtodos?: {
+    _id: string;
+    text: string;
+    completed: boolean;
+    createdAt: string;
+  }[];
   createdAt: string;
   updatedAt: string;
   // 兼容导入数据的字段
   id?: string;
   content?: string;
-  tags?: string[];
-  startDate?: string;
 }
 
 interface TagContent {
@@ -240,14 +253,20 @@ export default function NotePad() {
   // 移除重复的认证状态，直接使用AuthContext的状态
 
   const [todosByDate, setTodosByDate] = useState<Record<string, Array<{
-    id: string; 
-    content: string; 
+    id: string;
+    _id: string;
+    content: string;
+    text: string;
     completed: boolean;
     tags: string[];
     dueDate?: string;
     startDate?: string;
     priority?: 'low' | 'medium' | 'high' | 'none';
     order?: number;
+    userId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    subtodos?: any[];
   }>>>({})
 
   const [searchTerm, setSearchTerm] = useState("")
@@ -275,14 +294,7 @@ export default function NotePad() {
     return isAdding || isInputEmpty
   }, [inputValue, isAdding])
   
-  const [selectedTodoDetail, setSelectedTodoDetail] = useState<{
-    id: string;
-    content: string;
-    completed: boolean;
-    tags: string[];
-    startDate?: string;
-    dueDate?: string;
-  } | null>(null) // 选中的todo详情
+  const [selectedTodoDetail, setSelectedTodoDetail] = useState<Todo | null>(null) // 选中的todo详情
   
   // 计时相关状态
   const [isTimerRunning, setIsTimerRunning] = useState(false)
@@ -2903,8 +2915,28 @@ export default function NotePad() {
       
       // 如果todo从未完成变为完成，则删除todo并创建笔记
       if (!targetTodo.completed) {
-        // 创建笔记内容，包含原todo的内容和标签
-        const noteContent = targetTodo.content + (targetTodo.tags && targetTodo.tags.length > 0 ? ' ' + targetTodo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
+        // 创建笔记内容，包含原todo的内容、标签和用时记录
+        let noteContent = targetTodo.content
+        
+        // 添加用时记录
+        if (timerSeconds > 0) {
+          const hours = Math.floor(timerSeconds / 3600)
+          const minutes = Math.floor((timerSeconds % 3600) / 60)
+          let timeRecord = ''
+          if (hours > 0) {
+            timeRecord = `用时${hours}小时${minutes}分`
+          } else if (minutes > 0) {
+            timeRecord = `用时${minutes}分`
+          } else {
+            timeRecord = `用时${timerSeconds}秒`
+          }
+          noteContent += ` ${timeRecord}`
+        }
+        
+        // 添加标签
+        if (targetTodo.tags && targetTodo.tags.length > 0) {
+          noteContent += ' ' + targetTodo.tags.map((tag: string) => `#${tag}`).join(' ')
+        }
         
         // 调用addNote API创建新笔记
         const result = await addNote(noteContent, new Date().toISOString())
@@ -3083,6 +3115,129 @@ export default function NotePad() {
         variant: "destructive",
       })
       throw error // 重新抛出错误以便上层捕获
+    }
+  }
+
+  // 子待办事项相关处理函数
+  const handleReorderSubtodos = async (todoId: string, reorderedSubtodos: any[]) => {
+    try {
+      const result = await apiClient.reorderSubtodos(todoId, reorderedSubtodos)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "子待办事项顺序已更新",
+        })
+      } else {
+        toast({
+          title: "更新失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "更新子待办事项顺序失败",
+        variant: "destructive",
+      })
+    }
+  }
+  const handleAddSubtodo = async (todoId: string, text: string) => {
+    try {
+      const result = await apiClient.addSubtodo(todoId, text)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "子待办事项已添加",
+        })
+      } else {
+        toast({
+          title: "添加失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('添加子待办事项失败:', error)
+      toast({
+        title: "添加失败",
+        description: "网络错误或服务器异常",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleSubtodo = async (todoId: string, subtodoId: string) => {
+    try {
+      const result = await apiClient.toggleSubtodo(todoId, subtodoId)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "子待办事项状态已更新",
+        })
+      } else {
+        toast({
+          title: "更新失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('切换子待办事项状态失败:', error)
+      toast({
+        title: "更新失败",
+        description: "网络错误或服务器异常",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteSubtodo = async (todoId: string, subtodoId: string) => {
+    try {
+      const result = await apiClient.deleteSubtodo(todoId, subtodoId)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        toast({
+          title: "成功",
+          description: "子待办事项已删除",
+        })
+      } else {
+        toast({
+          title: "删除失败",
+          description: result.error || "未知错误",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('删除子待办事项失败:', error)
+      toast({
+        title: "删除失败",
+        description: "网络错误或服务器异常",
+        variant: "destructive",
+      })
     }
   }
 
@@ -3419,13 +3574,19 @@ export default function NotePad() {
       if (response.success && response.data) {
         const todosByDateMap: Record<string, Array<{
           id: string;
+          _id: string;
           content: string;
+          text: string;
           completed: boolean;
           tags: string[];
           dueDate?: string;
           startDate?: string;
           priority?: 'low' | 'medium' | 'high' | 'none';
           order?: number;
+          userId?: string;
+          createdAt?: string;
+          updatedAt?: string;
+          subtodos?: any[];
         }>> = {}
         
         response.data.todos.forEach((todo: any) => {
@@ -3435,13 +3596,19 @@ export default function NotePad() {
           }
           todosByDateMap[dateKey].push({
             id: todo._id,
+            _id: todo._id,
             content: todo.text,
+            text: todo.text,
             completed: todo.completed || false,
             tags: todo.tags || [],
             dueDate: todo.dueDate,
             startDate: todo.startDate,
             priority: todo.priority || 'medium',
-            order: todo.order
+            order: todo.order,
+            userId: todo.userId,
+            createdAt: todo.createdAt,
+            updatedAt: todo.updatedAt,
+            subtodos: todo.subtodos || []
           })
         })
         
@@ -3866,7 +4033,24 @@ export default function NotePad() {
                     onDeleteTodo={handleDeleteTodo}
                     onLoadTodos={loadTodosData}
                     onAddTodo={handleAddTodo}
-                    onShowTodoDetail={setSelectedTodoDetail}
+                    onShowTodoDetail={(todo) => {
+          // 确保传递完整的 Todo 对象，包含 subtodos
+          const fullTodo: Todo = {
+            _id: todo._id || todo.id,
+            text: todo.text || todo.content,
+            completed: todo.completed,
+            userId: todo.userId || '', // 临时值，实际会从后端获取
+            createdAt: todo.createdAt || new Date().toISOString(),
+            updatedAt: todo.updatedAt || new Date().toISOString(),
+            priority: todo.priority,
+            dueDate: todo.dueDate,
+            startDate: todo.startDate,
+            tags: todo.tags,
+            order: todo.order,
+            subtodos: todo.subtodos || [] // 确保包含子待办事项
+          }
+          setSelectedTodoDetail(fullTodo)
+        }}
                   />
                 </div>
               </div>
@@ -3895,6 +4079,10 @@ export default function NotePad() {
           onStartTimer={startTimer}
           onPauseTimer={pauseTimer}
           formatTime={formatTime}
+          onAddSubtodo={handleAddSubtodo}
+          onToggleSubtodo={handleToggleSubtodo}
+          onDeleteSubtodo={handleDeleteSubtodo}
+          onReorderSubtodos={handleReorderSubtodos}
         />
 
     </div>

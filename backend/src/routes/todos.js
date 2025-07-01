@@ -666,4 +666,188 @@ router.patch('/:id/set-order', [
   }
 });
 
+// @route   POST /api/todos/:id/subtodos
+// @desc    Add subtodo to a todo
+// @access  Private
+router.post('/:id/subtodos', [
+  body('text')
+    .notEmpty()
+    .withMessage('Subtodo text is required')
+    .isLength({ max: 300 })
+    .withMessage('Subtodo text cannot exceed 300 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { text } = req.body;
+    const todoId = req.params.id;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    const newSubtodo = {
+      text,
+      completed: false,
+      createdAt: new Date()
+    };
+
+    todo.subtodos.push(newSubtodo);
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.status(201).json({
+      success: true,
+      data: updatedTodo,
+      message: 'Subtodo added successfully'
+    });
+  } catch (error) {
+    console.error('Error adding subtodo:', error);
+    res.status(500).json({ error: 'Server error while adding subtodo' });
+  }
+});
+
+// @route   PATCH /api/todos/:id/subtodos/:subtodoId/toggle
+// @desc    Toggle subtodo completion status
+// @access  Private
+router.patch('/:id/subtodos/:subtodoId/toggle', async (req, res) => {
+  try {
+    const { id: todoId, subtodoId } = req.params;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    const subtodo = todo.subtodos.id(subtodoId);
+    if (!subtodo) {
+      return res.status(404).json({ error: 'Subtodo not found' });
+    }
+
+    subtodo.completed = !subtodo.completed;
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Subtodo status updated successfully'
+    });
+  } catch (error) {
+    console.error('Error toggling subtodo:', error);
+    res.status(500).json({ error: 'Server error while toggling subtodo' });
+  }
+});
+
+// @route   DELETE /api/todos/:id/subtodos/:subtodoId
+// @desc    Delete a subtodo
+// @access  Private
+router.delete('/:id/subtodos/:subtodoId', async (req, res) => {
+  try {
+    const { id: todoId, subtodoId } = req.params;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    const subtodo = todo.subtodos.id(subtodoId);
+    if (!subtodo) {
+      return res.status(404).json({ error: 'Subtodo not found' });
+    }
+
+    todo.subtodos.pull(subtodoId);
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Subtodo deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting subtodo:', error);
+    res.status(500).json({ error: 'Server error while deleting subtodo' });
+  }
+});
+
+// @route   PUT /api/todos/:id/subtodos/reorder
+// @desc    Reorder subtodos
+// @access  Private
+router.put('/:id/subtodos/reorder', [
+  body('subtodos')
+    .isArray()
+    .withMessage('Subtodos must be an array')
+    .custom((subtodos) => {
+      if (subtodos && subtodos.length > 0) {
+        for (const subtodo of subtodos) {
+          if (!subtodo._id || typeof subtodo.text !== 'string' || typeof subtodo.completed !== 'boolean') {
+            throw new Error('Each subtodo must have _id, text, and completed fields');
+          }
+        }
+      }
+      return true;
+    })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { subtodos } = req.body;
+    const todoId = req.params.id;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    // 验证所有子待办事项ID是否存在
+    const existingSubtodoIds = todo.subtodos.map(s => s._id.toString());
+    const providedSubtodoIds = subtodos.map(s => s._id);
+    
+    if (existingSubtodoIds.length !== providedSubtodoIds.length) {
+      return res.status(400).json({ error: 'Subtodo count mismatch' });
+    }
+
+    for (const id of providedSubtodoIds) {
+      if (!existingSubtodoIds.includes(id)) {
+        return res.status(400).json({ error: `Subtodo with id ${id} not found` });
+      }
+    }
+
+    // 重新排序子待办事项
+    todo.subtodos = subtodos.map(newSubtodo => {
+      const existingSubtodo = todo.subtodos.find(s => s._id.toString() === newSubtodo._id);
+      if (existingSubtodo) {
+        existingSubtodo.text = newSubtodo.text;
+        existingSubtodo.completed = newSubtodo.completed;
+        return existingSubtodo;
+      }
+      return newSubtodo;
+    });
+
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Subtodos reordered successfully'
+    });
+  } catch (error) {
+    console.error('Error reordering subtodos:', error);
+    res.status(500).json({ error: 'Server error while reordering subtodos' });
+  }
+});
+
 module.exports = router;

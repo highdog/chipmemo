@@ -69,14 +69,32 @@ export interface SystemConfig {
 }
 
 // 待办事项相关类型
+export interface Subtodo {
+  _id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
 export interface Todo {
   _id: string;
   text: string;
   completed: boolean;
   priority?: 'low' | 'medium' | 'high' | 'none';
   dueDate?: string;
+  startDate?: string;
   userId: string;
+  noteId?: string;
+  category?: string;
+  tags?: string[];
   order?: number;
+  reminder?: {
+    enabled: boolean;
+    datetime?: string;
+  };
+  subtodos?: Subtodo[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // 管理员相关类型
@@ -584,6 +602,26 @@ class ApiClient {
 
   async getTodoCategories(): Promise<ApiResponse<Array<{ category: string; count: number }>>> {
     return this.get<Array<{ category: string; count: number }>>('/todos/categories');
+  }
+
+  // 添加子待办事项
+  async addSubtodo(todoId: string, text: string): Promise<ApiResponse<Todo>> {
+    return this.post<Todo>(`/todos/${todoId}/subtodos`, { text });
+  }
+
+  // 切换子待办事项完成状态
+  async toggleSubtodo(todoId: string, subtodoId: string): Promise<ApiResponse<Todo>> {
+    return this.patch<Todo>(`/todos/${todoId}/subtodos/${subtodoId}/toggle`);
+  }
+
+  // 删除子待办事项
+  async deleteSubtodo(todoId: string, subtodoId: string): Promise<ApiResponse<Todo>> {
+    return this.delete<Todo>(`/todos/${todoId}/subtodos/${subtodoId}`);
+  }
+
+  // 重新排序子待办事项
+  async reorderSubtodos(todoId: string, reorderedSubtodos: Subtodo[]): Promise<ApiResponse<Todo>> {
+    return this.put<Todo>(`/todos/${todoId}/subtodos/reorder`, { subtodos: reorderedSubtodos });
   }
 
   // 管理员相关方法
