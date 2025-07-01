@@ -18,6 +18,7 @@ import { Image, Loader2, Info, Search, X, Trash2, CheckSquare, Tag, CheckCircle2
 
 import { TagContent } from "@/components/tag-content"
 import { TodoList } from "@/components/todo-list"
+import { TodoDetail } from "@/components/todo-detail"
 import { tagContentsApi } from "@/lib/api"
 import { UserNav } from "@/components/user-nav"
 import { NoteItem } from "@/components/note-item"
@@ -3884,146 +3885,18 @@ export default function NotePad() {
          />
 
       {/* Todo详情弹框 */}
-      {selectedTodoDetail && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            {/* 弹窗标题栏 */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Todo 详情</h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedTodoDetail(null)}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* 弹窗内容 */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-4">
-                {/* 标签 */}
-                {selectedTodoDetail.tags.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">标签</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTodoDetail.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        >                          <Tag className="h-3 w-3 mr-1" />                          {tag}                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+      {/* Todo详情弹框 */}
+        <TodoDetail
+          todo={selectedTodoDetail}
+          onClose={() => setSelectedTodoDetail(null)}
+          onToggleTodo={handleToggleTodo}
+          isTimerRunning={isTimerRunning}
+          timerSeconds={timerSeconds}
+          onStartTimer={startTimer}
+          onPauseTimer={pauseTimer}
+          formatTime={formatTime}
+        />
 
-                {/* Todo内容 */}
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">内容</h3>
-                  <div className={cn(
-                    "text-base p-3 bg-muted/30 rounded-md",
-                    selectedTodoDetail.completed ? "line-through text-muted-foreground" : "text-foreground"
-                  )}>
-                    {selectedTodoDetail.content}
-                  </div>
-                </div>
-
-                {/* 正计时按钮 */}
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">计时</h3>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                      onClick={() => {
-                        if (isTimerRunning) {
-                          pauseTimer()
-                        } else {
-                          startTimer()
-                        }
-                      }}
-                    >
-                      {isTimerRunning ? (
-                        <>
-                          <Pause className="h-4 w-4" />
-                          暂停计时
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="h-4 w-4" />
-                          开始计时
-                        </>
-                      )}
-                    </Button>
-                    {timerSeconds > 0 && (
-                      <div className="text-lg font-mono font-semibold text-foreground">
-                        {formatTime(timerSeconds)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 日期信息 */}
-                {(selectedTodoDetail.startDate || selectedTodoDetail.dueDate) && (
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground mb-2">日期</h3>
-                    <div className="space-y-2">
-                      {selectedTodoDetail.startDate && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">开始日期:</span>
-                          <span className="font-medium">
-                            {new Date(selectedTodoDetail.startDate).toLocaleDateString('zh-CN', { 
-                              year: 'numeric', 
-                              month: '2-digit', 
-                              day: '2-digit' 
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      {selectedTodoDetail.dueDate && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-muted-foreground">截止日期:</span>
-                          <span className="font-medium">
-                            {new Date(selectedTodoDetail.dueDate).toLocaleDateString('zh-CN', { 
-                              year: 'numeric', 
-                              month: '2-digit', 
-                              day: '2-digit' 
-                            })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 弹窗底部操作按钮 */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedTodoDetail(null)}
-              >
-                关闭
-              </Button>
-              <Button
-                onClick={() => {
-                  handleToggleTodo(selectedTodoDetail.id)
-                  setSelectedTodoDetail(null)
-                }}
-                className={cn(
-                  selectedTodoDetail.completed 
-                    ? "bg-orange-500 hover:bg-orange-600" 
-                    : "bg-green-500 hover:bg-green-600"
-                )}
-              >
-                {selectedTodoDetail.completed ? "标记为未完成" : "标记为已完成"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
