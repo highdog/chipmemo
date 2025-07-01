@@ -3,21 +3,113 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, Clock, Pause, Tag, Plus, Check, Trash2, Play, GripVertical } from "lucide-react"
+import { X, Clock, Pause, Tag, Plus, Check, Trash2, Play, GripVertical, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Todo, Subtodo } from "@/lib/api"
-import { useState } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+
 // 使用原生HTML5拖拽API，不需要额外依赖
+
+// 计时器状态枚举
+enum TimerState {
+  STOPPED = 'stopped',
+  RUNNING = 'running',
+  PAUSED = 'paused'
+}
+
+// 自定义 Hook：管理计时器逻辑
+const useTimer = (todo: Todo | null) => {
+  const [, forceUpdate] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  // 计算当前显示的时间
+  const getDisplayTime = useCallback(() => {
+    try {
+      // 如果没有 timer 对象，返回0
+      if (!todo?.timer) {
+        return 0
+      }
+      
+      // 确保 totalSeconds 有默认值，使用 ?? 而不是 ||
+      const totalSeconds = todo.timer.totalSeconds ?? 0
+      
+      // 验证 totalSeconds 是否为有效数字
+      if (typeof totalSeconds !== 'number' || isNaN(totalSeconds)) {
+        console.warn('Invalid totalSeconds value:', totalSeconds)
+        return 0
+      }
+      
+      // 如果计时器正在运行且有开始时间，计算经过的时间
+      if (todo.timer.isRunning && todo.timer.startTime) {
+        const startTime = new Date(todo.timer.startTime).getTime()
+        
+        // 验证开始时间是否有效
+        if (isNaN(startTime)) {
+          console.warn('Invalid startTime value:', todo.timer.startTime)
+          return totalSeconds
+        }
+        
+        const now = Date.now()
+        const elapsedSeconds = Math.floor((now - startTime) / 1000)
+        // 确保 elapsedSeconds 不为负数，防止时间异常
+        return totalSeconds + Math.max(0, elapsedSeconds)
+      }
+      
+      // 计时器未运行时，直接返回累计时间
+      return totalSeconds
+    } catch (err) {
+      console.error('Error calculating display time:', err)
+      setError('计时器计算错误')
+      return 0
+    }
+  }, [todo?.timer])
+
+  // 获取计时器状态
+  const getTimerState = useCallback((): TimerState => {
+    if (!todo?.timer) return TimerState.STOPPED
+    return todo.timer.isRunning ? TimerState.RUNNING : TimerState.PAUSED
+  }, [todo?.timer])
+
+  // 实时更新计时器显示
+  useEffect(() => {
+    if (!todo?.timer?.isRunning) return
+
+    const interval = setInterval(() => {
+      try {
+        forceUpdate(prev => prev + 1)
+      } catch (err) {
+        console.error('Error updating timer:', err)
+        setError('计时器更新错误')
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [todo?.timer?.isRunning])
+
+  // 清除错误状态
+  useEffect(() => {
+    if (error) {
+      const timeout = setTimeout(() => setError(null), 5000)
+      return () => clearTimeout(timeout)
+    }
+  }, [error])
+
+  return {
+    displayTime: getDisplayTime(),
+    timerState: getTimerState(),
+    isRunning: todo?.timer?.isRunning ?? false,
+    error
+  }
+}
 
 interface TodoDetailProps {
   todo: Todo | null;
   onClose: () => void;
   onToggleTodo: (todoId: string) => Promise<void>;
   // 计时器相关props
-  isTimerRunning?: boolean;
-  timerSeconds?: number;
-  onStartTimer?: () => void;
-  onPauseTimer?: () => void;
+  onStartTimer?: (todoId: string) => void;
+  onPauseTimer?: (todoId: string) => void;
+  onResetTimer?: (todoId: string) => void;
   formatTime?: (seconds: number) => string;
   onAddSubtodo?: (todoId: string, text: string) => void;
   onToggleSubtodo?: (todoId: string, subtodoId: string) => void;
@@ -29,10 +121,9 @@ export function TodoDetail({
   todo, 
   onClose, 
   onToggleTodo,
-  isTimerRunning = false,
-  timerSeconds = 0,
   onStartTimer,
   onPauseTimer,
+  onResetTimer,
   formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
@@ -46,26 +137,39 @@ export function TodoDetail({
 }: TodoDetailProps) {
   const [newSubtodoText, setNewSubtodoText] = useState('')
   const [isAddingSubtodo, setIsAddingSubtodo] = useState(false)
+  
+  // 使用自定义 Hook 管理计时器逻辑
+  const { displayTime, timerState, isRunning, error } = useTimer(todo)
 
-  const handleAddSubtodo = () => {
+  // 使用 useMemo 优化子待办事项列表
+  const subtodosList = useMemo(() => {
+    return todo?.subtodos || []
+  }, [todo?.subtodos])
+
+  // 使用 useMemo 优化计时器按钮文本
+  const timerButtonText = useMemo(() => {
+    return isRunning ? '暂停' : '开始'
+  }, [isRunning])
+
+  const handleAddSubtodo = useCallback(() => {
     if (newSubtodoText.trim() && onAddSubtodo && todo) {
       onAddSubtodo(todo._id, newSubtodoText.trim())
       setNewSubtodoText('')
       setIsAddingSubtodo(false)
     }
-  }
+  }, [newSubtodoText, onAddSubtodo, todo])
 
-  const handleToggleSubtodo = (subtodoId: string) => {
+  const handleToggleSubtodo = useCallback((subtodoId: string) => {
     if (onToggleSubtodo && todo) {
       onToggleSubtodo(todo._id, subtodoId)
     }
-  }
+  }, [onToggleSubtodo, todo])
 
-  const handleDeleteSubtodo = (subtodoId: string) => {
+  const handleDeleteSubtodo = useCallback((subtodoId: string) => {
     if (onDeleteSubtodo && todo) {
       onDeleteSubtodo(todo._id, subtodoId)
     }
-  }
+  }, [onDeleteSubtodo, todo])
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -220,8 +324,8 @@ export function TodoDetail({
 
               {/* 子待办事项列表 */}
               <div className="space-y-2">
-                {todo.subtodos && todo.subtodos.length > 0 ? (
-                  todo.subtodos.map((subtodo, index) => (
+                {subtodosList.length > 0 ? (
+                  subtodosList.map((subtodo, index) => (
                     <div
                       key={subtodo._id}
                       draggable
@@ -316,25 +420,48 @@ export function TodoDetail({
         {/* 弹窗底部操作按钮 */}
         <div className="flex items-center justify-between p-4 border-t">
           {/* 计时器按钮 */}
-          {(onStartTimer || onPauseTimer) && (
+          {(onStartTimer || onPauseTimer) && todo && (
             <div className="flex items-center gap-3">
-              <Button
-                size="sm"
-                variant={isTimerRunning ? "destructive" : "default"}
-                onClick={isTimerRunning ? onPauseTimer : onStartTimer}
-                className="h-8 w-8 p-0"
-              >
-                {isTimerRunning ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (todo.timer?.isRunning) {
+                      onPauseTimer?.(todo._id)
+                    } else {
+                      onStartTimer?.(todo._id)
+                    }
+                  }}
+                  className="h-8 w-8 p-0 rounded-full bg-black hover:bg-gray-800 text-white border-0"
+                >
+                  {todo.timer?.isRunning ? (
+                    <Pause className="h-4 w-4 fill-white" />
+                  ) : (
+                    <Play className="h-4 w-4 fill-white" />
+                  )}
+                </Button>
+                {onResetTimer && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onResetTimer(todo._id)}
+                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                    title="重置计时器"
+                  >
+                    <RotateCcw className="h-4 w-4 text-black" />
+                  </Button>
                 )}
-              </Button>
+              </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-lg font-mono text-blue-900 dark:text-blue-100">
-                  {formatTime(timerSeconds)}
+                <span className="text-lg font-mono text-black dark:text-black">
+                  {formatTime(displayTime)}
                 </span>
+                {error && (
+                  <span className="text-xs text-red-500 ml-2">
+                    {error}
+                  </span>
+                )}
               </div>
             </div>
           )}

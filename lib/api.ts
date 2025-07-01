@@ -92,6 +92,11 @@ export interface Todo {
     enabled: boolean;
     datetime?: string;
   };
+  timer?: {
+    isRunning: boolean;
+    totalSeconds: number;
+    startTime?: string;
+  };
   subtodos?: Subtodo[];
   createdAt: string;
   updatedAt: string;
@@ -624,6 +629,19 @@ class ApiClient {
     return this.put<Todo>(`/todos/${todoId}/subtodos/reorder`, { subtodos: reorderedSubtodos });
   }
 
+  // 计时器相关方法
+  async startTodoTimer(todoId: string): Promise<ApiResponse<Todo>> {
+    return this.post<Todo>(`/todos/${todoId}/timer/start`);
+  }
+
+  async pauseTodoTimer(todoId: string): Promise<ApiResponse<Todo>> {
+    return this.post<Todo>(`/todos/${todoId}/timer/pause`);
+  }
+
+  async resetTodoTimer(todoId: string): Promise<ApiResponse<Todo>> {
+    return this.post<Todo>(`/todos/${todoId}/timer/reset`);
+  }
+
   // 管理员相关方法
   async getAdminStats(): Promise<ApiResponse<AdminStats>> {
     return this.get<AdminStats>('/admin/stats');
@@ -716,8 +734,12 @@ export const todosApi = {
   delete: (id: string) => apiClient.deleteTodo(id),
   reorder: (id: string, direction: 'up' | 'down') => apiClient.reorderTodo(id, direction),
   setOrder: (id: string, order: number) => apiClient.setTodoOrder(id, order),
-
   getCategories: () => apiClient.getTodoCategories(),
+  
+  // 计时器相关
+  startTimer: (todoId: string) => apiClient.startTodoTimer(todoId),
+  pauseTimer: (todoId: string) => apiClient.pauseTodoTimer(todoId),
+  resetTimer: (todoId: string) => apiClient.resetTodoTimer(todoId),
 };
 
 export const tagContentsApi = {

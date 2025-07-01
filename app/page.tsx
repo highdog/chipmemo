@@ -296,10 +296,7 @@ export default function NotePad() {
   
   const [selectedTodoDetail, setSelectedTodoDetail] = useState<Todo | null>(null) // 选中的todo详情
   
-  // 计时相关状态
-  const [isTimerRunning, setIsTimerRunning] = useState(false)
-  const [timerSeconds, setTimerSeconds] = useState(0)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  // 移除全局计时器状态，改为使用每个待办事项的独立计时
 
   // 加载所有日程数据
   const loadAllSchedules = useCallback(async () => {
@@ -415,38 +412,112 @@ export default function NotePad() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const startTimer = () => {
-    setIsTimerRunning(true)
-    timerRef.current = setInterval(() => {
-      setTimerSeconds(prev => prev + 1)
-    }, 1000)
-  }
-
-  const pauseTimer = () => {
-    setIsTimerRunning(false)
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }
-
-  const resetTimer = () => {
-    setIsTimerRunning(false)
-    setTimerSeconds(0)
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }
-
-  // 清理计时器
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+  // 开始计时
+  const handleStartTimer = async (todoId: string) => {
+    try {
+      const result = await todosApi.startTimer(todoId)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        // 如果当前选中的todo是被操作的todo，再次更新详情以确保数据同步
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId && result.data) {
+          setSelectedTodoDetail(result.data)
+        }
+        toast({
+          title: "成功",
+          description: "计时器已开始",
+        })
+      } else {
+        toast({
+          title: "失败",
+          description: result.error || "开始计时失败",
+          variant: "destructive",
+        })
       }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "开始计时失败",
+        variant: "destructive",
+      })
     }
-  }, [])
+  }
+
+  // 暂停计时
+  const handlePauseTimer = async (todoId: string) => {
+    try {
+      const result = await todosApi.pauseTimer(todoId)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        // 如果当前选中的todo是被操作的todo，再次更新详情以确保数据同步
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId && result.data) {
+          setSelectedTodoDetail(result.data)
+        }
+        toast({
+          title: "成功",
+          description: "计时器已暂停",
+        })
+      } else {
+        toast({
+          title: "失败",
+          description: result.error || "暂停计时失败",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "暂停计时失败",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // 重置计时
+  const handleResetTimer = async (todoId: string) => {
+    try {
+      const result = await todosApi.resetTimer(todoId)
+      if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail(result.data || null)
+        }
+        // 重新加载todos数据
+        await loadTodosData()
+        // 如果当前选中的todo是被操作的todo，再次更新详情以确保数据同步
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId && result.data) {
+          setSelectedTodoDetail(result.data)
+        }
+        toast({
+          title: "成功",
+          description: "计时器已重置",
+        })
+      } else {
+        toast({
+          title: "失败",
+          description: result.error || "重置计时失败",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "错误",
+        description: "重置计时失败",
+        variant: "destructive",
+      })
+    }
+  }
+
+
 
   // 滚动到指定日期的笔记
   const scrollToDate = (targetDate: Date) => {
@@ -2919,16 +2990,24 @@ export default function NotePad() {
         let noteContent = targetTodo.content
         
         // 添加用时记录
-        if (timerSeconds > 0) {
-          const hours = Math.floor(timerSeconds / 3600)
-          const minutes = Math.floor((timerSeconds % 3600) / 60)
+        if (targetTodo.timer && targetTodo.timer.totalSeconds > 0) {
+          const totalSeconds = targetTodo.timer.totalSeconds
+          // 如果计时器正在运行，需要加上当前运行时间
+          let finalSeconds = totalSeconds
+          if (targetTodo.timer.isRunning && targetTodo.timer.startTime) {
+            const elapsed = Math.floor((new Date().getTime() - new Date(targetTodo.timer.startTime).getTime()) / 1000)
+            finalSeconds += elapsed
+          }
+          
+          const hours = Math.floor(finalSeconds / 3600)
+          const minutes = Math.floor((finalSeconds % 3600) / 60)
           let timeRecord = ''
           if (hours > 0) {
             timeRecord = `用时${hours}小时${minutes}分`
           } else if (minutes > 0) {
             timeRecord = `用时${minutes}分`
           } else {
-            timeRecord = `用时${timerSeconds}秒`
+            timeRecord = `用时${finalSeconds}秒`
           }
           noteContent += ` ${timeRecord}`
         }
@@ -4069,16 +4148,14 @@ export default function NotePad() {
          />
 
       {/* Todo详情弹框 */}
-      {/* Todo详情弹框 */}
         <TodoDetail
           todo={selectedTodoDetail}
           onClose={() => setSelectedTodoDetail(null)}
           onToggleTodo={handleToggleTodo}
-          isTimerRunning={isTimerRunning}
-          timerSeconds={timerSeconds}
-          onStartTimer={startTimer}
-          onPauseTimer={pauseTimer}
           formatTime={formatTime}
+          onStartTimer={(todoId) => handleStartTimer(todoId)}
+          onPauseTimer={(todoId) => handlePauseTimer(todoId)}
+          onResetTimer={(todoId) => handleResetTimer(todoId)}
           onAddSubtodo={handleAddSubtodo}
           onToggleSubtodo={handleToggleSubtodo}
           onDeleteSubtodo={handleDeleteSubtodo}

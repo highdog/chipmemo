@@ -850,4 +850,104 @@ router.put('/:id/subtodos/reorder', [
   }
 });
 
+// @route   POST /api/todos/:id/timer/start
+// @desc    Start timer for a todo
+// @access  Private
+router.post('/:id/timer/start', async (req, res) => {
+  try {
+    const todoId = req.params.id;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    // 如果计时器已经在运行，先停止并累加时间
+    if (todo.timer.isRunning && todo.timer.startTime) {
+      const elapsed = Math.floor((new Date() - todo.timer.startTime) / 1000);
+      todo.timer.totalSeconds += elapsed;
+    }
+
+    todo.timer.isRunning = true;
+    todo.timer.startTime = new Date();
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Timer started successfully'
+    });
+  } catch (error) {
+    console.error('Error starting timer:', error);
+    res.status(500).json({ error: 'Server error while starting timer' });
+  }
+});
+
+// @route   POST /api/todos/:id/timer/pause
+// @desc    Pause timer for a todo
+// @access  Private
+router.post('/:id/timer/pause', async (req, res) => {
+  try {
+    const todoId = req.params.id;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    // 如果计时器正在运行，累加已用时间
+    if (todo.timer.isRunning && todo.timer.startTime) {
+      const elapsed = Math.floor((new Date() - todo.timer.startTime) / 1000);
+      todo.timer.totalSeconds += elapsed;
+    }
+
+    todo.timer.isRunning = false;
+    todo.timer.startTime = null;
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Timer paused successfully'
+    });
+  } catch (error) {
+    console.error('Error pausing timer:', error);
+    res.status(500).json({ error: 'Server error while pausing timer' });
+  }
+});
+
+// @route   POST /api/todos/:id/timer/reset
+// @desc    Reset timer for a todo
+// @access  Private
+router.post('/:id/timer/reset', async (req, res) => {
+  try {
+    const todoId = req.params.id;
+
+    const todo = await Todo.findOne({ _id: todoId, userId: req.user._id });
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    todo.timer.isRunning = false;
+    todo.timer.totalSeconds = 0;
+    todo.timer.startTime = null;
+    await todo.save();
+
+    const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    res.json({
+      success: true,
+      data: updatedTodo,
+      message: 'Timer reset successfully'
+    });
+  } catch (error) {
+    console.error('Error resetting timer:', error);
+    res.status(500).json({ error: 'Server error while resetting timer' });
+  }
+});
+
 module.exports = router;

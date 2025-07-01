@@ -59,6 +59,21 @@ const todoSchema = new mongoose.Schema({
       default: null
     }
   },
+  // 计时相关字段
+  timer: {
+    isRunning: {
+      type: Boolean,
+      default: false
+    },
+    totalSeconds: {
+      type: Number,
+      default: 0
+    },
+    startTime: {
+      type: Date,
+      default: null
+    }
+  },
   // 子待办事项
   subtodos: [{
     text: {
