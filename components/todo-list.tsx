@@ -72,7 +72,7 @@ function SortableTodoItem({
   menuOpenTodo: string | null;
   orderSelectTodo: string | null;
   allTodos: Todo[];
-  onToggleTodo: (id: string) => void;
+  onToggleTodo: (id: string, timeRecord?: string) => void;
   onEditTodo: (todo: Todo) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -151,7 +151,30 @@ function SortableTodoItem({
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={todo.completed}
-              onCheckedChange={() => onToggleTodo(todo.id || (todo as any)._id)}
+              onCheckedChange={() => {
+                // 如果todo未完成且有计时器，计算时间记录
+                let timeRecord = undefined
+                if (!todo.completed && todo.timer && todo.timer.totalSeconds > 0) {
+                  const totalSeconds = todo.timer.totalSeconds
+                  // 如果计时器正在运行，需要加上当前运行时间
+                  let finalSeconds = totalSeconds
+                  if (todo.timer.isRunning && todo.timer.startTime) {
+                    const elapsed = Math.floor((new Date().getTime() - new Date(todo.timer.startTime).getTime()) / 1000)
+                    finalSeconds += elapsed
+                  }
+                  
+                  const hours = Math.floor(finalSeconds / 3600)
+                  const minutes = Math.floor((finalSeconds % 3600) / 60)
+                  if (hours > 0) {
+                    timeRecord = `用时${hours}小时${minutes}分`
+                  } else if (minutes > 0) {
+                    timeRecord = `用时${minutes}分`
+                  } else {
+                    timeRecord = `用时${finalSeconds}秒`
+                  }
+                }
+                onToggleTodo(todo.id || (todo as any)._id, timeRecord)
+              }}
               className={cn("mt-0.5", getPriorityCheckboxClass(todo.priority))}
             />
             <Input
@@ -215,7 +238,30 @@ function SortableTodoItem({
             <Checkbox
               id={todo.id || (todo as any)._id}
               checked={todo.completed}
-              onCheckedChange={() => onToggleTodo(todo.id || (todo as any)._id)}
+              onCheckedChange={() => {
+                // 如果todo未完成且有计时器，计算时间记录
+                let timeRecord = undefined
+                if (!todo.completed && todo.timer && todo.timer.totalSeconds > 0) {
+                  const totalSeconds = todo.timer.totalSeconds
+                  // 如果计时器正在运行，需要加上当前运行时间
+                  let finalSeconds = totalSeconds
+                  if (todo.timer.isRunning && todo.timer.startTime) {
+                    const elapsed = Math.floor((new Date().getTime() - new Date(todo.timer.startTime).getTime()) / 1000)
+                    finalSeconds += elapsed
+                  }
+                  
+                  const hours = Math.floor(finalSeconds / 3600)
+                  const minutes = Math.floor((finalSeconds % 3600) / 60)
+                  if (hours > 0) {
+                    timeRecord = `用时${hours}小时${minutes}分`
+                  } else if (minutes > 0) {
+                    timeRecord = `用时${minutes}分`
+                  } else {
+                    timeRecord = `用时${finalSeconds}秒`
+                  }
+                }
+                onToggleTodo(todo.id || (todo as any)._id, timeRecord)
+              }}
               className={cn("mt-0.5", getPriorityCheckboxClass(todo.priority))}
             />
 
@@ -396,13 +442,18 @@ export const TodoList = React.memo(function TodoList({
     createdAt?: string;
     updatedAt?: string;
     subtodos?: any[];
+    timer?: {
+      isRunning: boolean;
+      totalSeconds: number;
+      startTime?: string;
+    };
   }>>;
-  onToggleTodo: (todoId: string) => void;
+  onToggleTodo: (todoId: string, timeRecord?: string) => void;
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
   onAddTodo: (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
-  onShowTodoDetail: (todo: { id: string; _id: string; content: string; text: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; order?: number; userId?: string; createdAt?: string; updatedAt?: string; subtodos?: any[]; }) => void;
+  onShowTodoDetail: (todo: { id: string; _id: string; content: string; text: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; order?: number; userId?: string; createdAt?: string; updatedAt?: string; subtodos?: any[]; timer?: { isRunning: boolean; totalSeconds: number; startTime?: string; }; }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
@@ -616,9 +667,38 @@ export const TodoList = React.memo(function TodoList({
     }
   }
 
-  const handleToggleTodo = async (todoId: string) => {
+  const handleToggleTodo = async (todoId: string, passedTimeRecord?: string) => {
     try {
-      onToggleTodo(todoId)
+      // 使用传递的时间记录，如果没有传递则计算
+      let timeRecord = passedTimeRecord
+      
+      if (!timeRecord) {
+        // 找到对应的todo
+        const todo = allTodos.find(t => (t.id || (t as any)._id) === todoId)
+        
+        // 如果todo未完成且有计时器，计算时间记录
+        if (todo && !todo.completed && todo.timer && todo.timer.totalSeconds > 0) {
+          const totalSeconds = todo.timer.totalSeconds
+          // 如果计时器正在运行，需要加上当前运行时间
+          let finalSeconds = totalSeconds
+          if (todo.timer.isRunning && todo.timer.startTime) {
+            const elapsed = Math.floor((new Date().getTime() - new Date(todo.timer.startTime).getTime()) / 1000)
+            finalSeconds += elapsed
+          }
+          
+          const hours = Math.floor(finalSeconds / 3600)
+          const minutes = Math.floor((finalSeconds % 3600) / 60)
+          if (hours > 0) {
+            timeRecord = `用时${hours}小时${minutes}分`
+          } else if (minutes > 0) {
+            timeRecord = `用时${minutes}分`
+          } else {
+            timeRecord = `用时${finalSeconds}秒`
+          }
+        }
+      }
+      
+      onToggleTodo(todoId, timeRecord)
     } catch (error) {
       // 错误处理已在主组件中完成
     }
@@ -1473,7 +1553,28 @@ export const TodoList = React.memo(function TodoList({
                                        variant="ghost"
                                        onClick={(e) => {
                                          e.stopPropagation()
-                                         handleToggleTodo(todo.id || (todo as any)._id)
+                                         // 如果todo未完成且有计时器，计算时间记录
+                                         let timeRecord = undefined
+                                         if (!todo.completed && todo.timer && todo.timer.totalSeconds > 0) {
+                                           const totalSeconds = todo.timer.totalSeconds
+                                           // 如果计时器正在运行，需要加上当前运行时间
+                                           let finalSeconds = totalSeconds
+                                           if (todo.timer.isRunning && todo.timer.startTime) {
+                                             const elapsed = Math.floor((new Date().getTime() - new Date(todo.timer.startTime).getTime()) / 1000)
+                                             finalSeconds += elapsed
+                                           }
+                                           
+                                           const hours = Math.floor(finalSeconds / 3600)
+                                           const minutes = Math.floor((finalSeconds % 3600) / 60)
+                                           if (hours > 0) {
+                                             timeRecord = `用时${hours}小时${minutes}分`
+                                           } else if (minutes > 0) {
+                                             timeRecord = `用时${minutes}分`
+                                           } else {
+                                             timeRecord = `用时${finalSeconds}秒`
+                                           }
+                                         }
+                                         handleToggleTodo(todo.id || (todo as any)._id, timeRecord)
                                          setMenuOpenTodo(null)
                                        }}
                                        className="w-full justify-start h-8 px-3 text-xs"

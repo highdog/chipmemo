@@ -25,6 +25,11 @@ export interface Todo {
   content?: string;
   tags?: string[];
   startDate?: string;
+  timer?: {
+    isRunning: boolean;
+    totalSeconds: number;
+    startTime?: string;
+  };
 }
 
 export interface User {

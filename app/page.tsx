@@ -2970,7 +2970,7 @@ export default function NotePad() {
     }
   }
    
-   const handleToggleTodo = async (todoId: string) => {
+   const handleToggleTodo = async (todoId: string, timeRecord?: string) => {
     try {
       // 在所有日期中查找todo
       let targetTodo: any = null
@@ -2990,25 +2990,7 @@ export default function NotePad() {
         let noteContent = targetTodo.content
         
         // 添加用时记录
-        if (targetTodo.timer && targetTodo.timer.totalSeconds > 0) {
-          const totalSeconds = targetTodo.timer.totalSeconds
-          // 如果计时器正在运行，需要加上当前运行时间
-          let finalSeconds = totalSeconds
-          if (targetTodo.timer.isRunning && targetTodo.timer.startTime) {
-            const elapsed = Math.floor((new Date().getTime() - new Date(targetTodo.timer.startTime).getTime()) / 1000)
-            finalSeconds += elapsed
-          }
-          
-          const hours = Math.floor(finalSeconds / 3600)
-          const minutes = Math.floor((finalSeconds % 3600) / 60)
-          let timeRecord = ''
-          if (hours > 0) {
-            timeRecord = `用时${hours}小时${minutes}分`
-          } else if (minutes > 0) {
-            timeRecord = `用时${minutes}分`
-          } else {
-            timeRecord = `用时${finalSeconds}秒`
-          }
+        if (timeRecord) {
           noteContent += ` ${timeRecord}`
         }
         

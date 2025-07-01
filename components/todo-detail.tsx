@@ -105,7 +105,7 @@ const useTimer = (todo: Todo | null) => {
 interface TodoDetailProps {
   todo: Todo | null;
   onClose: () => void;
-  onToggleTodo: (todoId: string) => Promise<void>;
+  onToggleTodo: (todoId: string, timeRecord?: string) => Promise<void>;
   // 计时器相关props
   onStartTimer?: (todoId: string) => void;
   onPauseTimer?: (todoId: string) => void;
@@ -218,9 +218,30 @@ export function TodoDetail({
   if (!todo) return null;
 
   const handleToggle = async () => {
-    await onToggleTodo(todo._id);
+    // 如果待办事项有计时记录且大于0秒，在完成时需要传递计时信息
+    if (!todo.completed && todo.timer && todo.timer.totalSeconds && todo.timer.totalSeconds > 0) {
+      // 计算用时记录
+      const totalSeconds = todo.timer.totalSeconds
+      const hours = Math.floor(totalSeconds / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const finalSeconds = totalSeconds % 60
+      
+      let timeRecord = ''
+      if (hours > 0) {
+        timeRecord = `用时${hours}小时${minutes}分`
+      } else if (minutes > 0) {
+        timeRecord = `用时${minutes}分`
+      } else {
+        timeRecord = `用时${finalSeconds}秒`
+      }
+      
+      // 将计时信息传递给父组件
+      await onToggleTodo(todo._id, timeRecord);
+    } else {
+      await onToggleTodo(todo._id);
+    }
     onClose();
-  };
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
