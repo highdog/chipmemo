@@ -548,9 +548,27 @@ class ApiClient {
       });
     }
     const query = searchParams.toString();
-    return this.get<{ todos: Todo[]; pagination: any }>(
+    
+    console.log('=== Frontend API getTodos Call ===');
+    const response = await this.get<{ todos: Todo[]; pagination: any }>(
       `/todos${query ? `?${query}` : ''}`
     );
+    
+    console.log('Frontend API response:', response);
+    if (response.success && response.data?.todos) {
+      console.log('Frontend API todos count:', response.data.todos.length);
+      response.data.todos.forEach((todo, index) => {
+        console.log(`Frontend Todo ${index + 1} (${todo._id}):`, {
+          text: todo.text?.substring(0, 30) + '...',
+          timer: todo.timer,
+          timerType: typeof todo.timer,
+          timerKeys: todo.timer ? Object.keys(todo.timer) : 'no timer'
+        });
+      });
+    }
+    console.log('=== End Frontend API Debug ===');
+    
+    return response;
   }
 
   async getTodoStats(): Promise<ApiResponse<{

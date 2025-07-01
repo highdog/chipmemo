@@ -72,6 +72,18 @@ router.get('/', [
       .skip(skip)
       .limit(limit);
 
+    // Debug: 记录从数据库获取的todos timer数据
+    console.log('=== Backend GET /api/todos - Database Timer Data ===');
+    todos.forEach((todo, index) => {
+      console.log(`Todo ${index + 1} (${todo._id}):`, {
+        text: todo.text?.substring(0, 30) + '...',
+        timer: todo.timer,
+        timerType: typeof todo.timer,
+        timerKeys: todo.timer ? Object.keys(todo.timer) : 'no timer'
+      });
+    });
+    console.log('=== End Backend Timer Debug ===');
+
     const total = await Todo.countDocuments(query);
 
     res.json({
@@ -862,6 +874,9 @@ router.post('/:id/timer/start', async (req, res) => {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
+    console.log('=== Backend Timer Start - Before ===');
+    console.log('Todo timer before start:', todo.timer);
+
     // 如果计时器已经在运行，先停止并累加时间
     if (todo.timer.isRunning && todo.timer.startTime) {
       const elapsed = Math.floor((new Date() - todo.timer.startTime) / 1000);
@@ -873,6 +888,10 @@ router.post('/:id/timer/start', async (req, res) => {
     await todo.save();
 
     const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
+
+    console.log('=== Backend Timer Start - After ===');
+    console.log('Updated todo timer:', updatedTodo.timer);
+    console.log('=== End Timer Start Debug ===');
 
     res.json({
       success: true,

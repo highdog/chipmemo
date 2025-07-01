@@ -21,17 +21,34 @@ enum TimerState {
 const useTimer = (todo: Todo | null) => {
   const [, forceUpdate] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  
+  // 添加调试语句
+  console.log('🔍 [DEBUG] useTimer called with todo:', todo)
+  console.log('🔍 [DEBUG] useTimer todo?.timer:', todo?.timer)
+  console.log('🔍 [DEBUG] useTimer todo?.timer?.totalSeconds:', todo?.timer?.totalSeconds)
+  console.log('🔍 [DEBUG] useTimer todo?.timer?.isRunning:', todo?.timer?.isRunning)
 
   // 计算当前显示的时间
   const getDisplayTime = useCallback(() => {
     try {
-      // 如果没有 timer 对象，返回0
-      if (!todo?.timer) {
+      console.log('🔍 [DEBUG] getDisplayTime called, todo?.timer:', todo?.timer)
+      
+      // 如果没有todo对象，返回0
+      if (!todo) {
+        console.log('🔍 [DEBUG] No todo object, returning 0')
+        return 0
+      }
+      
+      // 如果没有timer对象但有todo，检查是否有timer数据
+      if (!todo.timer) {
+        console.log('🔍 [DEBUG] No timer object on todo, returning 0')
         return 0
       }
       
       // 确保 totalSeconds 有默认值，使用 ?? 而不是 ||
       const totalSeconds = todo.timer.totalSeconds ?? 0
+      console.log('🔍 [DEBUG] totalSeconds calculated:', totalSeconds)
+      console.log('🔍 [DEBUG] todo.timer.totalSeconds original:', todo.timer.totalSeconds)
       
       // 验证 totalSeconds 是否为有效数字
       if (typeof totalSeconds !== 'number' || isNaN(totalSeconds)) {
@@ -62,7 +79,7 @@ const useTimer = (todo: Todo | null) => {
       setError('计时器计算错误')
       return 0
     }
-  }, [todo?.timer])
+  }, [todo, todo?.timer])
 
   // 获取计时器状态
   const getTimerState = useCallback((): TimerState => {
@@ -151,6 +168,7 @@ export function TodoDetail({
     return isRunning ? '暂停' : '开始'
   }, [isRunning])
 
+  // 所有 useCallback hooks 必须在条件返回之前定义
   const handleAddSubtodo = useCallback(() => {
     if (newSubtodoText.trim() && onAddSubtodo && todo) {
       onAddSubtodo(todo._id, newSubtodoText.trim())
@@ -171,9 +189,11 @@ export function TodoDetail({
     }
   }, [onDeleteSubtodo, todo])
 
+  // 拖拽相关状态
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
+  // 拖拽处理函数
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = 'move'
@@ -215,9 +235,9 @@ export function TodoDetail({
     setDragOverIndex(null)
   }
 
-  if (!todo) return null;
-
   const handleToggle = async () => {
+    if (!todo) return
+    
     // 如果待办事项有计时记录且大于0秒，在完成时需要传递计时信息
     if (!todo.completed && todo.timer && todo.timer.totalSeconds && todo.timer.totalSeconds > 0) {
       // 计算用时记录
@@ -241,6 +261,11 @@ export function TodoDetail({
       await onToggleTodo(todo._id);
     }
     onClose();
+  }
+
+  // 如果没有todo数据，不渲染任何内容
+  if (!todo) {
+    return null
   }
 
   return (

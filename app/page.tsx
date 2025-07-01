@@ -75,6 +75,11 @@ interface Todo {
     enabled: boolean;
     datetime?: string;
   };
+  timer?: {
+    isRunning: boolean;
+    totalSeconds: number;
+    startTime?: string;
+  };
   subtodos?: {
     _id: string;
     text: string;
@@ -3648,6 +3653,11 @@ export default function NotePad() {
           createdAt?: string;
           updatedAt?: string;
           subtodos?: any[];
+          timer?: {
+            isRunning: boolean;
+            totalSeconds: number;
+            startTime?: string;
+          };
         }>> = {}
         
         response.data.todos.forEach((todo: any) => {
@@ -3669,7 +3679,8 @@ export default function NotePad() {
             userId: todo.userId,
             createdAt: todo.createdAt,
             updatedAt: todo.updatedAt,
-            subtodos: todo.subtodos || []
+            subtodos: todo.subtodos || [],
+            timer: todo.timer
           })
         })
         
@@ -4095,7 +4106,12 @@ export default function NotePad() {
                     onLoadTodos={loadTodosData}
                     onAddTodo={handleAddTodo}
                     onShowTodoDetail={(todo) => {
-          // 确保传递完整的 Todo 对象，包含 subtodos
+          // 确保传递完整的 Todo 对象，包含 subtodos 和 timer
+          console.log('🔍 [DEBUG] onShowTodoDetail called with todo:', todo)
+          console.log('🔍 [DEBUG] Input todo.timer:', todo.timer)
+          console.log('🔍 [DEBUG] Input todo type:', typeof todo)
+          console.log('🔍 [DEBUG] Input todo keys:', Object.keys(todo))
+          
           const fullTodo: Todo = {
             _id: todo._id || todo.id,
             text: todo.text || todo.content,
@@ -4108,9 +4124,18 @@ export default function NotePad() {
             startDate: todo.startDate,
             tags: todo.tags,
             order: todo.order,
-            subtodos: todo.subtodos || [] // 确保包含子待办事项
+            subtodos: todo.subtodos || [], // 确保包含子待办事项
+            timer: (() => {
+              console.log('🔍 [DEBUG] Setting timer property, todo.timer:', todo.timer)
+              console.log('🔍 [DEBUG] todo.timer?.totalSeconds:', todo.timer?.totalSeconds)
+              console.log('🔍 [DEBUG] todo.timer?.isRunning:', todo.timer?.isRunning)
+              console.log('🔍 [DEBUG] todo.timer?.startTime:', todo.timer?.startTime)
+              return todo.timer
+            })() // 确保包含计时器信息
           }
           setSelectedTodoDetail(fullTodo)
+          console.log('🔍 [DEBUG] setSelectedTodoDetail called with fullTodo:', fullTodo)
+          console.log('🔍 [DEBUG] Final fullTodo.timer:', fullTodo.timer)
         }}
                   />
                 </div>
