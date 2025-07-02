@@ -59,6 +59,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
           _id: item._id,
           id: item._id, // 使用_id作为id
           text: item.text,
+          content: item.content || '', // 确保包含content字段
           completed: item.completed || false,
           priority: item.priority || 'medium',
           tags: Array.isArray(item.tags) ? item.tags : [],
@@ -262,7 +263,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
   const getPriorityCheckboxColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'border-red-500 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500'
-      case 'medium': return 'border-yellow-500 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500'
+      case 'medium': return 'data-[state=checked]:border-[#EAB30A]' + ' border-[#EAB30A] data-[state=checked]:bg-[#EAB30A]'
       case 'low': return 'border-green-500 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500'
       case 'none': return 'border-gray-300 data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-400'
       default: return 'border-gray-300 data-[state=checked]:bg-gray-500 data-[state=checked]:border-gray-500'
@@ -322,8 +323,9 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                       onClick={() => setNewTodoPriority('medium')}
                       className={cn(
                         "flex-1",
-                        newTodoPriority === 'medium' && "bg-yellow-500 hover:bg-yellow-600 text-white"
+                        newTodoPriority === 'medium' && "text-white"
                       )}
+                      style={newTodoPriority === 'medium' ? { backgroundColor: '#EAB30A', borderColor: '#EAB30A' } : {}}
                     >
                       中
                     </Button>
@@ -453,9 +455,20 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                   </div>
                 </div>
                 
-                {/* 删除按钮 - 只在选中时显示 */}
+                {/* 待办详情 - 只在选中时显示 */}
                 {selectedTodoId === todo._id && (
-                  <div className="px-3 pb-3">
+                  <div className="px-3 pb-3 space-y-3">
+                    {/* 待办内容 */}
+                    {todo.content && (
+                      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">内容</div>
+                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {todo.content}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 删除按钮 */}
                     <Button 
                       variant="destructive" 
                       size="sm" 

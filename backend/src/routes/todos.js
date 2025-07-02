@@ -208,6 +208,15 @@ router.post('/', [
   body('tags')
     .optional()
     .isArray()
+    .withMessage('Tags must be an array'),
+  body('tags.*')
+    .optional()
+    .isString()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Each tag must be between 1 and 50 characters'),
+  body('tags')
+    .optional()
+    .isArray()
     .withMessage('Tags must be an array')
     .custom((tags) => {
       if (tags && tags.length > 0) {
@@ -423,7 +432,16 @@ router.put('/:id', [
   body('category')
     .optional()
     .isLength({ max: 50 })
-    .withMessage('Category cannot exceed 50 characters')
+    .withMessage('Category cannot exceed 50 characters'),
+  body('tags')
+    .optional()
+    .isArray()
+    .withMessage('Tags must be an array'),
+  body('tags.*')
+    .optional()
+    .isString()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Each tag must be between 1 and 50 characters')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

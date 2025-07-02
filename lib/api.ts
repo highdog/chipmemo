@@ -527,6 +527,7 @@ class ApiClient {
       priority: 'low' | 'medium' | 'high' | 'none';
       dueDate: string;
       category: string;
+      tags: string[];
     }>
   ): Promise<ApiResponse<Todo>> {
     return this.put<Todo>(`/todos/${id}`, todoData);

@@ -40,6 +40,7 @@ function SortableTodoItem({
   priorityIndex, 
   editingTodo, 
   editContent, 
+  editDetailContent, 
   editStartDate, 
   editDueDate, 
   editTags,
@@ -55,6 +56,7 @@ function SortableTodoItem({
   onDeleteTodo, 
   onLoadTodos,
   setEditContent,
+  setEditDetailContent,
   setEditStartDate,
   setEditDueDate,
   setEditTags,
@@ -66,6 +68,7 @@ function SortableTodoItem({
   priorityIndex: number;
   editingTodo: string | null;
   editContent: string;
+  editDetailContent: string;
   editStartDate: string;
   editDueDate: string;
   editTags: string;
@@ -81,6 +84,7 @@ function SortableTodoItem({
   onDeleteTodo: (id: string) => void;
   onLoadTodos: () => Promise<void>;
   setEditContent: (content: string) => void;
+  setEditDetailContent: (content: string) => void;
   setEditStartDate: (date: string) => void;
   setEditDueDate: (date: string) => void;
   setEditTags: (tags: string) => void;
@@ -126,7 +130,7 @@ function SortableTodoItem({
       case 'high':
         return 'border-red-500 border-2 data-[state=checked]:border-red-500'
       case 'medium':
-        return 'border-yellow-500 border-2 data-[state=checked]:border-yellow-500'
+        return 'border-[#EAB30A] border-2 data-[state=checked]:border-[#EAB30A]'
       case 'low':
         return 'border-gray-400 border-2 data-[state=checked]:border-gray-400'
       case 'none':
@@ -181,7 +185,16 @@ function SortableTodoItem({
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               className="flex-1 text-sm"
-              placeholder="编辑todo内容"
+              placeholder="编辑todo标题"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-gray-600">详细内容:</label>
+            <Textarea
+              value={editDetailContent}
+              onChange={(e) => setEditDetailContent(e.target.value)}
+              className="text-sm min-h-[60px] resize-none"
+              placeholder="编辑todo详细内容"
             />
           </div>
           <div className="flex items-center space-x-1">
@@ -277,7 +290,7 @@ function SortableTodoItem({
                 todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
               )}
             >
-              {todo.content || todo.text}
+              {todo.text || todo.content}
               {/* 标签跟在文字后面 */}
               {(todo.tags && todo.tags.length > 0) && (
                 <span className="ml-2">
@@ -449,7 +462,7 @@ export const TodoList = React.memo(function TodoList({
     };
   }>>;
   onToggleTodo: (todoId: string, timeRecord?: string) => void;
-  onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
+  onUpdateTodo: (todoId: string, updates: { content?: string; text?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
   onAddTodo: (todo: { content: string; detailContent?: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
@@ -460,6 +473,7 @@ export const TodoList = React.memo(function TodoList({
   const [selectedPriority, setSelectedPriority] = useState<'high' | 'medium' | 'low'>('high')
   const [editingTodo, setEditingTodo] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [editDetailContent, setEditDetailContent] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editDueDate, setEditDueDate] = useState('')
   const [editTags, setEditTags] = useState('')
@@ -708,7 +722,8 @@ export const TodoList = React.memo(function TodoList({
   const handleEditTodo = (todo: any) => {
     // handleEditTodo被调用
     setEditingTodo(todo.id || (todo as any)._id)
-    setEditContent(todo.content || todo.text)
+    setEditContent(todo.text || '')
+    setEditDetailContent(todo.content || '')
     setEditStartDate(todo.startDate || '')
     setEditDueDate(todo.dueDate || '')
     setEditTags(todo.tags ? todo.tags.join(', ') : '')
@@ -718,22 +733,41 @@ export const TodoList = React.memo(function TodoList({
     if (!editingTodo) return
     
     try {
-      // 处理标签：将逗号分隔的字符串转换为数组，并去除空白
-      const tagsArray = editTags
+      // 从编辑的标题内容中提取#标签
+      const titleContent = editContent.trim()
+      const tagRegex = /#([^\s#]+)/g
+      const extractedTags: string[] = []
+      let match
+      
+      // 提取所有#标签
+      while ((match = tagRegex.exec(titleContent)) !== null) {
+        extractedTags.push(match[1])
+      }
+      
+      // 从标题中移除#标签，保留纯文本
+      const cleanTitle = titleContent.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim()
+      
+      // 处理手动输入的标签：将逗号分隔的字符串转换为数组，并去除空白
+      const manualTags = editTags
         .split(',')
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0)
       
+      // 合并提取的标签和手动输入的标签，去重
+      const allTags = [...new Set([...extractedTags, ...manualTags])]
+      
       // 调用父组件的更新函数并等待完成
       await onUpdateTodo(editingTodo, {
-        content: editContent,
+        text: cleanTitle, // 使用清理后的标题文本
+        content: editDetailContent,
         startDate: editStartDate,
         dueDate: editDueDate,
-        tags: tagsArray
+        tags: allTags // 使用合并后的标签数组
       })
       // 只有在更新成功后才清空编辑状态
       setEditingTodo(null)
       setEditContent('')
+      setEditDetailContent('')
       setEditStartDate('')
       setEditDueDate('')
       setEditTags('')
@@ -751,6 +785,7 @@ export const TodoList = React.memo(function TodoList({
   const handleCancelEdit = () => {
     setEditingTodo(null)
     setEditContent('')
+    setEditDetailContent('')
     setEditStartDate('')
     setEditDueDate('')
     setEditTags('')
@@ -792,7 +827,7 @@ export const TodoList = React.memo(function TodoList({
       const pureContent = content.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim()
       
       await onAddTodo({
-        content: content,
+        content: pureContent, // 使用清理后的纯文本内容，不包含#标签
         detailContent: newTodoDetailContent.trim(),
         priority: newTodoPriority,
         startDate: newTodoStartDate || undefined,
@@ -880,22 +915,22 @@ export const TodoList = React.memo(function TodoList({
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle className="text-lg font-semibold">添加Todo</DialogTitle>
+                <DialogTitle className="text-lg font-semibold">添加待办事项</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Todo内容</label>
+                  <label className="text-sm font-medium">标题</label>
                   <div className="relative">
                     <Input
                       ref={tagInputRef}
-                      placeholder="请输入Todo标题，用#开头可添加标签"
+                      placeholder="请输入待办事项标题，用#开头可添加标签"
                       value={newTodoContent}
                       onChange={(e) => setNewTodoContent(e.target.value)}
                     />
                     <div className="mt-3">
                       <label className="text-sm font-medium mb-2 block">内容</label>
                       <Textarea
-                        placeholder="请输入Todo详细内容..."
+                        placeholder="请输入待办事项详细内容..."
                         value={newTodoDetailContent}
                         onChange={(e) => setNewTodoDetailContent(e.target.value)}
                         className="min-h-[80px] resize-none"
@@ -931,7 +966,8 @@ export const TodoList = React.memo(function TodoList({
                       variant={newTodoPriority === 'medium' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setNewTodoPriority('medium')}
-                      className={newTodoPriority === 'medium' ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : ''}
+                      className={newTodoPriority === 'medium' ? 'text-white' : ''}
+                      style={newTodoPriority === 'medium' ? { backgroundColor: '#EAB30A', borderColor: '#EAB30A' } : {}}
                     >
                       中
                     </Button>
@@ -993,7 +1029,7 @@ export const TodoList = React.memo(function TodoList({
                   disabled={!newTodoContent.trim() || (newTodoPriority === 'none' && !/#[^\s#]+/.test(newTodoContent))}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  添加Todo
+                  添加待办事项
                 </Button>
               </div>
             </DialogContent>
@@ -1088,7 +1124,7 @@ export const TodoList = React.memo(function TodoList({
                   </TabsTrigger>
                   <TabsTrigger value="medium" className="text-xs flex items-center gap-1">
                     <span>中</span>
-                    <span className="text-xs font-medium text-yellow-500">
+                    <span className="text-xs font-medium" style={{color: '#EAB30A'}}>
                       {allTodos.filter(todo => todo.priority === 'medium').length}
                     </span>
                   </TabsTrigger>
@@ -1194,14 +1230,15 @@ export const TodoList = React.memo(function TodoList({
                         高
                       </button>
                       <button
-                        onClick={() => setNewTodoPriority('medium')}
-                        className={cn(
-                          "px-2 py-1 text-xs rounded border transition-colors",
-                          newTodoPriority === 'medium'
-                            ? "bg-yellow-500 text-white border-yellow-500"
-                            : "bg-background text-muted-foreground border-border hover:bg-accent"
-                        )}
-                      >
+                          onClick={() => setNewTodoPriority('medium')}
+                          className={cn(
+                            "px-2 py-1 text-xs rounded border transition-colors",
+                            newTodoPriority === 'medium'
+                              ? "text-white" + " border-[#EAB30A]"
+                              : "bg-background text-muted-foreground border-border hover:bg-accent"
+                          )}
+                          style={newTodoPriority === 'medium' ? { backgroundColor: '#EAB30A' } : {}}
+                        >
                         中
                       </button>
                       <button
@@ -1341,6 +1378,7 @@ export const TodoList = React.memo(function TodoList({
                           priorityIndex={priorityIndex}
                           editingTodo={editingTodo}
                           editContent={editContent}
+                          editDetailContent={editDetailContent}
                           editStartDate={editStartDate}
                           editDueDate={editDueDate}
                           editTags={editTags}
@@ -1357,6 +1395,7 @@ export const TodoList = React.memo(function TodoList({
                           onLoadTodos={onLoadTodos}
                           setOrderSelectTodo={setOrderSelectTodo}
                           setEditContent={setEditContent}
+                          setEditDetailContent={setEditDetailContent}
                           setEditStartDate={setEditStartDate}
                           setEditDueDate={setEditDueDate}
                           setEditTags={setEditTags}

@@ -319,20 +319,9 @@ export function TodoDetail({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        {/* 头部 */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">待办详情</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+
 
         {/* 弹窗内容 */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -340,10 +329,10 @@ export function TodoDetail({
             {/* 待办事项标题和标签 */}
             <div className="flex items-center justify-between mb-4">
               <h2 className={cn(
-                "text-xl font-semibold",
+                "text-base font-semibold",
                 todo.completed && "line-through text-gray-500"
               )}>
-                {todo.text}
+                待办事项：{todo.text}
               </h2>
               {/* 标签 */}
               {todo.tags && todo.tags.length > 0 && (
@@ -363,9 +352,6 @@ export function TodoDetail({
 
             {/* 待办事项内容 */}
             <div className="mb-6">
-              <div className="mb-2">
-                <h3 className="text-sm font-medium text-gray-700">内容</h3>
-              </div>
               
               {isEditingContent ? (
                 <div ref={editAreaRef} className="space-y-2">
@@ -424,57 +410,9 @@ export function TodoDetail({
 
             {/* 子待办事项 */}
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">子待办事项</h3>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsAddingSubtodo(true)}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  添加
-                </Button>
-              </div>
-
-              {/* 添加子待办事项输入框 */}
-              {isAddingSubtodo && (
-                <div className="mb-3 flex gap-2">
-                  <input
-                    type="text"
-                    value={newSubtodoText}
-                    onChange={(e) => setNewSubtodoText(e.target.value)}
-                    placeholder="输入子待办事项..."
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAddSubtodo()
-                      } else if (e.key === 'Escape') {
-                        setIsAddingSubtodo(false)
-                        setNewSubtodoText('')
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={handleAddSubtodo} className="h-8">
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setIsAddingSubtodo(false)
-                      setNewSubtodoText('')
-                    }}
-                    className="h-8"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
 
               {/* 子待办事项列表 */}
-              <div className="space-y-2">
+              <div className="space-y-2 mb-4">
                 {subtodosList.length > 0 ? (
                   subtodosList.map((subtodo, index) => (
                     <div
@@ -531,6 +469,55 @@ export function TodoDetail({
                   </p>
                 )}
               </div>
+
+              {/* 添加子待办事项输入框 */}
+              {isAddingSubtodo && (
+                <div className="mb-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={newSubtodoText}
+                    onChange={(e) => setNewSubtodoText(e.target.value)}
+                    placeholder="输入子待办事项..."
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddSubtodo()
+                      } else if (e.key === 'Escape') {
+                        setIsAddingSubtodo(false)
+                        setNewSubtodoText('')
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={handleAddSubtodo} className="h-8">
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddingSubtodo(false)
+                      setNewSubtodoText('')
+                    }}
+                    className="h-8"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              {/* 添加按钮 - 居中显示 */}
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddingSubtodo(true)}
+                  className="h-7 text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  添加子待办事项
+                </Button>
+              </div>
             </div>
 
             {/* 日期信息 */}
@@ -574,6 +561,17 @@ export function TodoDetail({
           {(onStartTimer || onPauseTimer) && todo && (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
+                {onResetTimer && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onResetTimer(todo._id)}
+                    className="h-8 w-8 p-0 rounded-full border border-gray-300 hover:bg-gray-100"
+                    title="重置计时器"
+                  >
+                    <RotateCcw className="h-4 w-4 text-black" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   onClick={() => {
@@ -591,20 +589,9 @@ export function TodoDetail({
                     <Play className="h-4 w-4 fill-white" />
                   )}
                 </Button>
-                {onResetTimer && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onResetTimer(todo._id)}
-                    className="h-8 w-8 p-0 hover:bg-gray-100"
-                    title="重置计时器"
-                  >
-                    <RotateCcw className="h-4 w-4 text-black" />
-                  </Button>
-                )}
               </div>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm text-gray-600 dark:text-gray-400">计时：</span>
                 <span className="text-lg font-mono text-black dark:text-black">
                   {formatTime(displayTime)}
                 </span>

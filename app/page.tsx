@@ -890,7 +890,7 @@ export default function NotePad() {
         const currentTodos = Object.values(todosByDate).flat()
         allTodos = currentTodos.map((todo: any) => ({
           _id: todo.id || todo._id || '',
-          text: todo.content || todo.text || '',
+          text: todo.text || todo.content || '',
           completed: todo.completed || false,
           priority: todo.priority || 'medium',
           dueDate: todo.dueDate,
@@ -1630,7 +1630,7 @@ export default function NotePad() {
               
               return true
             }).map(todoData => ({
-              text: todoData.todo.content,
+              text: todoData.todo.text || todoData.todo.content,
               tags: todoData.todo.tags || [],
               dueDate: todoData.todo.dueDate,
               startDate: todoData.todo.startDate,
@@ -3066,7 +3066,7 @@ export default function NotePad() {
     try {
       // 调用后端API创建todo
       const result = await todosApi.create({
-        text: todo.content,
+        text: todo.content, // 这里todo.content实际上是标题内容
         content: todo.detailContent || '',
         priority: todo.priority,
         dueDate: todo.dueDate ? new Date(todo.dueDate).toISOString() : undefined,
@@ -3581,8 +3581,8 @@ export default function NotePad() {
           todosByDateMap[dateKey].push({
             id: todo._id,
             _id: todo._id,
-            content: todo.text,
-            text: todo.text,
+            content: todo.content || '', // 详细内容字段
+            text: todo.text, // 标题字段
             completed: todo.completed || false,
             tags: todo.tags || [],
             dueDate: todo.dueDate,
@@ -4020,9 +4020,10 @@ export default function NotePad() {
                     onAddTodo={handleAddTodo}
                     onShowTodoDetail={(todo) => {
           const fullTodo: Todo = {
-            _id: todo._id || todo.id,
-            text: todo.text || todo.content,
-            completed: todo.completed,
+          _id: todo._id || todo.id,
+          text: todo.text,
+          content: todo.content || '', // 确保包含content字段，但不使用text作为备选
+          completed: todo.completed,
             userId: todo.userId || '',
             createdAt: todo.createdAt || new Date().toISOString(),
             updatedAt: todo.updatedAt || new Date().toISOString(),

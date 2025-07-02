@@ -408,10 +408,12 @@ export const todoActions = {
     id: string,
     data: {
       text?: string;
+      content?: string;
       completed?: boolean;
       priority?: 'low' | 'medium' | 'high' | 'none';
       dueDate?: string;
       category?: string;
+      tags?: string[];
     }
   ) {
     try {
