@@ -82,7 +82,7 @@ router.get('/', [
         timerKeys: todo.timer ? Object.keys(todo.timer) : 'no timer'
       });
     });
-    console.log('=== End Backend Timer Debug ===');
+
 
     const total = await Todo.countDocuments(query);
 
@@ -874,8 +874,7 @@ router.post('/:id/timer/start', async (req, res) => {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
-    console.log('=== Backend Timer Start - Before ===');
-    console.log('Todo timer before start:', todo.timer);
+
 
     // 如果计时器已经在运行，先停止并累加时间
     if (todo.timer.isRunning && todo.timer.startTime) {
@@ -889,9 +888,7 @@ router.post('/:id/timer/start', async (req, res) => {
 
     const updatedTodo = await Todo.findById(todoId).populate('noteId', 'title');
 
-    console.log('=== Backend Timer Start - After ===');
-    console.log('Updated todo timer:', updatedTodo.timer);
-    console.log('=== End Timer Start Debug ===');
+
 
     res.json({
       success: true,

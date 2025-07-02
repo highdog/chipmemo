@@ -26,13 +26,10 @@ const CheckInList: React.FC<CheckInListProps> = ({ onTagSelect }) => {
 
   const fetchCheckInTags = async () => {
     try {
-      console.log('🔍 [CheckInList] 开始获取所有标签内容...')
       const response = await tagContentsApi.getAll()
-      console.log('📥 [CheckInList] 获取到的原始数据:', response)
-      
-      if (response && response.data) {
-        const checkInData = response.data.filter((item: TagContent) => item.isCheckInEnabled)
-        console.log('✅ [CheckInList] 过滤后的打卡标签:', checkInData)
+    
+    if (response.success && response.data) {
+      const checkInData = response.data.filter((tagContent: TagContent) => tagContent.isCheckInEnabled === true)
         setCheckInTags(checkInData)
         setError(null)
       } else {
@@ -82,80 +79,52 @@ const CheckInList: React.FC<CheckInListProps> = ({ onTagSelect }) => {
   }
 
   const handleTagClick = (tag: string) => {
-    console.log('✅ [CheckInList] 点击打卡标签，显示标签内容:', tag)
-    // 触发标签搜索事件，在当前页面显示标签内容
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('tag-search', { detail: { tag } }))
-    }
+    onTagSelect?.(tag)
+  }
+
+  // 监听打卡列表刷新事件
+  const handleCheckInRefresh = () => {
+    fetchCheckInTags()
   }
 
   useEffect(() => {
     fetchCheckInTags()
-
-    // 监听打卡列表刷新事件
-    const handleCheckInRefresh = () => {
-      console.log('🔄 [CheckInList] 收到打卡列表刷新事件，重新获取数据...')
-      setLoading(true)
-      fetchCheckInTags()
-    }
-
-    window.addEventListener('checkin-list-refresh', handleCheckInRefresh)
-    window.addEventListener('goals-list-refresh', handleCheckInRefresh) // 复用目标刷新事件
-    console.log('👂 [CheckInList] 已添加打卡列表刷新事件监听器')
-
-    // 清理事件监听器
+    window.addEventListener('checkInRefresh', handleCheckInRefresh)
+    
     return () => {
-      window.removeEventListener('checkin-list-refresh', handleCheckInRefresh)
-      window.removeEventListener('goals-list-refresh', handleCheckInRefresh)
-      console.log('🧹 [CheckInList] 已移除打卡列表刷新事件监听器')
+      window.removeEventListener('checkInRefresh', handleCheckInRefresh)
     }
   }, [])
 
-  console.log('🎨 [CheckInList] 渲染组件，当前状态:', {
-    loading,
-    error,
-    checkInTagsCount: checkInTags.length,
-    checkInTags: checkInTags.map(t => ({ tag: t.tag, isCheckInEnabled: t.isCheckInEnabled, checkInCount: t.checkInCount }))
-  })
-
   if (loading) {
-    console.log('⏳ [CheckInList] 显示加载状态')
     return (
-      <div>
-        <p>加载中...</p>
+      <div className="flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-gray-600">加载打卡列表...</span>
       </div>
     )
   }
 
   if (error) {
-    console.log('❌ [CheckInList] 显示错误状态:', error)
     return (
-      <div>
-         <p className="text-red-500">{error}</p>
-       </div>
+      <div className="flex items-center justify-center p-4">
+        <div className="text-red-500">{error}</div>
+      </div>
     )
   }
 
-  if (checkInTags.length === 0) {
-    console.log('📭 [CheckInList] 显示无打卡标签状态')
+  if (!checkInTags || checkInTags.length === 0) {
     return (
-      <div>
-         <p className="text-gray-500">暂无设置打卡的标签</p>
-       </div>
+      <div className="flex items-center justify-center p-4">
+        <div className="text-gray-500">暂无打卡标签</div>
+      </div>
     )
   }
 
-  console.log('✅ [CheckInList] 显示打卡列表，共', checkInTags.length, '个打卡标签')
-  
   return (
     <div className="space-y-2">
       {checkInTags.map((tag) => {
         const isCheckingIn = checkingInTags.has(tag.tag)
-        
-        console.log(`✅ [CheckInList] 渲染打卡标签 "${tag.tag}":`, {
-          checkInCount: tag.checkInCount,
-          isCheckingIn
-        })
         
         return (
           <div 

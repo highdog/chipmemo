@@ -21,34 +21,22 @@ enum TimerState {
 const useTimer = (todo: Todo | null) => {
   const [, forceUpdate] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  
-  // 添加调试语句
-  console.log('🔍 [DEBUG] useTimer called with todo:', todo)
-  console.log('🔍 [DEBUG] useTimer todo?.timer:', todo?.timer)
-  console.log('🔍 [DEBUG] useTimer todo?.timer?.totalSeconds:', todo?.timer?.totalSeconds)
-  console.log('🔍 [DEBUG] useTimer todo?.timer?.isRunning:', todo?.timer?.isRunning)
 
   // 计算当前显示的时间
   const getDisplayTime = useCallback(() => {
     try {
-      console.log('🔍 [DEBUG] getDisplayTime called, todo?.timer:', todo?.timer)
-      
       // 如果没有todo对象，返回0
       if (!todo) {
-        console.log('🔍 [DEBUG] No todo object, returning 0')
         return 0
       }
       
       // 如果没有timer对象但有todo，检查是否有timer数据
       if (!todo.timer) {
-        console.log('🔍 [DEBUG] No timer object on todo, returning 0')
         return 0
       }
       
       // 确保 totalSeconds 有默认值，使用 ?? 而不是 ||
       const totalSeconds = todo.timer.totalSeconds ?? 0
-      console.log('🔍 [DEBUG] totalSeconds calculated:', totalSeconds)
-      console.log('🔍 [DEBUG] todo.timer.totalSeconds original:', todo.timer.totalSeconds)
       
       // 验证 totalSeconds 是否为有效数字
       if (typeof totalSeconds !== 'number' || isNaN(totalSeconds)) {

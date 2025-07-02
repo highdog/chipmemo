@@ -31,15 +31,7 @@ router.get('/', [
     const skip = (page - 1) * limit;
     const { search, tags, archived } = req.query;
 
-    // 添加调试日志
-    console.log('🔍 [BACKEND DEBUG] Notes search request:', {
-      userId: req.user._id,
-      search,
-      tags,
-      archived,
-      page,
-      limit
-    });
+
 
     // Build query
     const query = { userId: req.user._id };
@@ -58,23 +50,21 @@ router.get('/', [
     let notes;
     let searchQuery = { ...query };
     
-    console.log('🔍 [BACKEND DEBUG] Base query:', query);
+
     
     if (search) {
-      console.log('🔍 [BACKEND DEBUG] Performing search for:', search);
       // Try text search first, fallback to regex search if no results or no text index
       try {
         searchQuery.$text = { $search: search };
-        console.log('🔍 [BACKEND DEBUG] Text search query:', searchQuery);
+
         notes = await Note.find(searchQuery, { score: { $meta: 'textScore' } })
           .sort({ score: { $meta: 'textScore' }, isPinned: -1, createdAt: -1 })
           .skip(skip)
           .limit(limit);
-        console.log('🔍 [BACKEND DEBUG] Text search results:', notes.length);
+
         
         // If text search returns no results, try regex search
         if (notes.length === 0) {
-          console.log('🔍 [BACKEND DEBUG] Text search returned no results, trying regex fallback');
           searchQuery = {
             ...query,
             $or: [
@@ -82,16 +72,16 @@ router.get('/', [
               { content: { $regex: search, $options: 'i' } }
             ]
           };
-          console.log('🔍 [BACKEND DEBUG] Regex search query:', searchQuery);
+
           notes = await Note.find(searchQuery)
             .sort({ isPinned: -1, createdAt: -1 })
             .skip(skip)
             .limit(limit);
-          console.log('🔍 [BACKEND DEBUG] Regex search results:', notes.length);
+
         }
       } catch (error) {
         // Fallback to regex search if text index doesn't exist
-        console.log('🔍 [BACKEND DEBUG] Text search failed, using regex fallback:', error.message);
+
         searchQuery = {
           ...query,
           $or: [
@@ -99,24 +89,23 @@ router.get('/', [
             { content: { $regex: search, $options: 'i' } }
           ]
         };
-        console.log('🔍 [BACKEND DEBUG] Regex search query:', searchQuery);
+
         notes = await Note.find(searchQuery)
           .sort({ isPinned: -1, createdAt: -1 })
           .skip(skip)
           .limit(limit);
-        console.log('🔍 [BACKEND DEBUG] Regex search results:', notes.length);
+
       }
     } else {
-      console.log('🔍 [BACKEND DEBUG] No search term, getting all notes');
       notes = await Note.find(query)
         .sort({ isPinned: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit);
-      console.log('🔍 [BACKEND DEBUG] All notes results:', notes.length);
+      
     }
 
     const total = await Note.countDocuments(searchQuery);
-    console.log('🔍 [BACKEND DEBUG] Total count:', total);
+    
 
     res.json({
       success: true,

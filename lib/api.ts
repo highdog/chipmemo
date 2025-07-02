@@ -344,25 +344,7 @@ class ApiClient {
     const query = searchParams.toString();
     const url = `/notes${query ? `?${query}` : ''}`;
     
-    // 添加调试信息
-    if (params?.search) {
-      console.log('🔍 [DEBUG] Search request:', {
-        params,
-        url: `${this.baseURL}${url}`,
-        query
-      });
-    }
-    
     const result = await this.get<{ notes: Note[]; pagination: any }>(url);
-    
-    // 添加响应调试信息
-    if (params?.search) {
-      console.log('📡 [DEBUG] Search response:', {
-        success: result.success,
-        notesCount: result.data?.notes?.length || 0,
-        error: result.error
-      });
-    }
     
     return result;
   }
@@ -415,59 +397,16 @@ class ApiClient {
     isCheckInEnabled?: boolean
     checkInCount?: number
   }): Promise<ApiResponse<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number; updatedAt: string }>> {
-    console.log('🌐 [API] saveTagContent 调用开始')
-    console.log('📤 [API] 请求参数:', {
-      tag: tag,
-      content: content,
-      goalSettings: goalSettings
-    })
-    
     const requestBody = {
       content,
       ...goalSettings
     }
     
-    console.log('📦 [API] 请求体:', requestBody)
-    console.log('🔗 [API] 请求URL:', `/tag-contents/${encodeURIComponent(tag)}`)
-    
-    try {
-      const response = await this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, requestBody)
-      
-      console.log('📥 [API] saveTagContent 响应:', response)
-      console.log('✅ [API] saveTagContent 成功')
-      
-      return response
-    } catch (error) {
-      console.error('❌ [API] saveTagContent 失败:', error)
-      throw error
-    }
+    return this.put<{ tag: string; content: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number; updatedAt: string }>(`/tag-contents/${encodeURIComponent(tag)}`, requestBody)
   }
 
   async getAll(): Promise<ApiResponse<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>>> {
-    console.log('🌐 [API] getAll 调用开始')
-    console.log('🔗 [API] 请求URL: /tag-contents')
-    
-    try {
-      const response = await this.get<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>>('/tag-contents')
-      console.log('📥 [API] getAll 响应:', response)
-      console.log('📊 [API] getAll 数据类型:', typeof response)
-      console.log('📋 [API] getAll 数据结构:', response ? Object.keys(response) : 'null')
-      
-      if (response && response.data) {
-        console.log('📄 [API] getAll 数据详情:', {
-          dataType: typeof response.data,
-          isArray: Array.isArray(response.data),
-          length: response.data.length,
-          firstItem: response.data[0]
-        })
-      }
-      
-      console.log('✅ [API] getAll 成功')
-      return response
-    } catch (error) {
-      console.error('❌ [API] getAll 失败:', error)
-      throw error
-    }
+    return this.get<Array<{ tag: string; content: string; updatedAt: string; isGoalEnabled?: boolean; targetCount?: number; currentCount?: number; isCheckInEnabled?: boolean; checkInCount?: number }>>('/tag-contents')
   }
   async deleteTagContent(tag: string): Promise<ApiResponse<{ message: string }>> {
     return this.delete<{ message: string }>(`/tag-contents/${encodeURIComponent(tag)}`);
@@ -549,24 +488,9 @@ class ApiClient {
     }
     const query = searchParams.toString();
     
-    console.log('=== Frontend API getTodos Call ===');
     const response = await this.get<{ todos: Todo[]; pagination: any }>(
       `/todos${query ? `?${query}` : ''}`
     );
-    
-    console.log('Frontend API response:', response);
-    if (response.success && response.data?.todos) {
-      console.log('Frontend API todos count:', response.data.todos.length);
-      response.data.todos.forEach((todo, index) => {
-        console.log(`Frontend Todo ${index + 1} (${todo._id}):`, {
-          text: todo.text?.substring(0, 30) + '...',
-          timer: todo.timer,
-          timerType: typeof todo.timer,
-          timerKeys: todo.timer ? Object.keys(todo.timer) : 'no timer'
-        });
-      });
-    }
-    console.log('=== End Frontend API Debug ===');
     
     return response;
   }

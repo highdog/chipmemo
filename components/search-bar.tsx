@@ -43,7 +43,7 @@ export const SearchBar = React.memo(function SearchBar({
     const loadTags = async () => {
       try {
         const tags = await getAllTags()
-        console.log('Loaded tags:', tags) // 调试信息
+    
         setAllTags(tags)
       } catch (error) {
         console.error('Failed to load tags:', error)
@@ -66,9 +66,7 @@ export const SearchBar = React.memo(function SearchBar({
 
   // 处理输入变化和标签建议
   const handleInputChange = (value: string) => {
-    console.log('=== handleInputChange called ===', value) // 新增调试信息
     setInputValue(value)
-    console.log('Input changed:', value, 'All tags:', allTags) // 调试信息
     
     // 如果输入以#开头，显示标签建议
     if (value.startsWith('#')) {
@@ -84,8 +82,6 @@ export const SearchBar = React.memo(function SearchBar({
         // 如果只输入了#，显示所有标签
         filteredTags = allTags.slice(0, 8)
       }
-      
-      console.log('Tag query:', tagQuery, 'Filtered tags:', filteredTags) // 调试信息
       setSuggestions(filteredTags)
       updateDropdownPosition()
       setShowSuggestions(true) // 总是显示建议列表

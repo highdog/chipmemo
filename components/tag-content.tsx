@@ -412,14 +412,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   const handleSave = async () => {
     if (!tag) return
     
-    console.log('💾 [TagContent] 开始保存标签内容和目标设置...')
-    console.log('📝 [TagContent] 保存参数:', {
-      tag: tag,
-      content: content,
-      isGoalEnabled: isGoalEnabled,
-      targetCount: targetCount,
-      currentCount: currentCount
-    })
+
     
     try {
       setIsSaving(true)
@@ -432,17 +425,12 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         checkInCount: isCheckInEnabled ? checkInCount : 0
       }
       
-      console.log('🎯 [TagContent] 目标设置数据:', goalSettings)
-      
       const result = await tagContentsApi.save(tag, content, goalSettings)
-      console.log('✅ [TagContent] 保存结果:', result)
       
       if (result.success) {
-        console.log('🎉 [TagContent] 保存成功！')
         setIsEditing(false)
         
         // 触发目标列表刷新
-        console.log('🔄 [TagContent] 触发目标列表刷新事件')
         window.dispatchEvent(new CustomEvent('goals-list-refresh'))
         
         // 显示成功提示
@@ -460,7 +448,6 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       toast.error('网络错误或服务器异常')
     } finally {
       setIsSaving(false)
-      console.log('🏁 [TagContent] 保存流程结束')
     }
   }
 
@@ -484,23 +471,12 @@ export function TagContent({ tag, onSave }: TagContentProps) {
 
   // 处理勾选框点击
   const handleCheckboxClick = async (index: number) => {
-    console.log('🎯 [勾选框] 点击勾选框，索引:', index)
-    
     if (!isGoalEnabled) {
-      console.log('❌ [勾选框] 目标功能未启用')
       return
     }
     
     const newCheckedBoxes = [...checkedBoxes]
     const wasChecked = newCheckedBoxes[index]
-    
-    console.log('📊 [勾选框] 当前状态:', {
-      index,
-      wasChecked,
-      tag,
-      targetCount,
-      currentCount
-    })
     
     // 切换勾选状态
     newCheckedBoxes[index] = !wasChecked
@@ -510,11 +486,6 @@ export function TagContent({ tag, onSave }: TagContentProps) {
     const newCurrentCount = newCheckedBoxes.filter(Boolean).length
     setCurrentCount(newCurrentCount)
     
-    console.log('🔄 [勾选框] 更新后状态:', {
-      newCurrentCount,
-      willCreateNote: !wasChecked
-    })
-    
     try {
       // 保存进度到后端
       const goalSettings = {
@@ -523,9 +494,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         currentCount: newCurrentCount
       }
       
-      console.log('💾 [勾选框] 保存进度设置:', goalSettings)
       const saveResult = await tagContentsApi.save(tag, content, goalSettings)
-      console.log('✅ [勾选框] 进度保存成功:', saveResult)
       
       // 如果是勾选（进度+1），自动创建笔记
       if (!wasChecked) {
@@ -539,10 +508,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
           color: 'blue'
         }
         
-        console.log('📝 [勾选框] 准备创建笔记:', noteData)
-        
         const createResult = await apiClient.createNote(noteData)
-        console.log('✅ [勾选框] 笔记创建成功:', createResult)
         
         toast.success(`进度 +1，已自动创建笔记`)
         
@@ -551,7 +517,6 @@ export function TagContent({ tag, onSave }: TagContentProps) {
           detail: { currentTag: tag }
         }))
       } else {
-        console.log('📝 [勾选框] 取消勾选，不创建笔记')
         toast.success(`进度已更新：${newCurrentCount}/${targetCount}`)
       }
       
@@ -559,12 +524,7 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       window.dispatchEvent(new CustomEvent('goals-list-refresh'))
       
     } catch (error: any) {
-      console.error('❌ [勾选框] 操作失败:', error)
-      console.error('❌ [勾选框] 错误详情:', {
-        message: error?.message,
-        stack: error?.stack,
-        response: error?.response
-      })
+      console.error('勾选框操作失败:', error)
       
       // 回滚状态
       newCheckedBoxes[index] = wasChecked
