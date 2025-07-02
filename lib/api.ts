@@ -79,6 +79,7 @@ export interface Subtodo {
 export interface Todo {
   _id: string;
   text: string;
+  content?: string;
   completed: boolean;
   priority?: 'low' | 'medium' | 'high' | 'none';
   dueDate?: string;
@@ -507,6 +508,7 @@ class ApiClient {
 
   async createTodo(todoData: {
     text: string;
+    content?: string;
     priority?: 'low' | 'medium' | 'high' | 'none';
     dueDate?: string;
     category?: string;
@@ -520,6 +522,7 @@ class ApiClient {
     id: string,
     todoData: Partial<{
       text: string;
+      content: string;
       completed: boolean;
       priority: 'low' | 'medium' | 'high' | 'none';
       dueDate: string;

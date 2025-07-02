@@ -41,6 +41,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
   // 待办相关状态
   const [todos, setTodos] = useState<Todo[]>([])
   const [newTodo, setNewTodo] = useState("")
+  const [newTodoContent, setNewTodoContent] = useState("")
   const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high' | 'none'>('medium')
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [selectedTag, setSelectedTag] = useState("All")
@@ -168,10 +169,12 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
       
       await todosApi.create({
         text: cleanContent,
+        content: newTodoContent.trim(),
         priority: newTodoPriority,
         tags: tags
       })
       setNewTodo("")
+      setNewTodoContent("")
       setNewTodoPriority('medium')
       setIsDialogOpen(false)
       await loadTodos()
@@ -280,13 +283,25 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                 <DialogTitle>添加待办事项</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <Textarea
-                  placeholder="输入待办内容"
-                  value={newTodo}
-                  onChange={(e) => setNewTodo(e.target.value)}
-                  className="min-h-[80px] resize-none"
-                  autoFocus
-                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">标题</label>
+                  <Textarea
+                    placeholder="输入待办标题"
+                    value={newTodo}
+                    onChange={(e) => setNewTodo(e.target.value)}
+                    className="min-h-[60px] resize-none"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">内容</label>
+                  <Textarea
+                    placeholder="输入待办详细内容（可选）"
+                    value={newTodoContent}
+                    onChange={(e) => setNewTodoContent(e.target.value)}
+                    className="min-h-[80px] resize-none"
+                  />
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">优先级</label>
                   <div className="flex gap-2">
@@ -349,6 +364,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
                     onClick={() => {
                       setIsDialogOpen(false)
                       setNewTodo("")
+                      setNewTodoContent("")
                       setNewTodoPriority('medium')
                     }}
                   >

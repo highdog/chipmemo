@@ -3,10 +3,11 @@
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, Clock, Pause, Tag, Plus, Check, Trash2, Play, GripVertical, RotateCcw } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { X, Clock, Pause, Tag, Plus, Check, Trash2, Play, GripVertical, RotateCcw, Edit, Save } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Todo, Subtodo } from "@/lib/api"
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 
 // 使用原生HTML5拖拽API，不需要额外依赖
 
@@ -120,6 +121,8 @@ interface TodoDetailProps {
   onToggleSubtodo?: (todoId: string, subtodoId: string) => void;
   onDeleteSubtodo?: (todoId: string, subtodoId: string) => void;
   onReorderSubtodos?: (todoId: string, reorderedSubtodos: Subtodo[]) => void;
+  // 编辑相关props
+  onUpdateTodo?: (todoId: string, updates: { content?: string; text?: string }) => Promise<void>;
 }
 
 export function TodoDetail({ 
@@ -138,10 +141,17 @@ export function TodoDetail({
   onAddSubtodo,
   onToggleSubtodo,
   onDeleteSubtodo,
-  onReorderSubtodos
+  onReorderSubtodos,
+  onUpdateTodo
 }: TodoDetailProps) {
   const [newSubtodoText, setNewSubtodoText] = useState('')
   const [isAddingSubtodo, setIsAddingSubtodo] = useState(false)
+  
+  // 编辑相关状态
+  const [isEditingContent, setIsEditingContent] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const editAreaRef = useRef<HTMLDivElement>(null)
   
   // 使用自定义 Hook 管理计时器逻辑
   const { displayTime, timerState, isRunning, error } = useTimer(todo)
@@ -155,6 +165,58 @@ export function TodoDetail({
   const timerButtonText = useMemo(() => {
     return isRunning ? '暂停' : '开始'
   }, [isRunning])
+
+  // 初始化编辑内容
+  useEffect(() => {
+    if (todo && isEditingContent) {
+      setEditContent(todo.content || '')
+    }
+  }, [todo, isEditingContent])
+  
+  // 点击外部区域自动保存
+  useEffect(() => {
+    if (!isEditingContent) return
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editAreaRef.current && !editAreaRef.current.contains(event.target as Node)) {
+        handleSaveContent()
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isEditingContent, editContent])
+  
+  // 开始编辑内容
+  const handleStartEditContent = () => {
+    if (todo) {
+      setEditContent(todo.content || '')
+      setIsEditingContent(true)
+    }
+  }
+  
+  // 保存编辑内容
+  const handleSaveContent = async () => {
+    if (!todo || !onUpdateTodo) return
+    
+    setIsSaving(true)
+    try {
+      await onUpdateTodo(todo._id, { content: editContent.trim() })
+      setIsEditingContent(false)
+    } catch (error) {
+      console.error('保存内容失败:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+  
+  // 取消编辑内容
+  const handleCancelEditContent = () => {
+    setIsEditingContent(false)
+    setEditContent('')
+  }
 
   // 所有 useCallback hooks 必须在条件返回之前定义
   const handleAddSubtodo = useCallback(() => {
@@ -275,35 +337,90 @@ export function TodoDetail({
         {/* 弹窗内容 */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
-            {/* Todo内容和标签在同一行 */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">内容</h3>
-                <div className={cn(
-                  "text-base p-3 bg-muted/30 rounded-md",
-                  todo.completed ? "line-through text-muted-foreground" : "text-foreground"
-                )}>
-                  {todo.text}
-                </div>
-              </div>
-              {/* 标签靠右排列 */}
+            {/* 待办事项标题和标签 */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={cn(
+                "text-xl font-semibold",
+                todo.completed && "line-through text-gray-500"
+              )}>
+                {todo.text}
+              </h2>
+              {/* 标签 */}
               {todo.tags && todo.tags.length > 0 && (
-                <div className="flex-shrink-0">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">标签</h3>
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    {todo.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      >
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {todo.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                    >
+                      <Tag className="h-3 w-3 mr-1" />
+                      {tag}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
+
+            {/* 待办事项内容 */}
+            <div className="mb-6">
+              <div className="mb-2">
+                <h3 className="text-sm font-medium text-gray-700">内容</h3>
+              </div>
+              
+              {isEditingContent ? (
+                <div ref={editAreaRef} className="space-y-2">
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="添加待办事项的详细内容..."
+                    className="min-h-[100px] resize-none"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveContent}
+                      disabled={isSaving}
+                      className="h-7 px-3 text-xs"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin mr-1" />
+                          保存中
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3 h-3 mr-1" />
+                          保存
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEditContent}
+                      disabled={isSaving}
+                      className="h-7 px-3 text-xs"
+                    >
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className="bg-gray-50 rounded-lg p-3 min-h-[60px] cursor-pointer hover:bg-gray-100 transition-colors"
+                  onDoubleClick={handleStartEditContent}
+                >
+                  {todo.content ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{todo.content}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">双击添加内容...</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+
 
             {/* 子待办事项 */}
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
@@ -509,15 +626,15 @@ export function TodoDetail({
               关闭
             </Button>
             <Button
-              onClick={handleToggle}
-              className={cn(
-                todo.completed 
-                  ? "bg-orange-500 hover:bg-orange-600" 
-                  : "bg-black hover:bg-gray-800 text-white"
-              )}
-            >
-              {todo.completed ? "标记为未完成" : "标记为已完成"}
-            </Button>
+                onClick={handleToggle}
+                className={cn(
+                  todo.completed 
+                    ? "bg-orange-500 hover:bg-orange-600" 
+                    : "bg-black hover:bg-gray-800 text-white"
+                )}
+              >
+                {todo.completed ? "标记为未完成" : "标记为已完成"}
+              </Button>
           </div>
         </div>
       </div>

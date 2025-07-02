@@ -2968,11 +2968,12 @@ export default function NotePad() {
     }
   }
 
-  const handleUpdateTodo = async (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => {
+  const handleUpdateTodo = async (todoId: string, updates: { content?: string; text?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => {
     try {
       // 调用后端API更新todo
       const updateData: any = {}
-      if (updates.content !== undefined) updateData.text = updates.content
+      if (updates.content !== undefined) updateData.content = updates.content
+      if (updates.text !== undefined) updateData.text = updates.text
       
       // 处理日期格式，确保符合ISO8601标准
       if (updates.startDate !== undefined) {
@@ -3000,6 +3001,13 @@ export default function NotePad() {
       
       const result = await apiClient.updateTodo(todoId, updateData)
       if (result.success) {
+        // 更新选中的todo详情
+        if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+          setSelectedTodoDetail({
+            ...selectedTodoDetail,
+            ...updates
+          })
+        }
         // 重新加载todos数据以确保同步
         await loadTodosData()
         toast({
@@ -3054,11 +3062,12 @@ export default function NotePad() {
     }
   }
 
-  const handleAddTodo = async (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => {
+  const handleAddTodo = async (todo: { content: string; detailContent?: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => {
     try {
       // 调用后端API创建todo
       const result = await todosApi.create({
         text: todo.content,
+        content: todo.detailContent || '',
         priority: todo.priority,
         dueDate: todo.dueDate ? new Date(todo.dueDate).toISOString() : undefined,
         tags: todo.tags
@@ -4057,6 +4066,7 @@ export default function NotePad() {
           onToggleSubtodo={handleToggleSubtodo}
           onDeleteSubtodo={handleDeleteSubtodo}
           onReorderSubtodos={handleReorderSubtodos}
+          onUpdateTodo={handleUpdateTodo}
         />
 
     </div>

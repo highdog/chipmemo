@@ -452,7 +452,7 @@ export const TodoList = React.memo(function TodoList({
   onUpdateTodo: (todoId: string, updates: { content?: string; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; tags?: string[] }) => void;
   onDeleteTodo: (todoId: string) => void;
   onLoadTodos: () => Promise<void>;
-  onAddTodo: (todo: { content: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
+  onAddTodo: (todo: { content: string; detailContent?: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
   onShowTodoDetail: (todo: { id: string; _id: string; content: string; text: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; order?: number; userId?: string; createdAt?: string; updatedAt?: string; subtodos?: any[]; timer?: { isRunning: boolean; totalSeconds: number; startTime?: string; }; }) => void;
 }) {
   const [isLoading, setIsLoading] = useState(false)
@@ -468,6 +468,7 @@ export const TodoList = React.memo(function TodoList({
   const [isLargeTodoListOpen, setIsLargeTodoListOpen] = useState(false)
   const [newTodoTag, setNewTodoTag] = useState<string | null>(null)
   const [newTodoContent, setNewTodoContent] = useState('')
+  const [newTodoDetailContent, setNewTodoDetailContent] = useState('')
   const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high' | 'none'>('medium')
   const [newTodoStartDate, setNewTodoStartDate] = useState('')
   const [newTodoDueDate, setNewTodoDueDate] = useState('')
@@ -791,15 +792,17 @@ export const TodoList = React.memo(function TodoList({
       const pureContent = content.replace(/#[^\s#]+/g, '').replace(/\s+/g, ' ').trim()
       
       await onAddTodo({
-        content: pureContent,
+        content: content,
+        detailContent: newTodoDetailContent.trim(),
         priority: newTodoPriority,
         startDate: newTodoStartDate || undefined,
         dueDate: newTodoDueDate || undefined,
         tags: tags
       })
-      
+
       // 重置表单
       setNewTodoContent('')
+      setNewTodoDetailContent('')
       setNewTodoPriority('medium')
       setNewTodoStartDate('')
       setNewTodoDueDate('')
@@ -885,10 +888,19 @@ export const TodoList = React.memo(function TodoList({
                   <div className="relative">
                     <Input
                       ref={tagInputRef}
-                      placeholder="请输入Todo内容，用#开头可添加标签"
+                      placeholder="请输入Todo标题，用#开头可添加标签"
                       value={newTodoContent}
                       onChange={(e) => setNewTodoContent(e.target.value)}
                     />
+                    <div className="mt-3">
+                      <label className="text-sm font-medium mb-2 block">内容</label>
+                      <Textarea
+                        placeholder="请输入Todo详细内容..."
+                        value={newTodoDetailContent}
+                        onChange={(e) => setNewTodoDetailContent(e.target.value)}
+                        className="min-h-[80px] resize-none"
+                      />
+                    </div>
                     <TagSuggestion
                       inputValue={newTodoContent}
                       onTagSelect={(newValue) => {

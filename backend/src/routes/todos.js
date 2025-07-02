@@ -189,6 +189,10 @@ router.post('/', [
     .withMessage('Todo text is required')
     .isLength({ max: 500 })
     .withMessage('Todo text cannot exceed 500 characters'),
+  body('content')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('Todo content cannot exceed 2000 characters'),
   body('priority')
     .optional()
     .isIn(['low', 'medium', 'high', 'none'])
@@ -240,6 +244,7 @@ router.post('/', [
 
     const todo = new Todo({
       text,
+      content: req.body.content || '',
       priority: todoPriority,
       dueDate: dueDate || null,
       category: category || 'general',
@@ -334,6 +339,7 @@ router.post('/batch', [
 
         const todo = new Todo({
           text,
+          content: req.body.content || '',
           priority: todoPriority,
           dueDate: dueDate || null,
           category: category || 'general',
@@ -380,6 +386,10 @@ router.put('/:id', [
     .optional()
     .isLength({ min: 1, max: 500 })
     .withMessage('Todo text must be between 1 and 500 characters'),
+  body('content')
+    .optional()
+    .isLength({ max: 2000 })
+    .withMessage('Todo content cannot exceed 2000 characters'),
   body('completed')
     .optional()
     .isBoolean()
