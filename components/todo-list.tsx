@@ -540,6 +540,7 @@ export const TodoList = React.memo(function TodoList({
   const [isLoading, setIsLoading] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [selectedPriority, setSelectedPriority] = useState<'high' | 'medium' | 'low'>('high')
+
   const [editingTodo, setEditingTodo] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [editDetailContent, setEditDetailContent] = useState('')
@@ -656,6 +657,32 @@ export const TodoList = React.memo(function TodoList({
       return countB - countA // 降序排列，数量多的在前面
     })
   }, [allTodos])
+
+  // 智能选择优先级：按高、中、低顺序检查，选择第一个有待办事项的优先级
+  const getSmartPriority = useCallback(() => {
+    const highCount = allTodos.filter(todo => todo.priority === 'high').length
+    const mediumCount = allTodos.filter(todo => todo.priority === 'medium').length
+    const lowCount = allTodos.filter(todo => todo.priority === 'low').length
+    
+    if (highCount > 0) {
+      return 'high'
+    } else if (mediumCount > 0) {
+      return 'medium'
+    } else {
+      return 'low'
+    }
+  }, [allTodos])
+
+  // 当选择'all'标签时，自动选择有待办事项的优先级
+  useEffect(() => {
+    if (selectedTag === 'all') {
+      const currentPriorityCount = allTodos.filter(todo => todo.priority === selectedPriority).length
+      if (currentPriorityCount === 0) {
+        const smartPriority = getSmartPriority()
+        setSelectedPriority(smartPriority)
+      }
+    }
+  }, [selectedTag, allTodos, selectedPriority, getSmartPriority])
 
   // 根据优先级和序号获取文字颜色
   const getPriorityTextColor = (priority?: string, priorityIndex?: number) => {
@@ -1131,18 +1158,8 @@ export const TodoList = React.memo(function TodoList({
             <button
               onClick={() => {
                 setSelectedTag('all')
-                // 智能选择优先级：如果高优先级数量为0，则选择中优先级；如果中优先级也为0，则选择低优先级
-                const highCount = allTodos.filter(todo => todo.priority === 'high').length
-                const mediumCount = allTodos.filter(todo => todo.priority === 'medium').length
-                const lowCount = allTodos.filter(todo => todo.priority === 'low').length
-                
-                if (highCount > 0) {
-                  setSelectedPriority('high')
-                } else if (mediumCount > 0) {
-                  setSelectedPriority('medium')
-                } else {
-                  setSelectedPriority('low')
-                }
+                // 使用智能选择优先级函数
+                setSelectedPriority(getSmartPriority())
               }}
               className={cn(
                 "px-2 py-1 text-xs rounded border transition-colors",
