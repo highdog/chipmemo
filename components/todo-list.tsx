@@ -958,7 +958,7 @@ export const TodoList = React.memo(function TodoList({
               onClick={() => setIsLargeTodoListOpen(true)}
               title="点击查看大的Todo列表"
             >
-              Todo 列表
+              待办事项
             </h3>
             <div className="text-xs text-muted-foreground">
               {totalCount - completedCount}
@@ -1223,7 +1223,7 @@ export const TodoList = React.memo(function TodoList({
                 variant="outline"
               >
                 <Plus className="h-3 w-3 mr-1" />
-                添加 {selectedTag} 标签的Todo
+                添加待办事项
               </Button>
               
               {/* 新建todo区域 - 紧跟在按钮下面 */}
@@ -1504,7 +1504,7 @@ export const TodoList = React.memo(function TodoList({
           <div className="bg-background rounded-lg shadow-xl w-full max-w-none h-[80vh] flex flex-col">
             {/* 弹窗标题栏 */}
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Todo 列表总览</h2>
+              <h2 className="text-lg font-semibold">待办事项总览</h2>
               <Button
                 variant="ghost"
                 size="sm"
