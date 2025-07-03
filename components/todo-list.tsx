@@ -1228,13 +1228,21 @@ export const TodoList = React.memo(function TodoList({
                       {allTodos.filter(todo => todo.priority === 'high').length}
                     </span>
                   </TabsTrigger>
-                  <TabsTrigger value="medium" className="text-xs flex items-center gap-1">
+                  <TabsTrigger 
+                    value="medium" 
+                    className="text-xs flex items-center gap-1"
+                    disabled={allTodos.filter(todo => todo.priority === 'high').length > 0}
+                  >
                     <span>中</span>
                     <span className="text-xs font-medium" style={{color: '#EAB30A'}}>
                       {allTodos.filter(todo => todo.priority === 'medium').length}
                     </span>
                   </TabsTrigger>
-                  <TabsTrigger value="low" className="text-xs flex items-center gap-1">
+                  <TabsTrigger 
+                    value="low" 
+                    className="text-xs flex items-center gap-1"
+                    disabled={allTodos.filter(todo => todo.priority === 'high').length > 0}
+                  >
                     <span>低</span>
                     <span className="text-xs font-medium text-green-500">
                       {allTodos.filter(todo => todo.priority === 'low').length}
