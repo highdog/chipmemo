@@ -288,26 +288,40 @@ export function TodoDetail({
   const handleToggle = async () => {
     if (!todo) return
     
-    // 如果待办事项有计时记录且大于0秒，在完成时需要传递计时信息
-    if (!todo.completed && todo.timer && todo.timer.totalSeconds && todo.timer.totalSeconds > 0) {
-      // 计算用时记录
-      const totalSeconds = todo.timer.totalSeconds
-      const hours = Math.floor(totalSeconds / 3600)
-      const minutes = Math.floor((totalSeconds % 3600) / 60)
-      const finalSeconds = totalSeconds % 60
-      
+    // 如果待办事项要标记为已完成
+    if (!todo.completed) {
       let timeRecord = ''
-      if (hours > 0) {
-        timeRecord = `用时${hours}小时${minutes}分`
-      } else if (minutes > 0) {
-        timeRecord = `用时${minutes}分`
-      } else {
-        timeRecord = `用时${finalSeconds}秒`
+      
+      // 如果待办事项有计时器，在完成时需要传递计时信息
+      if (todo.timer && displayTime > 0) {
+        // 先计算用时记录（包括当前正在运行的时间），然后再停止计时器
+        const totalSeconds = displayTime // 使用 displayTime 获取包含当前运行时间的总时长
+        const hours = Math.floor(totalSeconds / 3600)
+        const minutes = Math.floor((totalSeconds % 3600) / 60)
+        const finalSeconds = totalSeconds % 60
+        
+        if (hours > 0) {
+          timeRecord = `用时${hours}小时${minutes}分`
+        } else if (minutes > 0) {
+          timeRecord = `用时${minutes}分`
+        } else {
+          timeRecord = `用时${finalSeconds}秒`
+        }
+      }
+      
+      // 如果计时器正在运行，停止计时器
+      if (todo.timer?.isRunning && onPauseTimer) {
+        onPauseTimer(todo._id)
       }
       
       // 将计时信息传递给父组件
-      await onToggleTodo(todo._id, timeRecord);
+      if (timeRecord) {
+        await onToggleTodo(todo._id, timeRecord);
+      } else {
+        await onToggleTodo(todo._id);
+      }
     } else {
+      // 标记为未完成
       await onToggleTodo(todo._id);
     }
     onClose();
