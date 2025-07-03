@@ -3220,6 +3220,54 @@ export default function NotePad() {
     }
   }
 
+  const handleConvertSubtodoToTodo = async (todoId: string, subtodoId: string, text: string) => {
+    try {
+      // 获取父待办事项的标签
+      const parentTags = selectedTodoDetail?.tags || []
+      // 创建新的待办事项，不设置日期，优先级为中等，继承父待办事项的标签
+      const addResult = await apiClient.createTodo({ 
+        text: text, 
+        priority: 'medium', 
+        tags: parentTags
+      })
+      if (addResult.success) {
+        // 然后删除原来的子待办事项
+        const deleteResult = await apiClient.deleteSubtodo(todoId, subtodoId)
+        if (deleteResult.success) {
+          // 更新选中的todo详情
+          if (selectedTodoDetail && selectedTodoDetail._id === todoId) {
+            setSelectedTodoDetail(deleteResult.data || null)
+          }
+          // 重新加载todos数据
+          await loadTodosData()
+          toast({
+            title: "成功",
+            description: "子待办事项已转换为待办事项",
+          })
+        } else {
+          toast({
+            title: "转换失败",
+            description: "创建待办事项成功，但删除子待办事项失败",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "转换失败",
+          description: addResult.error || "创建待办事项失败",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('转换子待办事项失败:', error)
+      toast({
+        title: "转换失败",
+        description: "网络错误或服务器异常",
+        variant: "destructive",
+      })
+    }
+  }
+
   // 优化输入处理函数，使用useCallback避免重新创建
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value)
@@ -4067,6 +4115,7 @@ export default function NotePad() {
           onToggleSubtodo={handleToggleSubtodo}
           onDeleteSubtodo={handleDeleteSubtodo}
           onReorderSubtodos={handleReorderSubtodos}
+          onConvertSubtodoToTodo={handleConvertSubtodoToTodo}
           onUpdateTodo={handleUpdateTodo}
         />
 

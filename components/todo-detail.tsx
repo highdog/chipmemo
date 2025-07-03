@@ -121,6 +121,7 @@ interface TodoDetailProps {
   onToggleSubtodo?: (todoId: string, subtodoId: string) => void;
   onDeleteSubtodo?: (todoId: string, subtodoId: string) => void;
   onReorderSubtodos?: (todoId: string, reorderedSubtodos: Subtodo[]) => void;
+  onConvertSubtodoToTodo?: (todoId: string, subtodoId: string, text: string) => void;
   // 编辑相关props
   onUpdateTodo?: (todoId: string, updates: { content?: string; text?: string }) => Promise<void>;
 }
@@ -142,6 +143,7 @@ export function TodoDetail({
   onToggleSubtodo,
   onDeleteSubtodo,
   onReorderSubtodos,
+  onConvertSubtodoToTodo,
   onUpdateTodo
 }: TodoDetailProps) {
   const [newSubtodoText, setNewSubtodoText] = useState('')
@@ -238,6 +240,12 @@ export function TodoDetail({
       onDeleteSubtodo(todo._id, subtodoId)
     }
   }, [onDeleteSubtodo, todo])
+
+  const handleConvertSubtodoToTodo = useCallback((subtodoId: string, text: string) => {
+    if (onConvertSubtodoToTodo && todo) {
+      onConvertSubtodoToTodo(todo._id, subtodoId, text)
+    }
+  }, [onConvertSubtodoToTodo, todo])
 
   // 拖拽相关状态
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
@@ -338,16 +346,19 @@ export function TodoDetail({
 
 
         {/* 弹窗内容 */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto py-12 px-10">
           <div className="space-y-4">
             {/* 待办事项标题和标签 */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className={cn(
-                "text-base font-semibold",
-                todo.completed && "line-through text-gray-500"
-              )}>
-                待办事项：{todo.text}
-              </h2>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-600" />
+                <h2 className={cn(
+                  "text-sm font-medium",
+                  todo.completed && "line-through text-gray-500"
+                )}>
+                  {todo.text}
+                </h2>
+              </div>
               {/* 标签 */}
               {todo.tags && todo.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -470,6 +481,13 @@ export function TodoDetail({
                         {subtodo.text}
                       </span>
                       <button
+                        onClick={() => handleConvertSubtodoToTodo(subtodo._id, subtodo.text)}
+                        className="flex-shrink-0 p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                        title="转换为待办事项"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                      <button
                         onClick={() => handleDeleteSubtodo(subtodo._id)}
                         className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 transition-colors"
                       >
@@ -570,7 +588,7 @@ export function TodoDetail({
         </div>
 
         {/* 弹窗底部操作按钮 */}
-        <div className="flex items-center justify-between p-4 border-t">
+        <div className="flex items-center justify-between py-10 px-8 border-t">
           {/* 计时器按钮 */}
           {(onStartTimer || onPauseTimer) && todo && (
             <div className="flex items-center gap-3">
