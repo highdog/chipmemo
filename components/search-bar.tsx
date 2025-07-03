@@ -135,16 +135,14 @@ export const SearchBar = React.memo(function SearchBar({
         e.preventDefault()
         if (selectedIndex >= 0) {
           handleSuggestionClick(suggestions[selectedIndex])
-        } else {
-          handleSearch()
         }
+        // 移除了else分支中的handleSearch()调用，禁用回车搜索
       } else if (e.key === 'Escape') {
         setShowSuggestions(false)
         setSelectedIndex(-1)
       }
-    } else if (e.key === "Enter") {
-      handleSearch()
     }
+    // 移除了Enter键的处理，禁用回车搜索
   }
 
   // 监听键盘事件
@@ -166,7 +164,9 @@ export const SearchBar = React.memo(function SearchBar({
           )
           break
         case 'Enter':
+          // 阻止默认行为，防止表单提交
           e.preventDefault()
+          // 只有当有选中的建议时才执行点击操作
           if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
             handleSuggestionClick(suggestions[selectedIndex])
           }

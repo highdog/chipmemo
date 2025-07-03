@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Pencil, Save, X, Target, Loader2, Zap, Bold, Italic, Link, Code, Heading1, Heading2, Heading3, List } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 
 import { toast } from "sonner"
 import { tagContentsApi, apiClient } from "@/lib/api"
@@ -909,10 +912,12 @@ export function TagContent({ tag, onSave }: TagContentProps) {
           </div>
         ) : (
           <div className="flex-1 flex flex-col gap-4">
-            <div className="prose prose-sm max-w-none flex-1 overflow-y-auto">
-              <div className="whitespace-pre-wrap text-sm">
+            <div className="prose prose-sm max-w-none flex-1 overflow-y-auto text-sm">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+              >
                 {content}
-              </div>
+              </ReactMarkdown>
             </div>
             
             {/* 目标进度勾选框区域 */}
