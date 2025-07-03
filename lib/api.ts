@@ -422,6 +422,14 @@ class ApiClient {
     return this.post<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>(`/tag-contents/${encodeURIComponent(tag)}/check-in`, {});
   }
 
+  async previewCheckInNote(tag: string): Promise<ApiResponse<{ content: string; title: string }>> {
+    return this.get<{ content: string; title: string }>(`/tag-contents/${encodeURIComponent(tag)}/check-in-preview`);
+  }
+
+  async checkInWithContent(tag: string, content: string, title?: string): Promise<ApiResponse<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>> {
+    return this.post<{ tag: string; checkInCount: number; note: { id: string; title: string; content: string; tags: string[] } }>(`/tag-contents/${encodeURIComponent(tag)}/check-in`, { content, title });
+  }
+
   async renameTag(oldTag: string, newTag: string): Promise<ApiResponse<{ oldTag: string; newTag: string; updatedNotesCount: number; tagContent: any }>> {
     return this.put<{ oldTag: string; newTag: string; updatedNotesCount: number; tagContent: any }>(`/tag-contents/${encodeURIComponent(oldTag)}/rename`, { newTag });
   }
@@ -694,6 +702,8 @@ export const tagContentsApi = {
   delete: (tag: string) => apiClient.deleteTagContent(tag),
   getAll: () => apiClient.getAllTagContents(),
   checkIn: (tag: string) => apiClient.checkInTag(tag),
+  previewCheckIn: (tag: string) => apiClient.previewCheckInNote(tag),
+  checkInWithContent: (tag: string, content: string, title?: string) => apiClient.checkInWithContent(tag, content, title),
   rename: (oldTag: string, newTag: string) => apiClient.renameTag(oldTag, newTag)
 };
 

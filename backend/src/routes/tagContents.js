@@ -340,10 +340,10 @@ router.put('/:oldTag/rename', [
   }
 });
 
-// @route   POST /api/tag-contents/:tag/check-in
-// @desc    Check in for a tag (increment check-in count and create note)
+// @route   GET /api/tag-contents/:tag/check-in-preview
+// @desc    Preview check-in note content for a tag
 // @access  Private
-router.post('/:tag/check-in', [
+router.get('/:tag/check-in-preview', [
   param('tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Tag must be between 1 and 50 characters')
 ], async (req, res) => {
   try {
@@ -353,6 +353,61 @@ router.post('/:tag/check-in', [
     }
 
     const { tag } = req.params;
+    
+    // 查找标签内容
+    const tagContent = await TagContent.findOne({ 
+      userId: req.user._id, 
+      tag: tag 
+    });
+
+    if (!tagContent) {
+      return res.status(404).json({ error: 'Tag content not found' });
+    }
+
+    if (!tagContent.isCheckInEnabled) {
+      return res.status(400).json({ error: 'Check-in is not enabled for this tag' });
+    }
+
+    // 生成预览内容
+    const currentDate = new Date().toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
+    
+    const previewCheckInCount = (tagContent.checkInCount || 0) + 1;
+    const noteContent = `# ${tag}打卡\n\n**日期**: ${currentDate}\n\n**打卡次数**: 第${previewCheckInCount}次\n\n## 今日感想\n\n今天继续在 #${tag} 方面努力，这是第${previewCheckInCount}次打卡。\n\n## 收获与思考\n\n- \n- \n- \n\n---\n\n*坚持就是胜利！*`;
+    
+    res.json({
+      success: true,
+      data: {
+        content: noteContent,
+        title: `${tag}打卡`
+      }
+    });
+  } catch (error) {
+    console.error('Error previewing check-in for tag:', error);
+    res.status(500).json({ error: 'Server error while previewing check-in' });
+  }
+});
+
+// @route   POST /api/tag-contents/:tag/check-in
+// @desc    Check in for a tag (increment check-in count and create note)
+// @access  Private
+router.post('/:tag/check-in', [
+  param('tag').isString().trim().isLength({ min: 1, max: 50 }).withMessage('Tag must be between 1 and 50 characters'),
+  body('content').optional().isString().withMessage('Content must be a string'),
+  body('title').optional().isString().withMessage('Title must be a string')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { tag } = req.params;
+    const { content, title } = req.body;
     
     // 查找标签内容
     const tagContent = await TagContent.findOne({ 
@@ -379,10 +434,11 @@ router.post('/:tag/check-in', [
     
     // 创建打卡笔记
     const Note = require('../models/Note');
-    const noteContent = `${tag}打卡，已打卡${newCheckInCount}次`;
+    const noteContent = content || `${tag}打卡，已打卡${newCheckInCount}次`;
+    const noteTitle = title || `${tag}打卡`;
     
     const note = new Note({
-      title: `${tag}打卡`,
+      title: noteTitle,
       content: noteContent,
       tags: [tag],
       userId: req.user._id,

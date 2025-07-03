@@ -9,10 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Pencil, Save, X, Target, Loader2, Zap, Bold, Italic, Link, Code, Heading1, Heading2, Heading3, List } from "lucide-react"
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkBreaks from 'remark-breaks'
+
 import { toast } from "sonner"
 import { tagContentsApi, apiClient } from "@/lib/api"
 import NoteHeatmap from "@/components/note-heatmap"
@@ -47,6 +46,9 @@ export function TagContent({ tag, onSave }: TagContentProps) {
   const [isCheckInEnabled, setIsCheckInEnabled] = useState(false)
   const [checkInCount, setCheckInCount] = useState(0)
   const [isCheckingIn, setIsCheckingIn] = useState(false)
+  const [showCheckInPreview, setShowCheckInPreview] = useState(false)
+  const [previewNoteContent, setPreviewNoteContent] = useState('')
+  const [editableNoteContent, setEditableNoteContent] = useState('')
   
 
 
@@ -554,9 +556,17 @@ export function TagContent({ tag, onSave }: TagContentProps) {
       return
     }
 
+    // 设置默认打卡内容
+    const defaultContent = `${tag}打卡，已打卡${checkInCount + 1}次`
+    setEditableNoteContent(defaultContent)
+    setShowCheckInPreview(true)
+  }
+
+  // 确认打卡
+  const handleConfirmCheckIn = async () => {
     setIsCheckingIn(true)
     try {
-      const result = await tagContentsApi.checkIn(tag)
+      const result = await tagContentsApi.checkInWithContent(tag, editableNoteContent)
       if (result.success && result.data) {
         setCheckInCount(result.data.checkInCount)
         toast.success(`打卡成功！已打卡${result.data.checkInCount}次`)
@@ -565,6 +575,8 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         window.dispatchEvent(new CustomEvent('notes-refresh', {
           detail: { currentTag: tag }
         }))
+        
+        setShowCheckInPreview(false)
       } else {
         toast.error(result.error || '打卡失败')
       }
@@ -617,7 +629,8 @@ export function TagContent({ tag, onSave }: TagContentProps) {
 
 
   return (
-    <Card className="h-full flex flex-col">
+    <>
+      <Card className="h-full flex flex-col">
       <CardHeader className="pb-2 flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -897,52 +910,9 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         ) : (
           <div className="flex-1 flex flex-col gap-4">
             <div className="prose prose-sm max-w-none flex-1 overflow-y-auto">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-base font-medium mb-1">{children}</h3>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                  li: ({ children }) => <li className="text-sm">{children}</li>,
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-border pl-4 italic text-muted-foreground mb-2">
-                      {children}
-                    </blockquote>
-                  ),
-                  code: ({ children, className }) => {
-                    const isInline = !className
-                    if (isInline) {
-                      return (
-                        <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">
-                          {children}
-                        </code>
-                      )
-                    }
-                    return (
-                      <pre className="bg-muted p-3 rounded-md overflow-x-auto mb-2">
-                        <code className="text-sm font-mono">{children}</code>
-                      </pre>
-                    )
-                  },
-                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  em: ({ children }) => <em className="italic">{children}</em>,
-                  a: ({ href, children }) => (
-                    <a 
-                      href={href} 
-                      className="text-primary hover:underline" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      {children}
-                    </a>
-                  ),
-                }}
-              >
+              <div className="whitespace-pre-wrap text-sm">
                 {content}
-              </ReactMarkdown>
+              </div>
             </div>
             
             {/* 目标进度勾选框区域 */}
@@ -979,6 +949,52 @@ export function TagContent({ tag, onSave }: TagContentProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+
+      {/* 打卡预览对话框 */}
+    <Dialog open={showCheckInPreview} onOpenChange={setShowCheckInPreview}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{tag}-打卡</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="note-content" className="text-sm font-medium">
+              笔记内容
+            </Label>
+            <Textarea
+              id="note-content"
+              value={editableNoteContent}
+              onChange={(e) => setEditableNoteContent(e.target.value)}
+              className="mt-2 min-h-[300px]"
+              placeholder="请输入打卡笔记内容..."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowCheckInPreview(false)}
+            disabled={isCheckingIn}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={handleConfirmCheckIn}
+            disabled={isCheckingIn || !editableNoteContent.trim()}
+          >
+            {isCheckingIn ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                打卡中...
+              </>
+            ) : (
+              '确认打卡'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
