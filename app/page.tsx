@@ -2895,8 +2895,8 @@ export default function NotePad() {
       
       // 如果todo从未完成变为完成，则删除todo并创建笔记
       if (!targetTodo.completed) {
-        // 创建笔记内容，包含原todo的内容、标签和用时记录
-        let noteContent = targetTodo.content
+        // 创建笔记内容，包含原todo的标题、标签和用时记录
+        let noteContent = targetTodo.text
         
         // 添加用时记录
         if (timeRecord) {

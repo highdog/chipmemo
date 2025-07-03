@@ -196,7 +196,7 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
       
       // 如果todo从未完成变为完成，则删除todo并创建笔记
       if (!todo.completed) {
-        // 创建笔记内容，包含原todo的内容和标签
+        // 创建笔记内容，包含原todo的标题和标签
         const noteContent = todo.text + (todo.tags && todo.tags.length > 0 ? ' ' + todo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
         
         // 调用notesApi创建新笔记
