@@ -944,8 +944,28 @@ export const TodoList = React.memo(function TodoList({
     }
   }, [menuOpenTodo])
 
-  const completedCount = useMemo(() => displayTodos.filter(todo => todo.completed).length, [displayTodos])
-  const totalCount = useMemo(() => displayTodos.length, [displayTodos])
+  const completedCount = useMemo(() => {
+    if (selectedTag === 'all') {
+      // all模式下显示所有有优先级的已完成事项数量
+      return allTodos.filter(todo => 
+        todo.completed && 
+        todo.priority && 
+        ['high', 'medium', 'low'].includes(todo.priority)
+      ).length
+    }
+    return displayTodos.filter(todo => todo.completed).length
+  }, [selectedTag, allTodos, displayTodos])
+  
+  const totalCount = useMemo(() => {
+    if (selectedTag === 'all') {
+      // all模式下显示所有有优先级的事项数量（高中低优先级，不包括无优先级）
+      return allTodos.filter(todo => 
+        todo.priority && 
+        ['high', 'medium', 'low'].includes(todo.priority)
+      ).length
+    }
+    return displayTodos.length
+  }, [selectedTag, allTodos, displayTodos])
 
   return (
     <div className="flex flex-col h-full">
