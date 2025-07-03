@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { TagSuggestion } from "@/components/tag-suggestion"
 import { Loader2, Plus, Save, XCircle, CheckSquare, Clock, CheckCircle, Edit, Info, Trash2, MoreVertical, ChevronUp, ChevronDown, Hash, X, Check, GripVertical } from "lucide-react"
 import { apiClient } from "@/lib/api"
@@ -279,45 +280,57 @@ function SortableTodoItem({
             />
 
           </div>
-          <div 
-            className="flex-1 cursor-grab active:cursor-grabbing hover:bg-accent/50 transition-colors"
-            {...attributes}
-            {...listeners}
-          >
-            <label
-              className={cn(
-                "text-sm block",
-                todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <div 
+                className="flex-1 cursor-grab active:cursor-grabbing hover:bg-accent/50 transition-colors"
+                {...attributes}
+                {...listeners}
+              >
+                <label
+                  className={cn(
+                    "text-sm block",
+                    todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
+                  )}
+                >
+                  {todo.text || todo.content}
+                  {/* 标签跟在文字后面 */}
+                  {(todo.tags && todo.tags.length > 0) && (
+                    <span className="ml-2">
+                      {todo.tags.map((tag: string, index: number) => (
+                                     <span
+                                       key={index}
+                                       className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                                     >
+                                       {tag}
+                                     </span>
+                                   ))}
+                    </span>
+                  )}
+                </label>
+                {/* 显示日期信息 */}
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {todo.startDate && todo.dueDate ? (
+                    <span>
+                      {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')} - {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
+                    </span>
+                  ) : todo.startDate ? (
+                    <span>起始: {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
+                  ) : todo.dueDate ? (
+                    <span>截止: {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
+                  ) : null}
+                </div>
+              </div>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-80" side="right" align="start">
+              {/* 只显示详细内容 */}
+              {todo.content && todo.content !== todo.text && (
+                <div>
+                  <p className="text-sm">{todo.content}</p>
+                </div>
               )}
-            >
-              {todo.text || todo.content}
-              {/* 标签跟在文字后面 */}
-              {(todo.tags && todo.tags.length > 0) && (
-                <span className="ml-2">
-                  {todo.tags.map((tag: string, index: number) => (
-                                 <span
-                                   key={index}
-                                   className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
-                                 >
-                                   {tag}
-                                 </span>
-                               ))}
-                </span>
-              )}
-            </label>
-            {/* 显示日期信息 */}
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {todo.startDate && todo.dueDate ? (
-                <span>
-                  {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')} - {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
-                </span>
-              ) : todo.startDate ? (
-                <span>起始: {new Date(todo.startDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
-              ) : todo.dueDate ? (
-                <span>截止: {new Date(todo.dueDate!).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}</span>
-              ) : null}
-            </div>
-          </div>
+            </HoverCardContent>
+          </HoverCard>
           <div className="flex items-center">
             <div className="relative">
               <Button
