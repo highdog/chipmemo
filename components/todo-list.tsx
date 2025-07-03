@@ -35,6 +35,47 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+// 提取用时信息的函数
+function extractTimeFromContent(content: string): { timeDisplay: string | null, cleanContent: string } {
+  // 匹配多种时间格式：用时xx时xx分、用时xx分、用时xx秒
+  const timeRegexes = [
+    /用时(\d+)小?时(\d+)分/g,
+    /用时(\d+)分/g,
+    /用时(\d+)秒/g
+  ]
+  
+  let timeDisplay = null
+  let cleanContent = content
+  
+  for (const regex of timeRegexes) {
+    const matches = [...content.matchAll(regex)]
+    if (matches.length > 0) {
+      const lastMatch = matches[matches.length - 1]
+      
+      if (regex.source.includes('小?时')) {
+        // 用时xx时xx分
+        const hours = parseInt(lastMatch[1])
+        const minutes = parseInt(lastMatch[2])
+        timeDisplay = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+      } else if (regex.source.includes('分')) {
+        // 用时xx分
+        const minutes = parseInt(lastMatch[1])
+        const hours = Math.floor(minutes / 60)
+        const remainingMinutes = minutes % 60
+        timeDisplay = `${hours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}`
+      } else {
+         // 用时xx秒 - 统一显示为00:01
+         timeDisplay = `00:01`
+       }
+      
+      cleanContent = content.replace(regex, '').trim()
+      break
+    }
+  }
+  
+  return { timeDisplay, cleanContent }
+}
+
 // 可拖拽的TodoItem组件
 function SortableTodoItem({ 
   todo, 
@@ -293,20 +334,35 @@ function SortableTodoItem({
                     todo.completed ? "line-through text-muted-foreground" : getPriorityTextColor(todo.priority, priorityIndex)
                   )}
                 >
-                  {todo.text || todo.content}
-                  {/* 标签跟在文字后面 */}
-                  {(todo.tags && todo.tags.length > 0) && (
-                    <span className="ml-2">
-                      {todo.tags.map((tag: string, index: number) => (
-                                     <span
-                                       key={index}
-                                       className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
-                                     >
-                                       {tag}
-                                     </span>
-                                   ))}
-                    </span>
-                  )}
+                  {(() => {
+                    const content = todo.text || todo.content || ''
+                    const { timeDisplay, cleanContent } = extractTimeFromContent(content)
+                    return (
+                      <>
+                        {cleanContent}
+                        {/* 时间信息显示在标签左边 */}
+                        {timeDisplay && (
+                          <span className="inline-flex items-center ml-2 text-xs text-gray-400">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {timeDisplay}
+                          </span>
+                        )}
+                        {/* 标签跟在时间后面 */}
+                        {(todo.tags && todo.tags.length > 0) && (
+                          <span className="ml-2">
+                            {todo.tags.map((tag: string, index: number) => (
+                                           <span
+                                             key={index}
+                                             className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 ml-1"
+                                           >
+                                             {tag}
+                                           </span>
+                                         ))}
+                          </span>
+                        )}
+                      </>
+                    )
+                  })()}
                 </label>
                 {/* 显示日期信息 */}
                 <div className="text-xs text-muted-foreground mt-0.5">
@@ -326,7 +382,7 @@ function SortableTodoItem({
               {/* 只显示详细内容 */}
               {todo.content && todo.content !== todo.text && (
                 <div>
-                  <p className="text-sm">{todo.content}</p>
+                  <p className="text-sm">{extractTimeFromContent(todo.content).cleanContent}</p>
                 </div>
               )}
             </HoverCardContent>

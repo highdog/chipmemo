@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X, ZoomIn } from "lucide-react"
+import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X, ZoomIn, Clock } from "lucide-react"
 import { deleteNote, type Note } from "@/lib/actions"
 import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
@@ -137,14 +137,56 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     return content.replace(/#[\u4e00-\u9fa5\w]+/g, '').replace(/\s+/g, ' ').trim();
   };
 
+  // 提取用时信息的函数
+  const extractTimeFromContent = (content: string): { timeDisplay: string | null, cleanContent: string } => {
+    // 匹配多种时间格式：用时xx时xx分、用时xx分、用时xx秒
+    const timeRegexes = [
+      /用时(\d+)小?时(\d+)分/g,
+      /用时(\d+)分/g,
+      /用时(\d+)秒/g
+    ]
+    
+    let timeDisplay = null
+    let cleanContent = content
+    
+    for (const regex of timeRegexes) {
+      const matches = [...content.matchAll(regex)]
+      if (matches.length > 0) {
+        const lastMatch = matches[matches.length - 1]
+        
+        if (regex.source.includes('小?时')) {
+          // 用时xx时xx分
+          const hours = parseInt(lastMatch[1])
+          const minutes = parseInt(lastMatch[2])
+          timeDisplay = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+        } else if (regex.source.includes('分')) {
+          // 用时xx分
+          const minutes = parseInt(lastMatch[1])
+          const hours = Math.floor(minutes / 60)
+          const remainingMinutes = minutes % 60
+          timeDisplay = `${hours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}`
+        } else {
+           // 用时xx秒 - 统一显示为00:01
+           timeDisplay = `00:01`
+         }
+        
+        cleanContent = content.replace(regex, '').trim()
+        break
+      }
+    }
+    
+    return { timeDisplay, cleanContent }
+  };
+
   // 渲染笔记内容（不含图片和标签）
   const renderNoteContent = () => {
     const contentWithoutImages = removeImagesFromContent(note.originalContent || note.content);
     const contentWithoutTags = removeTagsFromContent(contentWithoutImages);
+    const { cleanContent } = extractTimeFromContent(contentWithoutTags);
     
     if (searchTerm) {
       // 不再高亮标签，因为标签已被移除
-      const content = contentWithoutTags
+      const content = cleanContent
       return (
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -239,7 +281,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
             ),
           }}
         >
-          {contentWithoutTags}
+          {cleanContent}
         </ReactMarkdown>
       )
     }
@@ -351,6 +393,20 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
               </Button>
             </>
           )}
+          
+          {/* 时间信息显示 */}
+          {(() => {
+            const contentWithoutImages = removeImagesFromContent(note.originalContent || note.content);
+            const contentWithoutTags = removeTagsFromContent(contentWithoutImages);
+            const { timeDisplay } = extractTimeFromContent(contentWithoutTags);
+            
+            return timeDisplay ? (
+               <div className="flex items-center gap-1 text-xs text-gray-400">
+                 <Clock className="h-3 w-3" />
+                 <span>{timeDisplay}</span>
+               </div>
+             ) : null;
+          })()}
           
           {/* 标签显示 */}
           {note.tags && note.tags.length > 0 && (
