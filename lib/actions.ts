@@ -1,6 +1,6 @@
 'use client';
 
-import { notesApi, todosApi, Note as ApiNote, Todo as ApiTodo } from './api';
+import { notesApi, todosApi, tagContentsApi, Note as ApiNote, Todo as ApiTodo } from './api';
 import { extractTags, removeTagsFromContent } from './utils';
 
 // 兼容原有的接口定义
@@ -350,14 +350,22 @@ export async function searchNotesByTag(tag: string, page = 1, limit = 20): Promi
 // 获取所有标签
 export async function getAllTags(): Promise<string[]> {
   try {
-    const response = await notesApi.getTags();
+    // 获取笔记中的标签
+    const notesTagsResponse = await notesApi.getTags();
+    const notesTags = notesTagsResponse.success && notesTagsResponse.data 
+      ? notesTagsResponse.data.map((item) => item.tag) 
+      : [];
     
-    if (response.success && response.data) {
-      return response.data.map((item) => item.tag);
-    } else {
-      console.error('Failed to fetch tags:', response.error);
-      return [];
-    }
+    // 获取标签内容中的标签
+    const tagContentsResponse = await tagContentsApi.getAll();
+    const tagContentsTags = tagContentsResponse.success && tagContentsResponse.data 
+      ? tagContentsResponse.data.map((item) => item.tag) 
+      : [];
+    
+    // 合并并去重所有标签
+    const allTags = [...new Set([...notesTags, ...tagContentsTags])];
+    
+    return allTags;
   } catch (error) {
     console.error('Error fetching tags:', error);
     return [];
