@@ -475,6 +475,41 @@ function SortableTodoItem({
                     无优先级
                   </Button>
                   <div className="border-t my-1"></div>
+                  <div className="px-2 py-1 text-xs text-muted-foreground">排序</div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        const result = await apiClient.reorderTodo(todo.id || (todo as any)._id, 'down')
+                        if (!result.error) {
+                          await onLoadTodos()
+                          toast({
+                            title: "成功",
+                            description: "待办事项已向下移动",
+                          })
+                        } else {
+                          toast({
+                            title: "错误",
+                            description: result.error || "移动失败",
+                            variant: "destructive",
+                          })
+                        }
+                      } catch (error) {
+                        toast({
+                          title: "错误",
+                          description: "移动失败",
+                          variant: "destructive",
+                        })
+                      }
+                      setMenuOpenTodo(null)
+                    }}
+                    className="w-full justify-start h-8 px-2 text-xs"
+                  >
+                    <ChevronDown className="h-3 w-3 mr-1" />
+                    下一个
+                  </Button>
+                  <div className="border-t my-1"></div>
                   <Button
                     size="sm"
                     variant="ghost"
