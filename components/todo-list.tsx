@@ -650,18 +650,21 @@ export const TodoList = React.memo(function TodoList({
       self.findIndex(t => (t.id || (t as any)._id) === (todo.id || (todo as any)._id)) === index
     )
     .filter((todo) => {
+      // 只在'all'标签下应用日期过滤，其他标签显示所有待办事项
+      if (selectedTag !== 'all') {
+        return true
+      }
+      
       const hasStartDate = todo.startDate
       const hasDueDate = todo.dueDate
       
       if (hasStartDate && hasDueDate) {
-         // 有起始日期和截止日期：点击日期在起始日期前一天或之后显示
+         // 有起始日期和截止日期：点击日期在起始日期当天或之后显示
          const startDate = new Date(todo.startDate!)
-         startDate.setDate(startDate.getDate() - 1)
          return selectedDateObj >= startDate
       } else if (hasStartDate && !hasDueDate) {
-         // 只有起始日期：点击日期在起始日期前一天或之后则显示
+         // 只有起始日期：点击日期在起始日期当天或之后则显示
          const startDate = new Date(todo.startDate!)
-         startDate.setDate(startDate.getDate() - 1)
          return selectedDateObj >= startDate
        } else if (!hasStartDate && hasDueDate) {
          // 只有截止日期：点击日期在截止日期前一天或之后则显示
@@ -787,10 +790,10 @@ export const TodoList = React.memo(function TodoList({
           return aPriority - bPriority
         }
         
-        // 相同优先级按创建时间倒序（新的在前）
+        // 相同优先级按创建时间正序（旧的在前）
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        return bTime - aTime
+        return aTime - bTime
       } else {
         // 对于all和focus模式，使用原有的排序逻辑
         // 然后按优先级排序：高 > 中 > 低 > 无优先级
