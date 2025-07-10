@@ -151,21 +151,7 @@ function SortableTodoItem({
 
 
 
-  const handleDeleteTodo = async (todoId: string) => {
-    try {
-      await onDeleteTodo(todoId)
-      toast({
-        title: "成功",
-        description: "Todo已删除",
-      })
-    } catch (error) {
-      toast({
-        title: "错误",
-        description: "删除失败",
-        variant: "destructive",
-      })
-    }
-  }
+
 
   const getPriorityCheckboxClass = (priority?: string) => {
     switch (priority) {
@@ -187,13 +173,13 @@ function SortableTodoItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-2 bg-card hover:bg-accent/50 transition-colors border-b border-border",
+        "bg-card hover:bg-accent/50 transition-colors border-b border-border",
         isDragging && "shadow-lg z-50"
       )}
     >
       {editingTodo === todo.id ? (
         // 编辑模式
-        <div className="space-y-2">
+        <div className="space-y-2 p-2">
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={todo.completed}
@@ -288,7 +274,7 @@ function SortableTodoItem({
         </div>
       ) : (
         // 显示模式
-        <div className="flex items-start p-2 transition-colors">
+        <div className="flex items-start py-2 transition-colors">
           {/* 序号显示在勾选框左边，颜色与优先级一致 */}
           {!todo.completed && (
             <span className={cn(
@@ -522,7 +508,7 @@ function SortableTodoItem({
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      handleDeleteTodo(todo.id || (todo as any)._id)
+                      onDeleteTodo(todo.id || (todo as any)._id)
                       setMenuOpenTodo(null)
                     }}
                     className="w-full justify-start h-8 px-2 text-xs text-red-500 hover:text-red-700"
@@ -580,7 +566,7 @@ export const TodoList = React.memo(function TodoList({
   onAddTodo: (todo: { content: string; detailContent?: string; priority: 'low' | 'medium' | 'high' | 'none'; startDate?: string; dueDate?: string; tags: string[] }) => Promise<void>;
   onShowTodoDetail: (todo: { id: string; _id: string; content: string; text: string; completed: boolean; tags: string[]; startDate?: string; dueDate?: string; priority?: 'low' | 'medium' | 'high' | 'none'; order?: number; userId?: string; createdAt?: string; updatedAt?: string; subtodos?: any[]; timer?: { isRunning: boolean; totalSeconds: number; startTime?: string; }; }) => void;
 }) {
-  const [isLoading, setIsLoading] = useState(false)
+
   const [selectedTag, setSelectedTag] = useState<string>('all')
   const [selectedPriority, setSelectedPriority] = useState<'high' | 'medium' | 'low'>('high')
 
@@ -823,21 +809,7 @@ export const TodoList = React.memo(function TodoList({
     })
   }, [selectedTag, selectedPriority, allTodos])
 
-  const loadTodos = async () => {
-    setIsLoading(true)
-    try {
-      // 这里可以调用后端API获取todos
-      // 暂时保持现有数据不变
-    } catch (error) {
-      toast({
-        title: "错误",
-        description: "无法加载Todo列表",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
+
 
   const handleToggleTodo = async (todoId: string, passedTimeRecord?: string) => {
     try {
@@ -1009,9 +981,7 @@ export const TodoList = React.memo(function TodoList({
 
 
 
-  useEffect(() => {
-    loadTodos()
-  }, [selectedDate])
+
 
   // 点击外部区域关闭菜单
   useEffect(() => {
@@ -1503,12 +1473,7 @@ export const TodoList = React.memo(function TodoList({
             </div>
           )}
           
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="text-sm">加载中...</span>
-            </div>
-          ) : displayTodos.length > 0 ? (
+          {displayTodos.length > 0 ? (
             <div className="space-y-2">
 
               {/* 专注模式提示 */}
