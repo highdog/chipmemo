@@ -125,8 +125,11 @@ export function UserNav({
         <DropdownMenuItem>
           个人资料
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          设置
+        <DropdownMenuItem asChild>
+          <Link href="/settings">
+            <Settings className="h-4 w-4 mr-2" />
+            设置
+          </Link>
         </DropdownMenuItem>
         {user.isAdmin && (
           <DropdownMenuItem asChild>

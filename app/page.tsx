@@ -245,6 +245,7 @@ const NoteGroup = React.memo(function NoteGroup({
 
 // Main Component
 export default function NotePad() {
+  const { user, loading: authLoading, isAuthenticated, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
@@ -576,6 +577,32 @@ export default function NotePad() {
     }
   }
 
+  // 根据用户偏好设置过滤笔记
+  const filterNotesByPreferences = useCallback((notes: Note[]) => {
+    if (!user?.preferences) return notes
+    
+    return notes.filter(note => {
+      const tags = note.tags || []
+      
+      // 检查是否需要隐藏打卡笔记
+      if (user?.preferences?.hideCheckinNotes && tags.includes('打卡')) {
+        return false
+      }
+      
+      // 检查是否需要隐藏待办笔记
+      if (user?.preferences?.hideTodoNotes && tags.includes('todo')) {
+        return false
+      }
+      
+      // 检查是否需要隐藏目标笔记
+      if (user?.preferences?.hideGoalNotes && tags.includes('目标')) {
+        return false
+      }
+      
+      return true
+    })
+  }, [user?.preferences])
+
   // 加载笔记
   const loadNotes = useCallback(async (reset: boolean = true) => {
     try {
@@ -586,13 +613,16 @@ export default function NotePad() {
       
       const result = await getNotes(reset ? 1 : currentPage, 100)
       
+      // 根据用户偏好设置过滤笔记
+      const filteredNotes = filterNotesByPreferences(result.notes)
+      
       if (reset) {
-        setNotes(result.notes)
+        setNotes(filteredNotes)
       } else {
         // 合并新笔记时，去重以避免重复的笔记ID
         setNotes(prev => {
           const existingIds = new Set(prev.map(note => note.id))
-          const newNotes = result.notes.filter(note => !existingIds.has(note.id))
+          const newNotes = filteredNotes.filter(note => !existingIds.has(note.id))
           return [...prev, ...newNotes]
         })
       }
@@ -613,7 +643,7 @@ export default function NotePad() {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [currentPage])
+  }, [currentPage, filterNotesByPreferences])
 
   // 加载更多笔记
   const loadMoreNotes = useCallback(async () => {
@@ -3632,12 +3662,9 @@ export default function NotePad() {
   }
 
   // 使用认证上下文
-  const { user, loading: authLoading, isAuthenticated, logout } = useAuth()
-
-  // 检查用户登录状态
+  // 检查认证状态，如果未登录则重定向到登录页面
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      // 用户未登录，重定向到登录页面
       router.push("/login")
     }
   }, [authLoading, isAuthenticated, router])

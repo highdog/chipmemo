@@ -5,20 +5,48 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { TabsContent } from "@/components/ui/tabs"
-import { User, FileText, Calendar, CheckSquare, Target, Moon, Sun, LogOut, Settings } from "lucide-react"
+import { User, FileText, Calendar, CheckSquare, Target, Moon, Sun, LogOut, Settings, Eye, EyeOff } from "lucide-react"
 import { useRouter } from "next/navigation"
-// 移除了API导入，不再需要获取统计数据
 import { ProfileTabProps } from "./types"
 import { toast as showToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/lib/auth-context"
+import { Switch } from "@/components/ui/switch"
+import { useState } from "react"
 
 // 移除了UserStats接口，不再需要统计数据
 
 export function ProfileTab({ user, theme, toggleTheme, logout }: ProfileTabProps) {
   const toast = showToast
   const router = useRouter()
-  // 移除了stats状态和isLoading状态，不再需要统计数据
-
-  // 移除了loadUserStats函数和useEffect，不再需要加载统计数据
+  const { updateUser } = useAuth()
+  
+  // 本地状态管理偏好设置
+  const [preferences, setPreferences] = useState({
+    hideCheckinNotes: user?.preferences?.hideCheckinNotes || false,
+    hideTodoNotes: user?.preferences?.hideTodoNotes || false,
+    hideGoalNotes: user?.preferences?.hideGoalNotes || false,
+  })
+  
+  // 更新偏好设置
+  const updatePreference = async (key: string, value: boolean) => {
+    try {
+      const newPreferences = { ...preferences, [key]: value }
+      setPreferences(newPreferences)
+      
+      const result = await updateUser({ preferences: newPreferences })
+      if (result.success) {
+        toast({ title: "设置已保存" })
+      } else {
+        // 如果更新失败，回滚状态
+        setPreferences(preferences)
+        toast({ title: "保存失败", description: result.error, variant: "destructive" })
+      }
+    } catch (error) {
+      // 如果更新失败，回滚状态
+      setPreferences(preferences)
+      toast({ title: "保存失败", description: "网络错误", variant: "destructive" })
+    }
+  }
 
   // 退出登录
   const handleLogout = () => {
@@ -103,25 +131,86 @@ export function ProfileTab({ user, theme, toggleTheme, logout }: ProfileTabProps
 
         {/* 设置选项 */}
         <Card className="-mt-2">
+          <CardHeader>
+            <CardTitle className="text-lg">个人设置</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
-            {/* 主题切换 */}
-            <div className="flex items-center justify-between p-3 rounded-lg border">
-              <div className="flex items-center gap-3">
-                {theme === 'dark' ? (
-                  <Moon className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <Sun className="h-5 w-5 text-muted-foreground" />
-                )}
-                <div>
-                  <div className="font-medium">主题模式</div>
-                  <div className="text-sm text-muted-foreground">
-                    当前: {theme === 'dark' ? '深色模式' : '浅色模式'}
+            {/* 主页笔记显示设置 */}
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">主页笔记显示</div>
+              
+              {/* 隐藏打卡笔记 */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">隐藏打卡笔记</div>
+                    <div className="text-sm text-muted-foreground">
+                      在主页上不显示打卡相关的笔记
+                    </div>
                   </div>
                 </div>
+                <Switch
+                  checked={preferences.hideCheckinNotes}
+                  onCheckedChange={(checked) => updatePreference('hideCheckinNotes', checked)}
+                />
               </div>
-              <Button variant="outline" size="sm" onClick={toggleTheme}>
-                切换
-              </Button>
+              
+              {/* 隐藏待办笔记 */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <CheckSquare className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">隐藏待办笔记</div>
+                    <div className="text-sm text-muted-foreground">
+                      在主页上不显示待办相关的笔记
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={preferences.hideTodoNotes}
+                  onCheckedChange={(checked) => updatePreference('hideTodoNotes', checked)}
+                />
+              </div>
+              
+              {/* 隐藏目标笔记 */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="font-medium">隐藏目标笔记</div>
+                    <div className="text-sm text-muted-foreground">
+                      在主页上不显示目标相关的笔记
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={preferences.hideGoalNotes}
+                  onCheckedChange={(checked) => updatePreference('hideGoalNotes', checked)}
+                />
+              </div>
+            </div>
+            
+            <div className="border-t pt-3">
+              {/* 主题切换 */}
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  {theme === 'dark' ? (
+                    <Moon className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <Sun className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <div>
+                    <div className="font-medium">主题模式</div>
+                    <div className="text-sm text-muted-foreground">
+                      当前: {theme === 'dark' ? '深色模式' : '浅色模式'}
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={toggleTheme}>
+                  切换
+                </Button>
+              </div>
             </div>
 
             {/* 退出登录 */}

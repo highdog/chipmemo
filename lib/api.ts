@@ -19,6 +19,9 @@ export interface User {
   preferences: {
     theme: 'light' | 'dark' | 'system';
     language: 'en' | 'zh' | 'ja';
+    hideCheckinNotes?: boolean;
+    hideTodoNotes?: boolean;
+    hideGoalNotes?: boolean;
   };
   createdAt: string;
   updatedAt: string;

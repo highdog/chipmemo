@@ -41,6 +41,18 @@ const userSchema = new mongoose.Schema({
       type: String,
       enum: ['en', 'zh', 'ja'],
       default: 'en'
+    },
+    hideCheckinNotes: {
+      type: Boolean,
+      default: false
+    },
+    hideTodoNotes: {
+      type: Boolean,
+      default: false
+    },
+    hideGoalNotes: {
+      type: Boolean,
+      default: false
     }
   }
 }, {

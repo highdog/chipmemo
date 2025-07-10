@@ -39,6 +39,13 @@ export interface User {
   avatar?: string;
   createdAt: string;
   updatedAt: string;
+  preferences?: {
+    theme?: string;
+    language?: string;
+    hideCheckinNotes?: boolean;
+    hideTodoNotes?: boolean;
+    hideGoalNotes?: boolean;
+  };
 }
 
 export interface TagContent {
