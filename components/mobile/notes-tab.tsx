@@ -63,6 +63,32 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
   const NOTES_PER_PAGE = 100
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  // 根据用户偏好设置过滤笔记
+  const filterNotesByPreferences = useCallback((notes: Note[]) => {
+    if (!user?.preferences) return notes
+    
+    return notes.filter(note => {
+      const tags = note.tags || []
+      
+      // 检查是否需要隐藏打卡笔记
+      if (user?.preferences?.hideCheckinNotes && tags.includes('打卡')) {
+        return false
+      }
+      
+      // 检查是否需要隐藏待办笔记
+      if (user?.preferences?.hideTodoNotes && tags.includes('todo')) {
+        return false
+      }
+      
+      // 检查是否需要隐藏目标笔记
+      if (user?.preferences?.hideGoalNotes && tags.includes('目标')) {
+        return false
+      }
+      
+      return true
+    })
+  }, [user?.preferences])
+
   // 加载笔记数据
   const loadNotes = useCallback(async (page = 1, append = false) => {
     if (loading) return
@@ -88,10 +114,13 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
         attachments: actionNote.attachments
       }))
       
+      // 根据用户偏好设置过滤笔记
+      const filteredNotes = filterNotesByPreferences(convertedNotes)
+      
       if (append) {
-        setNotes(prev => [...prev, ...convertedNotes])
+        setNotes(prev => [...prev, ...filteredNotes])
       } else {
-        setNotes(convertedNotes)
+        setNotes(filteredNotes)
       }
       
       setHasMore(newNotes.length === NOTES_PER_PAGE)
@@ -102,7 +131,7 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
     } finally {
       setLoading(false)
     }
-  }, [NOTES_PER_PAGE, toast])
+  }, [NOTES_PER_PAGE, toast, filterNotesByPreferences])
   
   // 加载更多笔记
   const loadMoreNotes = useCallback(() => {
@@ -161,11 +190,15 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
 
   // 过滤和计算数据
   const filteredNotes = useMemo(() => {
-    if (!searchTerm) return notes
-    return notes.filter(note => 
+    // 首先应用用户偏好设置过滤
+    const preferenceFilteredNotes = filterNotesByPreferences(notes)
+    
+    // 然后应用搜索过滤
+    if (!searchTerm) return preferenceFilteredNotes
+    return preferenceFilteredNotes.filter(note => 
       note.content.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  }, [notes, searchTerm])
+  }, [notes, searchTerm, filterNotesByPreferences])
 
   const groupedNotes = useMemo(() => groupNotesByDate(filteredNotes), [filteredNotes])
 
@@ -379,11 +412,14 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
           updatedAt: actionNote.createdAt,
           attachments: actionNote.attachments
         }))
-        setNotes(convertedNotes)
+        
+        // 根据用户偏好设置过滤搜索结果
+        const filteredNotes = filterNotesByPreferences(convertedNotes)
+        setNotes(filteredNotes)
         setHasMore(false) // 搜索结果不支持分页
         toast({
           title: "标签搜索",
-          description: `找到 ${searchResult.notes.length} 条包含 #${trimmedTag} 标签的笔记`,
+          description: `找到 ${filteredNotes.length} 条包含 #${trimmedTag} 标签的笔记`,
         })
       } else {
         // 处理返回值为空的情况

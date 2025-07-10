@@ -711,7 +711,9 @@ export default function NotePad() {
         searchResult = await searchNotes(term, 1, 1000) // 增加搜索限制到1000条
       }
       
-      setNotes(searchResult.notes)
+      // 根据用户偏好设置过滤搜索结果
+      const filteredNotes = filterNotesByPreferences(searchResult.notes)
+      setNotes(filteredNotes)
       setHasMoreNotes(searchResult.pagination ? searchResult.pagination.current < searchResult.pagination.pages : false)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "搜索时出现错误";
@@ -723,7 +725,7 @@ export default function NotePad() {
     } finally {
       setIsSearching(false)
     }
-  }, [searchHistory, toast])
+  }, [searchHistory, toast, filterNotesByPreferences])
 
   // 清除搜索，显示全部笔记
   const handleClearSearch = useCallback(async () => {
@@ -735,11 +737,13 @@ export default function NotePad() {
 
     try {
       const result = await getNotes(1, 100)
-      setNotes(result.notes)
+      // 根据用户偏好设置过滤笔记
+      const filteredNotes = filterNotesByPreferences(result.notes)
+      setNotes(filteredNotes)
       setHasMoreNotes(result.pagination && result.pagination.current < result.pagination.pages)
       toast({
         title: "已显示全部笔记",
-        description: `共显示 ${result.notes.length} 条笔记`,
+        description: `共显示 ${filteredNotes.length} 条笔记`,
       })
     } catch (error) {
       toast({
@@ -750,7 +754,7 @@ export default function NotePad() {
     } finally {
       setIsSearching(false)
     }
-  }, [toast])
+  }, [toast, filterNotesByPreferences])
 
   // 标签点击搜索
   const handleTagClick = async (tag: string) => {
@@ -775,11 +779,13 @@ export default function NotePad() {
         loadTagTodos(trimmedTag)
       ])
       
-      setNotes(searchResult.notes)
+      // 根据用户偏好设置过滤搜索结果
+      const filteredNotes = filterNotesByPreferences(searchResult.notes)
+      setNotes(filteredNotes)
       setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
       toast({
           title: "标签搜索",
-          description: `找到 ${searchResult.notes.length} 条包含 #${trimmedTag} 标签的笔记`,
+          description: `找到 ${filteredNotes.length} 条包含 #${trimmedTag} 标签的笔记`,
         })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "标签搜索时出现错误";
