@@ -289,7 +289,16 @@ function SortableTodoItem({
       ) : (
         // 显示模式
         <div className="flex items-start p-2 transition-colors">
-          <div className="flex flex-col items-center mr-2">
+          {/* 序号显示在勾选框左边，颜色与优先级一致 */}
+          {!todo.completed && (
+            <span className={cn(
+              "text-xs font-medium mr-1 mt-0.5 min-w-[16px] text-center",
+              getPriorityTextColor(todo.priority)
+            )}>
+              {priorityIndex}
+            </span>
+          )}
+          <div className="mr-2">
             <Checkbox
               id={todo.id || (todo as any)._id}
               checked={todo.completed}
@@ -319,7 +328,6 @@ function SortableTodoItem({
               }}
               className={cn("mt-0.5", getPriorityCheckboxClass(todo.priority))}
             />
-
           </div>
           <HoverCard>
             <HoverCardTrigger asChild>
@@ -782,18 +790,36 @@ export const TodoList = React.memo(function TodoList({
         return a.completed ? 1 : -1
       }
       
-      // 然后按优先级排序：高 > 中 > 低 > 无优先级
-      const priorityOrder = { high: 4, medium: 3, low: 2, none: 1 }
-      const aPriority = a.priority ? priorityOrder[a.priority] || 3 : 3 // 默认为中优先级
-      const bPriority = b.priority ? priorityOrder[b.priority] || 3 : 3 // 默认为中优先级
-      if (aPriority !== bPriority) {
-        return bPriority - aPriority
+      // 对于标签列表，使用特殊的排序逻辑：中优先级的新待办事项排在第一位
+      if (selectedTag !== 'all' && selectedTag !== 'focus') {
+        // 优先级排序：medium > high > low > none
+        const priorityOrder = { medium: 0, high: 1, low: 2, none: 3 }
+        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 3
+        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3
+        
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority
+        }
+        
+        // 相同优先级按创建时间倒序（新的在前）
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTime - aTime
+      } else {
+        // 对于all和focus模式，使用原有的排序逻辑
+        // 然后按优先级排序：高 > 中 > 低 > 无优先级
+        const priorityOrder = { high: 4, medium: 3, low: 2, none: 1 }
+        const aPriority = a.priority ? priorityOrder[a.priority] || 3 : 3 // 默认为中优先级
+        const bPriority = b.priority ? priorityOrder[b.priority] || 3 : 3 // 默认为中优先级
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority
+        }
+        
+        // 同优先级内按order字段排序
+        const aOrder = (a as any).order || 0
+        const bOrder = (b as any).order || 0
+        return aOrder - bOrder
       }
-      
-      // 同优先级内按order字段排序
-      const aOrder = (a as any).order || 0
-      const bOrder = (b as any).order || 0
-      return aOrder - bOrder
     })
   }, [selectedTag, selectedPriority, allTodos])
 

@@ -242,14 +242,26 @@ router.post('/', [
     const { text, priority, dueDate, category, noteId, tags } = req.body;
     const todoPriority = priority || 'medium';
 
-    // 获取同优先级的最大order值
-    const maxOrderTodo = await Todo.findOne({
+    // 获取同优先级的最小order值，新待办事项排在第一位
+    const minOrderTodo = await Todo.findOne({
       userId: req.user._id,
       priority: todoPriority,
       completed: false
-    }).sort({ order: -1 });
+    }).sort({ order: 1 });
 
-    const nextOrder = maxOrderTodo ? (maxOrderTodo.order || 0) + 1 : 1;
+    let nextOrder = 1;
+    if (minOrderTodo && minOrderTodo.order) {
+      // 将所有同优先级未完成的待办事项order值+1
+      await Todo.updateMany(
+        {
+          userId: req.user._id,
+          priority: todoPriority,
+          completed: false
+        },
+        { $inc: { order: 1 } }
+      );
+      nextOrder = minOrderTodo.order;
+    }
 
     const todo = new Todo({
       text,
@@ -323,28 +335,46 @@ router.post('/batch', [
     const createdTodos = [];
     const failedTodos = [];
 
-    // 获取各优先级的当前最大order值
-    const orderCounters = {
-      low: 0,
-      medium: 0,
-      high: 0
-    };
+    // 获取各优先级的当前最小order值，新待办事项排在第一位
+    const minOrderByPriority = {};
+    const prioritiesToUpdate = new Set();
 
     for (const priority of ['low', 'medium', 'high', 'none']) {
-      const maxOrderTodo = await Todo.findOne({
+      const minOrderTodo = await Todo.findOne({
         userId: req.user._id,
         priority: priority,
         completed: false
-      }).sort({ order: -1 });
-      orderCounters[priority] = maxOrderTodo ? (maxOrderTodo.order || 0) : 0;
+      }).sort({ order: 1 });
+      minOrderByPriority[priority] = minOrderTodo ? (minOrderTodo.order || 1) : 1;
+    }
+
+    // 统计每个优先级需要创建的待办事项数量
+    const priorityCounts = { low: 0, medium: 0, high: 0, none: 0 };
+    todos.forEach(todo => {
+      const priority = todo.priority || 'medium';
+      priorityCounts[priority]++;
+    });
+
+    // 为每个有新待办事项的优先级更新现有待办事项的order值
+    for (const [priority, count] of Object.entries(priorityCounts)) {
+      if (count > 0) {
+        await Todo.updateMany(
+          {
+            userId: req.user._id,
+            priority: priority,
+            completed: false
+          },
+          { $inc: { order: count } }
+        );
+      }
     }
 
     // 批量创建Todo
+    const orderCounters = { ...minOrderByPriority };
     for (let i = 0; i < todos.length; i++) {
       try {
         const { text, priority, dueDate, category, noteId, tags } = todos[i];
         const todoPriority = priority || 'medium';
-        orderCounters[todoPriority]++;
 
         const todo = new Todo({
           text,
@@ -355,7 +385,7 @@ router.post('/batch', [
           noteId: noteId || null,
           tags: tags || [],
           userId: req.user._id,
-          order: orderCounters[todoPriority]
+          order: orderCounters[todoPriority]++
         });
 
         await todo.save();

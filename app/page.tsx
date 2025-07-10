@@ -30,6 +30,7 @@ import GoalsList from "@/components/goals-list"
 import CheckInList from "@/components/checkin-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import LargeCalendar from "@/components/large-calendar"
 import {
   addNote,
@@ -288,6 +289,10 @@ export default function NotePad() {
   const [tagNoteInput, setTagNoteInput] = useState('') // 标签页面的笔记输入
   const [tagProgressInput, setTagProgressInput] = useState(0) // 标签页面的进度输入
   const [isTagNoteAdding, setIsTagNoteAdding] = useState(false) // 标签页面添加笔记状态
+  const [activeTab, setActiveTab] = useState('notes') // 标签页面的tab切换状态：'notes' 或 'todos'
+  const [tagTodos, setTagTodos] = useState<Todo[]>([]) // 标签相关的待办事项
+  const [tagTodoInput, setTagTodoInput] = useState('') // 标签页面的待办事项输入
+  const [isTagTodoAdding, setIsTagTodoAdding] = useState(false) // 标签页面添加待办事项状态
   
   // Memoized button disabled states to optimize performance
   const isMainButtonDisabled = useMemo(() => {
@@ -734,7 +739,12 @@ export default function NotePad() {
     setIsSearching(true)
 
     try {
-      const searchResult = await searchNotesByTag(trimmedTag, 1, 1000)
+      // 并行加载笔记和待办事项
+      const [searchResult] = await Promise.all([
+        searchNotesByTag(trimmedTag, 1, 1000),
+        loadTagTodos(trimmedTag)
+      ])
+      
       setNotes(searchResult.notes)
       setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
       toast({
@@ -2810,6 +2820,86 @@ export default function NotePad() {
   
   // extractTagsAndCleanContent函数已移到组件外部
   
+  // 加载标签相关的待办事项
+  const loadTagTodos = async (tag: string) => {
+    try {
+      const result = await apiClient.getTodos()
+      if (result.success && result.data && result.data.todos) {
+        // 过滤出包含当前标签的待办事项
+        const filteredTodos = result.data.todos.filter((todo: Todo) => 
+          todo.tags && todo.tags.includes(tag)
+        )
+        
+        // 按优先级和order字段排序
+        const sortedTodos = filteredTodos.sort((a, b) => {
+          // 优先级排序：high > medium > low > none
+          const priorityOrder = { high: 0, medium: 1, low: 2, none: 3 }
+          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 3
+          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3
+          
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority
+          }
+          
+          // 相同优先级按order字段排序（升序，order值小的在前）
+          const aOrder = a.order ?? 999999
+          const bOrder = b.order ?? 999999
+          return aOrder - bOrder
+        })
+        
+        setTagTodos(sortedTodos)
+      }
+    } catch (error) {
+      console.error('Error loading tag todos:', error)
+    }
+  }
+
+  // 标签页面添加待办事项函数
+  const handleTagAddTodo = async () => {
+    if (!tagTodoInput.trim()) return
+
+    setIsTagTodoAdding(true)
+    try {
+      let todoContent = tagTodoInput.trim()
+      
+      // 添加标签到待办事项内容
+      if (!todoContent.includes(`#${currentTag}`)) {
+        todoContent = `${todoContent} #${currentTag}`
+      }
+      
+      // 调用添加待办事项的API
+      const result = await todosApi.create({
+        text: todoContent,
+        tags: [currentTag],
+        priority: 'medium' // 默认设置为中优先级
+      })
+      
+      if (result.success) {
+        // 清空输入
+        setTagTodoInput('')
+        
+        // 重新加载标签相关的待办事项
+        await loadTagTodos(currentTag)
+        
+        toast({
+          title: "添加成功",
+          description: "待办事项已保存到服务器",
+        })
+      } else {
+        throw new Error(result.error || '添加待办事项失败')
+      }
+    } catch (error) {
+      console.error('Error adding tag todo:', error)
+      toast({
+        title: "添加失败",
+        description: "添加待办事项失败，请重试",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTagTodoAdding(false)
+    }
+  }
+
   // 标签页面添加笔记函数
   const handleTagAddNote = async () => {
     if (!tagNoteInput.trim() && tagProgressInput === 0) return
@@ -3645,6 +3735,25 @@ export default function NotePad() {
           })
         })
         
+        // 对每个日期组内的待办事项按优先级和order字段排序
+        Object.keys(todosByDateMap).forEach(dateKey => {
+          todosByDateMap[dateKey].sort((a, b) => {
+            // 首先按优先级排序：high > medium > low > none
+            const priorityOrder = { high: 0, medium: 1, low: 2, none: 3 }
+            const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 3
+            const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3
+            
+            if (aPriority !== bPriority) {
+              return aPriority - bPriority
+            }
+            
+            // 相同优先级按order字段排序（升序，order值小的在前）
+            const aOrder = a.order ?? 999999
+            const bOrder = b.order ?? 999999
+            return aOrder - bOrder
+          })
+        })
+        
         setTodosByDate(todosByDateMap)
       }
     } catch (error) {
@@ -3915,84 +4024,306 @@ export default function NotePad() {
                   
                   {/* 右侧：可滚动的有日期笔记区域 */}
                   <div className="flex-1 flex flex-col">
-                    {/* 标签页面的笔记输入区域 - 在右侧笔记列表顶部 */}
-                    <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
-                      <div className="flex items-center space-x-2">
-                        <Textarea
-                          value={tagNoteInput}
-                          onChange={(e) => setTagNoteInput(e.target.value)}
-                          placeholder={`输入新笔记... (#${currentTag})`}
-                          className="flex-1 min-h-[60px] resize-none font-mono text-sm"
-                          disabled={isTagNoteAdding}
-                        />
-                        {/* 进度输入框 - 需要动态检查当前标签是否启用目标功能 */}
-                         <TagProgressInputField 
-                           currentTag={currentTag}
-                           progressInput={tagProgressInput}
-                           setProgressInput={setTagProgressInput}
-                           isAdding={isTagNoteAdding}
-                         />
-                        <Button 
-                          onClick={handleTagAddNote} 
-                          disabled={isTagNoteAdding} 
-                          size="sm" 
-                          className="h-[60px] px-4"
+                    {/* Tab切换组件 */}
+                    <div className="flex-shrink-0 bg-background border-b">
+                      <div className="flex">
+                        <button
+                          onClick={() => setActiveTab('notes')}
+                          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                            activeTab === 'notes'
+                              ? 'border-primary text-primary bg-primary/5'
+                              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
+                          }`}
                         >
-                          {isTagNoteAdding ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                              <span>保存中</span>
-                            </>
-                          ) : (
-                            <span>添加笔记</span>
-                          )}
-                        </Button>
+                          笔记
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('todos')}
+                          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                            activeTab === 'todos'
+                              ? 'border-primary text-primary bg-primary/5'
+                              : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
+                          }`}
+                        >
+                          待办事项
+                        </button>
                       </div>
                     </div>
+
+                    {/* 根据activeTab显示不同的输入区域 */}
+                    {activeTab === 'notes' ? (
+                      /* 笔记输入区域 */
+                      <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
+                        <div className="flex items-center space-x-2">
+                          <Textarea
+                            value={tagNoteInput}
+                            onChange={(e) => setTagNoteInput(e.target.value)}
+                            placeholder={`输入新笔记... (#${currentTag})`}
+                            className="flex-1 min-h-[60px] resize-none font-mono text-sm"
+                            disabled={isTagNoteAdding}
+                          />
+                          {/* 进度输入框 - 需要动态检查当前标签是否启用目标功能 */}
+                           <TagProgressInputField 
+                             currentTag={currentTag}
+                             progressInput={tagProgressInput}
+                             setProgressInput={setTagProgressInput}
+                             isAdding={isTagNoteAdding}
+                           />
+                          <Button 
+                            onClick={handleTagAddNote} 
+                            disabled={isTagNoteAdding} 
+                            size="sm" 
+                            className="h-[60px] px-4"
+                          >
+                            {isTagNoteAdding ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                <span>保存中</span>
+                              </>
+                            ) : (
+                              <span>添加笔记</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* 待办事项输入区域 */
+                      <div className="flex-shrink-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-3">
+                        <div className="flex items-center space-x-2">
+                          <Textarea
+                            value={tagTodoInput}
+                            onChange={(e) => setTagTodoInput(e.target.value)}
+                            placeholder={`输入新待办事项... (#${currentTag})`}
+                            className="flex-1 min-h-[60px] resize-none font-mono text-sm"
+                            disabled={isTagTodoAdding}
+                          />
+                          <Button 
+                            onClick={handleTagAddTodo} 
+                            disabled={isTagTodoAdding} 
+                            size="sm" 
+                            className="h-[60px] px-4"
+                          >
+                            {isTagTodoAdding ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                                <span>保存中</span>
+                              </>
+                            ) : (
+                              <span>添加待办事项</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-1 overflow-y-auto">
                       <div className="p-4">
-                        {isLoading || isSearching ? (
-                          <div className="h-full flex items-center justify-center">
-                            <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                            <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
-                          </div>
-                        ) : groupedNotes.length > 0 ? (
-                          <div className="space-y-6">
-                            {groupedNotes.map(([dateKey, groupNotes]) => (
-                              <NoteGroup
-                                key={dateKey}
-                                date={dateKey}
-                                notes={groupNotes}
-                                onDelete={handleNoteDelete}
-                                searchTerm={searchTerm}
-                                onTagClick={handleTagClick}
-                                onConvertToTodo={handleConvertToTodo}
-                                onUpdate={handleUpdateNote}
-                              />
-                            ))}
-                            {hasMoreNotes && (
-                              <div className="flex justify-center py-4">
-                                {isLoadingMore ? (
-                                  <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>正在加载更多...</span>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    onClick={loadMoreNotes}
-                                    className="flex items-center gap-2 text-sm"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                    点击加载更多
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                        {activeTab === 'notes' ? (
+                          /* 笔记列表 */
+                          isLoading || isSearching ? (
+                            <div className="h-full flex items-center justify-center">
+                              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                              <span>{isSearching ? "搜索中..." : "加载笔记中..."}</span>
+                            </div>
+                          ) : groupedNotes.length > 0 ? (
+                            <div className="space-y-6">
+                              {groupedNotes.map(([dateKey, groupNotes]) => (
+                                <NoteGroup
+                                  key={dateKey}
+                                  date={dateKey}
+                                  notes={groupNotes}
+                                  onDelete={handleNoteDelete}
+                                  searchTerm={searchTerm}
+                                  onTagClick={handleTagClick}
+                                  onConvertToTodo={handleConvertToTodo}
+                                  onUpdate={handleUpdateNote}
+                                />
+                              ))}
+                              {hasMoreNotes && (
+                                <div className="flex justify-center py-4">
+                                  {isLoadingMore ? (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span>正在加载更多...</span>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      onClick={loadMoreNotes}
+                                      className="flex items-center gap-2 text-sm"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      点击加载更多
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground">
+                              {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
+                            </div>
+                          )
                         ) : (
-                          <div className="h-full flex items-center justify-center text-muted-foreground">
-                            {searchTerm ? "没有找到匹配的笔记" : "暂无笔记，开始添加吧"}
+                          /* 待办事项列表 - 简化版本，无标签筛选和优先级区域 */
+                          <div className="h-full flex flex-col">
+                            {/* 简化的标题区域 */}
+                            <div className="p-2 bg-background border-b">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-medium text-sm">待办事项</h3>
+                                <div className="text-xs text-muted-foreground">
+                                  {tagTodos.filter(todo => !todo.completed).length}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* 待办事项列表 */}
+                            <div className="flex-1 overflow-y-auto p-2">
+                              {tagTodos.length > 0 ? (
+                                <div className="space-y-1">
+                                  {tagTodos.map((todo, index) => {
+                                    // 计算在同优先级组内的序号
+                                    const samePriorityTodos = tagTodos.filter(t => t.priority === todo.priority && !t.completed)
+                                    const priorityIndex = samePriorityTodos.findIndex(t => t._id === todo._id)
+                                    const displayIndex = priorityIndex >= 0 ? priorityIndex + 1 : index + 1
+                                    
+                                    return (
+                                    <div key={todo._id} className="p-2 bg-card hover:bg-accent/50 transition-colors border-b border-border">
+                                      <div className="flex items-start space-x-3">
+                                        <span className="text-xs text-muted-foreground mt-1 min-w-[20px] text-center">
+                                          {todo.completed ? '✓' : displayIndex}
+                                        </span>
+                                        <Checkbox
+                                          checked={todo.completed}
+                                          onCheckedChange={() => handleToggleTodo(todo._id)}
+                                          className={`mt-1 ${
+                                            todo.priority === 'high' ? 'border-red-500 border-2 data-[state=checked]:border-red-500' :
+                                            todo.priority === 'medium' ? 'border-[#EAB30A] border-2 data-[state=checked]:border-[#EAB30A]' :
+                                            todo.priority === 'low' ? 'border-gray-400 border-2 data-[state=checked]:border-gray-400' :
+                                            'border-gray-300 border-2 data-[state=checked]:border-gray-300'
+                                          }`}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <p className={`text-sm break-words ${
+                                                todo.completed ? 'line-through text-muted-foreground' : ''
+                                              }`}>
+                                                {(() => {
+                                                  // 移除文本中的#标签
+                                                  const cleanText = todo.text.replace(/#[\u4e00-\u9fa5\w]+/g, '').trim()
+                                                  return cleanText
+                                                })()}
+                                              </p>
+                                              
+                                              {/* 标签显示 */}
+                                              {todo.tags && todo.tags.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                  {todo.tags.map((tag, index) => (
+                                                    <span
+                                                      key={index}
+                                                      className="inline-block px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded cursor-pointer hover:bg-primary/20"
+                                                      onClick={() => handleTagClick(tag)}
+                                                    >
+                                                      #{tag}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              
+                                              {/* 截止时间 */}
+                                              <div className="flex items-center gap-2 mt-1">
+                                                {todo.dueDate && (
+                                                  <span className="text-xs text-muted-foreground">
+                                                    {new Date(todo.dueDate).toLocaleDateString('zh-CN')}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            {/* 操作按钮 */}
+                                            <div className="flex items-center gap-1 ml-2">
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-6 w-6 p-0"
+                                                  >
+                                                    <MoreVertical className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  <DropdownMenuItem
+                                                    onClick={() => {
+                                                      const fullTodo: Todo = {
+                                                        _id: todo._id,
+                                                        text: todo.text,
+                                                        content: todo.content || '',
+                                                        completed: todo.completed,
+                                                        userId: todo.userId || '',
+                                                        createdAt: todo.createdAt || new Date().toISOString(),
+                                                        updatedAt: todo.updatedAt || new Date().toISOString(),
+                                                        priority: todo.priority,
+                                                        dueDate: todo.dueDate,
+                                                        startDate: todo.startDate,
+                                                        tags: todo.tags,
+                                                        order: todo.order,
+                                                        subtodos: todo.subtodos || [],
+                                                        timer: todo.timer
+                                                      }
+                                                      setSelectedTodoDetail(fullTodo)
+                                                    }}
+                                                  >
+                                                    <Info className="h-4 w-4 mr-2" />
+                                                    查看详情
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem
+                                                    onClick={() => {
+                                                      // 编辑功能
+                                                      const fullTodo: Todo = {
+                                                        _id: todo._id,
+                                                        text: todo.text,
+                                                        content: todo.content || '',
+                                                        completed: todo.completed,
+                                                        userId: todo.userId || '',
+                                                        createdAt: todo.createdAt || new Date().toISOString(),
+                                                        updatedAt: todo.updatedAt || new Date().toISOString(),
+                                                        priority: todo.priority,
+                                                        dueDate: todo.dueDate,
+                                                        startDate: todo.startDate,
+                                                        tags: todo.tags,
+                                                        order: todo.order,
+                                                        subtodos: todo.subtodos || [],
+                                                        timer: todo.timer
+                                                      }
+                                                      setSelectedTodoDetail(fullTodo)
+                                                    }}
+                                                  >
+                                                    <Edit className="h-4 w-4 mr-2" />
+                                                    编辑
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem
+                                                    onClick={() => handleDeleteTodo(todo._id)}
+                                                    className="text-red-600"
+                                                  >
+                                                    <Trash2 className="h-4 w-4 mr-2" />
+                                                    删除
+                                                  </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )})}
+                                </div>
+                              ) : (
+                                <div className="h-full flex items-center justify-center text-muted-foreground">
+                                  暂无相关待办事项，开始添加吧
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
