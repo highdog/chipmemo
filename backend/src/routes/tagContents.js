@@ -437,10 +437,16 @@ router.post('/:tag/check-in', [
     const noteContent = content || `${tag}打卡，已打卡${newCheckInCount}次`;
     const noteTitle = title || `${tag}打卡`;
     
+    // 为打卡事项自动添加'打卡'标签
+    const noteTags = [tag];
+    if (!noteTags.includes('打卡')) {
+      noteTags.push('打卡');
+    }
+    
     const note = new Note({
       title: noteTitle,
       content: noteContent,
-      tags: [tag],
+      tags: noteTags,
       userId: req.user._id,
       color: 'green'
     });

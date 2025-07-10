@@ -259,10 +259,16 @@ export function GoalsTab({ user }: GoalsTabProps) {
         const noteTitle = `${selectedGoal.tag} 目标进度 +1`
         const noteContent = `完成了 ${selectedGoal.tag.replace('#', '')} 的一个目标进度，当前进度：${newCurrentCount}/${selectedGoal.targetCount}`
         
+        // 为完成的目标事项自动添加'目标'标签
+        const noteTags = [selectedGoal.tag]
+        if (!noteTags.includes('目标')) {
+          noteTags.push('目标')
+        }
+        
         const noteData = {
           title: noteTitle,
           content: noteContent,
-          tags: [selectedGoal.tag],
+          tags: noteTags,
           color: 'blue'
         }
         

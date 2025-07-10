@@ -2993,9 +2993,16 @@ export default function NotePad() {
           noteContent += ` ${timeRecord}`
         }
         
+        // 为完成的待办事项自动添加'todo'标签
+        const existingTags = targetTodo.tags || []
+        const allTags = [...existingTags]
+        if (!allTags.includes('todo')) {
+          allTags.push('todo')
+        }
+        
         // 添加标签
-        if (targetTodo.tags && targetTodo.tags.length > 0) {
-          noteContent += ' ' + targetTodo.tags.map((tag: string) => `#${tag}`).join(' ')
+        if (allTags.length > 0) {
+          noteContent += ' ' + allTags.map((tag: string) => `#${tag}`).join(' ')
         }
         
         // 调用addNote API创建新笔记

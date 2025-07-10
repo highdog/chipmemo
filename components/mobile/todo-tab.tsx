@@ -199,11 +199,17 @@ export function TodoTab({ user, theme, triggerAdd = false, onAddTriggered }: Tod
         // 创建笔记内容，包含原todo的标题和标签
         const noteContent = todo.text + (todo.tags && todo.tags.length > 0 ? ' ' + todo.tags.map((tag: string) => `#${tag}`).join(' ') : '')
         
+        // 为完成的待办事项自动添加'todo'标签
+        const noteTags = [...(todo.tags || [])]
+        if (!noteTags.includes('todo')) {
+          noteTags.push('todo')
+        }
+        
         // 调用notesApi创建新笔记
          const result = await notesApi.create({
            title: todo.text.length > 50 ? todo.text.substring(0, 50) + '...' : todo.text,
            content: noteContent,
-           tags: todo.tags || []
+           tags: noteTags
          })
         
         if (result.success) {

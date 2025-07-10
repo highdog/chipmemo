@@ -506,10 +506,16 @@ export function TagContent({ tag, onSave }: TagContentProps) {
         const noteTitle = `${tag} 目标进度 +1`
         const noteContent = `完成了 ${tag.replace('#', '')} 的一个目标进度，当前进度：${newCurrentCount}/${targetCount}`
         
+        // 为完成的目标事项自动添加'目标'标签
+        const noteTags = [tag]
+        if (!noteTags.includes('目标')) {
+          noteTags.push('目标')
+        }
+        
         const noteData = {
           title: noteTitle,
           content: noteContent,
-          tags: [tag],
+          tags: noteTags,
           color: 'blue'
         }
         
