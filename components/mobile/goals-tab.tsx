@@ -76,7 +76,16 @@ export function GoalsTab({ user }: GoalsTabProps) {
         (response.data && typeof response.data === 'object' ? Object.values(response.data).flat() : [])
       
       const goals = goalsData
-        .filter((item: any) => item.isGoalEnabled)
+        .filter((item: any) => {
+          // 过滤启用目标功能的标签
+          if (!item.isGoalEnabled) return false
+          
+          // 过滤已完成100%的目标
+          const progress = item.targetCount && item.targetCount > 0 
+            ? (item.currentCount || 0) / item.targetCount * 100 
+            : 0
+          return progress < 100
+        })
         .map((item: any) => ({
           _id: item._id || item.id || Math.random().toString(),
           id: item.id,

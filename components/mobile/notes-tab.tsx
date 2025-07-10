@@ -190,8 +190,11 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
 
   // 过滤和计算数据
   const filteredNotes = useMemo(() => {
-    // 首先应用用户偏好设置过滤
-    const preferenceFilteredNotes = filterNotesByPreferences(notes)
+    // 检查是否是标签搜索
+    const isTagSearch = searchTerm.startsWith('#')
+    
+    // 只在非标签搜索时应用用户偏好设置过滤
+    const preferenceFilteredNotes = isTagSearch ? notes : filterNotesByPreferences(notes)
     
     // 然后应用搜索过滤
     if (!searchTerm) return preferenceFilteredNotes
@@ -413,8 +416,8 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
           attachments: actionNote.attachments
         }))
         
-        // 根据用户偏好设置过滤搜索结果
-        const filteredNotes = filterNotesByPreferences(convertedNotes)
+        // 标签搜索时不应用用户偏好设置过滤
+        const filteredNotes = convertedNotes
         setNotes(filteredNotes)
         setHasMore(false) // 搜索结果不支持分页
         toast({

@@ -697,6 +697,7 @@ export default function NotePad() {
 
     try {
       let searchResult: { notes: Note[]; pagination: any }
+      let isTagSearch = false
       
       // 检查是否是标签搜索（以#开头）
       if (term.startsWith('#')) {
@@ -706,13 +707,14 @@ export default function NotePad() {
         }
         setCurrentTag(tag) // 设置当前标签
         searchResult = await searchNotesByTag(tag, 1, 1000) // 增加搜索限制到1000条
+        isTagSearch = true
       } else {
         setCurrentTag("") // 清除当前标签
         searchResult = await searchNotes(term, 1, 1000) // 增加搜索限制到1000条
       }
       
-      // 根据用户偏好设置过滤搜索结果
-      const filteredNotes = filterNotesByPreferences(searchResult.notes)
+      // 只在非标签搜索时应用用户偏好设置过滤
+      const filteredNotes = isTagSearch ? searchResult.notes : filterNotesByPreferences(searchResult.notes)
       setNotes(filteredNotes)
       setHasMoreNotes(searchResult.pagination ? searchResult.pagination.current < searchResult.pagination.pages : false)
     } catch (error) {
@@ -779,8 +781,8 @@ export default function NotePad() {
         loadTagTodos(trimmedTag)
       ])
       
-      // 根据用户偏好设置过滤搜索结果
-      const filteredNotes = filterNotesByPreferences(searchResult.notes)
+      // 标签搜索时不应用用户偏好设置过滤
+      const filteredNotes = searchResult.notes
       setNotes(filteredNotes)
       setHasMoreNotes(searchResult.pagination && searchResult.pagination.current < searchResult.pagination.pages)
       toast({

@@ -32,7 +32,14 @@ const GoalsList: React.FC<GoalsListProps> = ({ onTagSelect }) => {
         const goalData = response.data
         
         const filteredGoals = goalData.filter((tagContent: TagContent) => {
-          return tagContent.isGoalEnabled === true
+          // 过滤启用目标功能的标签
+          if (!tagContent.isGoalEnabled) return false
+          
+          // 过滤已完成100%的目标
+          const progress = tagContent.targetCount && tagContent.targetCount > 0 
+            ? (tagContent.currentCount || 0) / tagContent.targetCount * 100 
+            : 0
+          return progress < 100
         })
         
         setGoals(filteredGoals)
