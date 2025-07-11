@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X, ZoomIn, Clock } from "lucide-react"
+import { Trash2, CheckSquare, Tag, ListTodo, Pencil, Save, X, ZoomIn, Clock, Calendar, Plus, Minus } from "lucide-react"
 import { deleteNote, type Note } from "@/lib/actions"
 import { formatTime } from "@/lib/date-utils"
 import { highlightTags } from "@/lib/tag-utils"
@@ -23,7 +23,7 @@ interface NoteItemProps {
   searchTerm?: string
   onTagClick?: (tag: string) => void
   onConvertToTodo?: () => void
-  onUpdate?: (noteId: string, content: string, tags: string[]) => Promise<void>
+  onUpdate?: (noteId: string, content: string, tags: string[], customDate?: string) => Promise<void>
 }
 
 export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTodo, onUpdate }: NoteItemProps) {
@@ -32,6 +32,10 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editContent, setEditContent] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editTime, setEditTime] = useState('')
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState('')
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
@@ -77,6 +81,17 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   // 开始编辑笔记
   const handleEdit = () => {
     setEditContent(note.originalContent || note.content)
+    
+    // 设置日期时间
+    const noteDate = note.customDate || note.createdAt
+    const date = new Date(noteDate)
+    setEditDate(date.toISOString().split('T')[0]) // YYYY-MM-DD格式
+    setEditTime(date.toTimeString().slice(0, 5)) // HH:MM格式
+    
+    // 设置标签
+    setEditTags([...note.tags])
+    setNewTag('')
+    
     setIsEditing(true)
   }
 
@@ -86,14 +101,31 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
     
     setIsSaving(true)
     try {
-      // 从内容中提取标签
+      // 合并内容中的标签和手动添加的标签
       const extractedTags = extractTags(editContent)
-      await onUpdate(note.id, editContent, extractedTags)
-      setIsEditing(false)
-      toast({
-        title: "保存成功",
-        description: "笔记已更新",
+      const allTags = [...new Set([...extractedTags, ...editTags])]
+      
+      // 构建自定义日期
+      const customDate = new Date(`${editDate}T${editTime}:00`)
+      
+      // 调用API更新笔记
+      const result = await apiClient.updateNote(note._id, {
+        content: editContent,
+        tags: allTags,
+        customDate: customDate.toISOString()
       })
+      
+      if (result.success) {
+        // 如果有onUpdate回调，也调用它来刷新列表
+        await onUpdate(note.id, editContent, allTags, customDate.toISOString())
+        setIsEditing(false)
+        toast({
+          title: "保存成功",
+          description: "笔记已更新",
+        })
+      } else {
+        throw new Error(result.error || '更新失败')
+      }
     } catch (error) {
       toast({
         title: "保存失败",
@@ -109,6 +141,31 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
   const handleCancel = () => {
     setIsEditing(false)
     setEditContent('')
+    setEditDate('')
+    setEditTime('')
+    setEditTags([])
+    setNewTag('')
+  }
+
+  // 添加标签
+  const handleAddTag = () => {
+    if (newTag.trim() && !editTags.includes(newTag.trim())) {
+      setEditTags([...editTags, newTag.trim()])
+      setNewTag('')
+    }
+  }
+
+  // 删除标签
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditTags(editTags.filter(tag => tag !== tagToRemove))
+  }
+
+  // 处理标签输入的回车键
+  const handleTagKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddTag()
+    }
   }
 
 
@@ -352,7 +409,7 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
       <div className="flex justify-between items-start mb-2">
         {/* 左上角：时间和Todo徽章 */}
         <div className="flex items-center gap-2">
-          <div className="text-sm font-medium text-muted-foreground">{formatTime(note.createdAt)}</div>
+          <div className="text-sm font-medium text-muted-foreground">{formatTime(note.customDate || note.createdAt)}</div>
           {todoCount > 0 && (
             <Badge variant="secondary" className="text-xs">
               <CheckSquare className="h-3 w-3 mr-1" />
@@ -458,13 +515,77 @@ export function NoteItem({ note, onDelete, searchTerm, onTagClick, onConvertToTo
 
       {/* 笔记内容 */}
       {isEditing ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* 内容编辑 */}
           <Textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             className="min-h-[100px] resize-none"
             placeholder="编辑笔记内容... (使用 #标签名 格式添加标签)"
           />
+          
+          {/* 日期时间编辑 */}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Input
+              type="date"
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              className="w-auto"
+            />
+            <Input
+              type="time"
+              value={editTime}
+              onChange={(e) => setEditTime(e.target.value)}
+              className="w-auto"
+            />
+          </div>
+          
+          {/* 标签管理 */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">标签管理</span>
+            </div>
+            
+            {/* 现有标签 */}
+            {editTags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {editTags.map((tag, index) => (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    {tag}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveTag(tag)}
+                      className="h-auto w-auto p-0 ml-1 hover:bg-transparent"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            
+            {/* 添加新标签 */}
+            <div className="flex items-center gap-2">
+              <Input
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyPress={handleTagKeyPress}
+                placeholder="输入新标签"
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddTag}
+                disabled={!newTag.trim() || editTags.includes(newTag.trim())}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       ) : (
         <div>

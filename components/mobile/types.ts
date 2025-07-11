@@ -95,6 +95,7 @@ export interface Note {
   userId: string;
   createdAt: string;
   updatedAt: string;
+  customDate?: string;
   tags?: string[];
   imageUrl?: string;
   images?: string[];

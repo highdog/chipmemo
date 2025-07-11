@@ -168,7 +168,9 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
     const groups: { [key: string]: Note[] } = {}
     
     notes.forEach(note => {
-      const dateKey = getDateKey(new Date(note.createdAt))
+      // 优先使用customDate，如果没有则使用createdAt
+      const noteDate = note.customDate || note.createdAt
+      const dateKey = getDateKey(new Date(noteDate))
       if (!groups[dateKey]) {
         groups[dateKey] = []
       }
@@ -177,8 +179,12 @@ export function NotesTab({ user, theme, triggerAdd = false, onAddTriggered }: No
     
     // 转换为数组并按日期排序（最新的在前）
     const groupedNotes = Object.entries(groups).map(([dateKey, groupNotes]) => {
-      // 每组内的笔记按创建时间排序（最新的在前）
-      groupNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // 每组内的笔记按时间排序（最新的在前）
+      groupNotes.sort((a, b) => {
+        const aDate = a.customDate || a.createdAt
+        const bDate = b.customDate || b.createdAt
+        return new Date(bDate).getTime() - new Date(aDate).getTime()
+      })
       return [dateKey, groupNotes] as [string, Note[]]
     })
     

@@ -376,6 +376,7 @@ class ApiClient {
       color: string;
       isPinned: boolean;
       isArchived: boolean;
+      customDate: string;
     }>
   ): Promise<ApiResponse<Note>> {
     return this.put<Note>(`/notes/${id}`, noteData);

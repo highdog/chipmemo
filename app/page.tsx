@@ -395,7 +395,9 @@ export default function NotePad() {
     const groups: { [key: string]: Note[] } = {}
 
     notes.forEach((note) => {
-      const dateKey = getDateKey(note.createdAt)
+      // 优先使用customDate，如果没有则使用createdAt
+      const noteDate = note.customDate || note.createdAt
+      const dateKey = getDateKey(noteDate)
       if (!groups[dateKey]) {
         groups[dateKey] = []
       }
@@ -409,7 +411,11 @@ export default function NotePad() {
 
     // 每组内的笔记按时间排序，最新的在前面
     sortedGroups.forEach(([, groupNotes]) => {
-      groupNotes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      groupNotes.sort((a, b) => {
+        const aDate = a.customDate || a.createdAt
+        const bDate = b.customDate || b.createdAt
+        return new Date(bDate).getTime() - new Date(aDate).getTime()
+      })
     })
 
     return sortedGroups
@@ -3581,12 +3587,18 @@ export default function NotePad() {
   }
 
   // 处理笔记更新
-  const handleUpdateNote = async (noteId: string, content: string, tags: string[]) => {
+  const handleUpdateNote = async (noteId: string, content: string, tags: string[], customDate?: string) => {
     try {
-      const result = await apiClient.updateNote(noteId, {
+      const updateData: any = {
         content,
         tags
-      })
+      }
+      
+      if (customDate) {
+        updateData.customDate = customDate
+      }
+      
+      const result = await apiClient.updateNote(noteId, updateData)
       
       if (result.success) {
         // 刷新笔记列表

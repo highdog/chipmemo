@@ -6,11 +6,13 @@ import { extractTags, removeTagsFromContent } from './utils';
 // 兼容原有的接口定义
 export interface Note {
   id: string;
+  _id: string;
   title: string;
   content: string;
   originalContent: string;
   date: string;
   createdAt: string;
+  customDate?: Date | string;
   todos?: TodoItem[];
   tags: string[];
   imageUrl?: string;
@@ -51,11 +53,13 @@ function convertApiNoteToNote(apiNote: ApiNote): Note {
   
   return {
     id: apiNote._id,
+    _id: apiNote._id,
     title: apiNote.title || '',
     content: contentWithoutImage,
     originalContent: apiNote.content, // 后端已经存储完整内容
     date: new Date(apiNote.createdAt).toISOString().split('T')[0],
     createdAt: apiNote.createdAt,
+    customDate: apiNote.customDate,
     todos,
     tags: apiNote.tags,
     imageUrl: imageUrl,
